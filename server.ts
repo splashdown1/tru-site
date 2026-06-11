@@ -178,10 +178,17 @@ function mergeSnapshot(payload: Record<string, unknown>) {
       current = {};
     }
   }
-  const merged = { ...current, ...payload, _lastWrite: new Date().toISOString() };
-  writeFileSync(STATE_SNAPSHOT, JSON.stringify(merged, null, 2));
-  appendFileSync(STATE_LOG, JSON.stringify({ ts: merged._lastWrite, ...payload }) + "\n");
-  return merged;
+  // Append to history[] (capped at 200) instead of replacing
+  if (Array.isArray(payload.history) && payload.history.length > 0) {
+    const existing = Array.isArray(current.history) ? current.history : [];
+    const merged_hist = [...existing, ...payload.history].slice(-200);
+    current = { ...current, ...payload, history: merged_hist, _lastWrite: new Date().toISOString() };
+  } else {
+    current = { ...current, ...payload, _lastWrite: new Date().toISOString() };
+  }
+  writeFileSync(STATE_SNAPSHOT, JSON.stringify(current, null, 2));
+  appendFileSync(STATE_LOG, JSON.stringify({ ts: current._lastWrite, ...payload }) + "\n");
+  return current;
 }
 
 app.get("/api/hello-zo", (c) => c.json({ msg: "Hello from Zo" }));

@@ -9,6 +9,8 @@ export default function TruPublic() {
   const [q, setQ] = useState("");
   const [out, setOut] = useState<{ kind: string; text: string; score?: number; source?: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [baking, setBaking] = useState(false);
+  const [bakeStatus, setBakeStatus] = useState<string>("");
   const [now, setNow] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -42,10 +44,6 @@ export default function TruPublic() {
         body: JSON.stringify({ q: query }),
       });
       const j = await r.json();
-      // /api/tru/ask returns one of three shapes:
-      //   scripture: { ok, kind:"scripture", ref, text }
-      //   brain:     { ok, kind:"brain",     k, v, t, source }
-      //   unknown:   { ok, kind:"unknown",   q }
       if (j.ok && j.kind === "scripture") {
         setOut({
           kind: "SCRIPTURE",
@@ -72,6 +70,36 @@ export default function TruPublic() {
       setBusy(false);
       setQ("");
       inputRef.current?.focus();
+    }
+  }
+
+  async function bake() {
+    if (baking) return;
+    setBaking(true);
+    setBakeStatus("Baking…");
+    try {
+      const r = await fetch("/api/tru/ghost?download=1", { method: "POST" });
+      if (!r.ok) {
+        setBakeStatus(`Bake failed (${r.status})`);
+        return;
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get("content-disposition") || "";
+      const m = cd.match(/filename="([^"]+)"/);
+      const name = m?.[1] || `TRU_GHOST_${Date.now()}.html`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setBakeStatus(`Downloaded ${name} · ${(blob.size / 1024 / 1024).toFixed(2)} MB · runs offline`);
+    } catch (err) {
+      setBakeStatus("Bake failed: network error");
+    } finally {
+      setBaking(false);
     }
   }
 
@@ -129,33 +157,48 @@ export default function TruPublic() {
           </div>
         )}
 
-        <div className="mt-24 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-700">
-            Airgapped · Sovereign · No telemetry
-          </div>
-
+        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <button
+            onClick={bake}
+            disabled={baking}
+            className="text-xs uppercase tracking-[0.25em] border border-neutral-800 hover:border-white hover:bg-white hover:text-black disabled:border-neutral-900 disabled:text-neutral-700 transition-colors px-5 py-3"
+          >
+            {baking ? "BAKING…" : "BAKE & DOWNLOAD GHOST"}
+          </button>
           {paymentReady ? (
             <a
               href={STRIPE_PAYMENT_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] border border-neutral-800 hover:border-white hover:bg-white hover:text-black transition-colors px-5 py-2.5"
+              className="inline-flex items-center justify-center gap-2 text-xs uppercase tracking-[0.25em] border border-neutral-800 hover:border-white hover:bg-white hover:text-black transition-colors px-5 py-3"
             >
               Pay $1 →
             </a>
           ) : (
-            <div className="flex flex-col items-start sm:items-end gap-1">
-              <button
-                disabled
-                className="text-xs uppercase tracking-[0.2em] border border-neutral-900 text-neutral-700 px-5 py-2.5 cursor-not-allowed"
-              >
-                Pay $1 (unconfigured)
-              </button>
-              <span className="text-[9px] uppercase tracking-[0.25em] text-neutral-800">
-                stripe link pending
-              </span>
-            </div>
+            <button
+              disabled
+              className="text-xs uppercase tracking-[0.25em] border border-neutral-900 text-neutral-700 px-5 py-3 cursor-not-allowed"
+            >
+              Pay $1 (unconfigured)
+            </button>
           )}
+        </div>
+        {bakeStatus && (
+          <div className="mt-3 text-[10px] uppercase tracking-[0.3em] text-neutral-600">
+            {bakeStatus}
+          </div>
+        )}
+
+        <div className="mt-24 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-700">
+            Airgapped · Sovereign · No telemetry
+          </div>
+          <a
+            href="/console"
+            className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
+          >
+            console →
+          </a>
         </div>
       </div>
     </div>
