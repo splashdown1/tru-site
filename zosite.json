@@ -8,8 +8,7 @@
     "entrypoint": "bun run prod",
     "published_port": 57980,
     "env": {
-      "NODE_ENV": "production",
-      "ZO_CLIENT_IDENTITY_TOKEN": "none"
+      "NODE_ENV": "production"
     }
   }
 }
