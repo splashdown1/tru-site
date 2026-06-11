@@ -24,6 +24,57 @@ const STATE_LOG = join(STATE_DIR, "TRU_state.log.ndjson");
 const STATE_SNAPSHOT = join(STATE_DIR, "TRU_latest.json");
 const BRAIN_DB = join(STATE_DIR, "tru_brain.db");
 
+// Brain DB self-bootstrap: if the SQLite file is missing but the
+// JSON source is available, build the DB once on first request.
+// This keeps the repo free of binary blobs and lets the brain
+// evolve from the JSON without a separate ETL step.
+function ensureBrainDb(): void {
+  if (existsSync(BRAIN_DB)) return;
+  if (!existsSync(GHOST_BRAIN)) return;
+  try {
+    const raw = JSON.parse(readFileSync(GHOST_BRAIN, "utf-8")) as Array<Record<string, unknown>>;
+    if (!Array.isArray(raw) || raw.length === 0) return;
+    const db = new Database(BRAIN_DB);
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS nodes (
+        k TEXT PRIMARY KEY,
+        v TEXT NOT NULL,
+        w REAL DEFAULT 0.5,
+        t TEXT,
+        source TEXT,
+        ref TEXT,
+        greek_tr TEXT,
+        greek_note TEXT,
+        meta_json TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_nodes_w ON nodes(w DESC);
+      CREATE INDEX IF NOT EXISTS idx_nodes_v ON nodes(v);
+    `);
+    const ins = db.prepare(
+      "INSERT OR REPLACE INTO nodes (k, v, w, t, source, ref, greek_tr, greek_note, meta_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    );
+    const tx = db.transaction((rows: Array<Record<string, unknown>>) => {
+      for (const n of rows) {
+        ins.run(
+          String(n.k ?? ""),
+          String(n.v ?? ""),
+          Number(n.w ?? 0.5),
+          n.t ? String(n.t) : null,
+          n.source ? String(n.source) : null,
+          n.ref ? String(n.ref) : null,
+          n.greek_tr ? String(n.greek_tr) : null,
+          n.greek_note ? String(n.greek_note) : null,
+          n.meta_json ? String(n.meta_json) : null,
+        );
+      }
+    });
+    tx(raw);
+    db.close();
+  } catch (e) {
+    console.error("[brain] bootstrap failed:", e);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // GHOST EXPORT — bake brain + active session memory into a
 // self-contained HTML written to TRU/ghost/. The resulting file
@@ -200,6 +251,7 @@ app.post("/api/tru/ask", async (c) => {
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+  ensureBrainDb();
   // Scripture shortcut
   const v = parseVerse(q);
   if (v) {
@@ -217,12 +269,16 @@ app.post("/api/tru/ask", async (c) => {
   if (existsSync(BRAIN_DB)) {
     try {
       const db = new Database(BRAIN_DB, { readonly: true });
-      const row = db.prepare("SELECT k, v, t, source FROM nodes WHERE k = ? LIMIT 1").get(q.toLowerCase()) as { k: string; v: string; t: string; source: string } | undefined;
+      const qLower = q.toLowerCase();
+      const row = db.prepare("SELECT k, v, t, source FROM nodes WHERE k = ? LIMIT 1").get(qLower) as { k: string; v: string; t: string; source: string } | undefined;
       if (row) { db.close(); return c.json({ ok: true, kind: "brain", k: row.k, v: row.v, t: row.t, source: row.source }); }
-      // contains match
-      const r2 = db.prepare("SELECT k, v, t, source FROM nodes WHERE k LIKE ? ORDER BY w DESC LIMIT 1").get(`%${q.toLowerCase()}%`) as { k: string; v: string; t: string; source: string } | undefined;
+      // contains match on key
+      const r2 = db.prepare("SELECT k, v, t, source FROM nodes WHERE k LIKE ? ORDER BY w DESC LIMIT 1").get(`%${qLower}%`) as { k: string; v: string; t: string; source: string } | undefined;
+      if (r2) { db.close(); return c.json({ ok: true, kind: "brain", k: r2.k, v: r2.v, t: r2.t, source: r2.source }); }
+      // contains match on value text — catches natural-language queries
+      const r3 = db.prepare("SELECT k, v, t, source FROM nodes WHERE LOWER(v) LIKE ? ORDER BY w DESC LIMIT 1").get(`%${qLower}%`) as { k: string; v: string; t: string; source: string } | undefined;
       db.close();
-      if (r2) return c.json({ ok: true, kind: "brain", k: r2.k, v: r2.v, t: r2.t, source: r2.source });
+      if (r3) return c.json({ ok: true, kind: "brain", k: r3.k, v: r3.v, t: r3.t, source: r3.source });
     } catch {}
   }
   return c.json({ ok: false, kind: "unknown", q, error: "no match" }, 404);
@@ -320,6 +376,18 @@ app.post("/api/tru/ghost", async (c) => {
     try { symlinkSync(outPath, latestLink); } catch {}
 
     const stat = existsSync(outPath) ? readFileSync(outPath).length : 0;
+    if (c.req.query("download") === "1") {
+      const file = readFileSync(outPath, "utf-8");
+      return new Response(file, {
+        status: 200,
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "content-disposition": `attachment; filename="TRU_HOLO_GHOST_${ts}.html"`,
+          "content-length": String(file.length),
+          "cache-control": "no-store",
+        },
+      });
+    }
     return c.json({
       ok: true,
       path: outPath,
