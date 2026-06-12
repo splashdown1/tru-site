@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRU · Ghost</title>
+<style>
+  :root {
+    --bg: #03030a;
+    --panel: #0a0a14;
+    --panel-2: #11111e;
+    --line: #1a1a28;
+    --line-2: #2a2a3e;
+    --fg: #e8e0d0;
+    --muted: #6a6a82;
+    --dim: #4a4a5e;
+    --truth: #d8a657;
+    --green: #4ade80;
+    --red: #f87171;
+    --blue: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.brand {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header.brand h1 {
+    margin: 0;
+    color: var(--truth);
+    font-size: 20px;
+    letter-spacing: 0.2em;
+    font-weight: 500;
+  }
+  header.brand .meta {
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+  }
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border: 1px solid var(--line-2);
+    border-radius: 3px;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    margin-left: 6px;
+  }
+  .pill.green { color: var(--green); border-color: rgba(74,222,128,0.4); }
+  .pill.red   { color: var(--red);   border-color: rgba(248,113,113,0.4); }
+
+  section.panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  section.panel h2 {
+    margin: 0 0 10px 0;
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--dim);
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  #askRow { display: flex; gap: 10px; align-items: center; }
+  #q {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--line-2);
+    color: var(--fg);
+    padding: 10px 14px;
+    font: inherit;
+    border-radius: 4px;
+    outline: none;
+  }
+  #q:focus { border-color: var(--truth); }
+  button.ask {
+    background: transparent;
+    color: var(--truth);
+    border: 1px solid var(--truth);
+    padding: 10px 18px;
+    font: inherit;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+  button.ask:hover { background: var(--truth); color: var(--bg); }
+
+  .verdict {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--truth);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .verdict.scripture { color: var(--blue); }
+  .verdict.unknown   { color: var(--red); }
+  .answer {
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--fg);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .answer .src {
+    display: block;
+    margin-top: 10px;
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+  }
+  .out { border-left: 3px solid var(--truth); padding: 4px 0 4px 16px; margin-top: 8px; }
+  .out.scripture { border-left-color: var(--blue); }
+  .out.unknown   { border-left-color: var(--red); }
+  .out.unknown .answer { color: var(--muted); font-style: italic; }
+
+  .notes, .gallery, .files {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .notes p {
+    margin: 0;
+    white-space: pre-wrap;
+    color: var(--fg);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .notes .empty, .gallery .empty, .files .empty {
+    color: var(--dim);
+    font-size: 12px;
+    font-style: italic;
+  }
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+  .gallery-grid figure {
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--panel-2);
+  }
+  .gallery-grid img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+  }
+  .gallery-grid figcaption {
+    font-size: 10px;
+    color: var(--dim);
+    padding: 6px 8px;
+    word-break: break-all;
+  }
+  .files ul { list-style: none; padding: 0; margin: 0; }
+  .files li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .files li .nm { color: var(--fg); word-break: break-all; margin-right: 10px; }
+  .files li .sz { color: var(--dim); font-size: 10px; white-space: nowrap; }
+  .files a {
+    color: var(--truth);
+    text-decoration: none;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border: 1px solid var(--truth);
+    padding: 4px 8px;
+    border-radius: 3px;
+  }
+  .files a:hover { background: var(--truth); color: var(--bg); }
+
+  footer.airgap {
+    text-align: center;
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    margin-top: 32px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 10px;
+  }
+  .stat {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px;
+  }
+  .stat .lbl { font-size: 9px; color: var(--dim); letter-spacing: 0.2em; text-transform: uppercase; }
+  .stat .val { font-size: 18px; color: var(--truth); margin-top: 4px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div>
+      <h1>TRU<span class="pill green" id="statusPill">AIRGAPPED</span></h1>
+      <div class="meta" id="meta">baked · sovereign</div>
+    </div>
+    <div class="meta" id="ts">—</div>
+  </header>
+
+  <section class="panel">
+    <h2>Ask</h2>
+    <div id="askRow">
+      <input id="q" type="text" placeholder="Ask TRU…" autocomplete="off" spellcheck="false">
+      <button class="ask" id="askBtn">Send</button>
+    </div>
+    <div id="out" style="margin-top:16px"></div>
+  </section>
+
+  <section class="panel" id="notesPanel" style="display:none">
+    <h2>Notes</h2>
+    <div class="notes" id="notesBody"></div>
+  </section>
+
+  <section class="panel" id="uploadsPanel" style="display:none">
+    <h2>Uploads</h2>
+    <div class="gallery" id="galleryBody"></div>
+  </section>
+
+  <section class="panel" id="filesPanel" style="display:none">
+    <h2>Files</h2>
+    <div class="files" id="filesBody"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Engine Stats</h2>
+    <div class="stats">
+      <div class="stat"><div class="lbl">Brain</div><div class="val" id="statBrain">—</div></div>
+      <div class="stat"><div class="lbl">KJV</div><div class="val" id="statKjv">—</div></div>
+      <div class="stat"><div class="lbl">Images</div><div class="val" id="statImg">—</div></div>
+      <div class="stat"><div class="lbl">Files</div><div class="val" id="statFiles">—</div></div>
+    </div>
+  </section>
+
+  <footer class="airgap">
+    NO TELEMETRY · NO NETWORK · NO CLOUD · FILE:// READY
+  </footer>
+</div>
+
+<script>
+/* __TRU_GHOST_RUNTIME__ */
+</script>
+</body>
+</html>

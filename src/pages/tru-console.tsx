@@ -59,7 +59,7 @@ export default function TruConsole() {
     }
   }, [push]);
 
-  // Ghost export
+  // Ghost export (save to disk)
   const fireGhost = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -80,6 +80,42 @@ export default function TruConsole() {
     }
   }, [busy, push, refreshStats]);
 
+  // Ghost export (browser download, includes any persisted session)
+  const fireGhostDownload = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    push("GHOST · firing POST /api/tru/ghost?download=1 …");
+    try {
+      const body = JSON.stringify({ _ts: Date.now() });
+      const r = await fetch("/api/tru/ghost?download=1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({} as any));
+        throw new Error(j.error || "download failed");
+      }
+      const blob = await r.blob();
+      const cd = r.headers.get("Content-Disposition") || "";
+      const m = cd.match(/filename="?([^"]+)"?/);
+      const filename = m ? m[1] : `TRU_GHOST_${Date.now()}.html`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      push(`GHOST · DOWNLOADED · ${filename} · ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+    } catch (e: any) {
+      push(`GHOST · FAILED · ${e?.message || "network error"}`);
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, push]);
+
   useEffect(() => {
     const fmt = () => {
       const d = new Date();
@@ -89,7 +125,6 @@ export default function TruConsole() {
       );
     };
     fmt();
-    setMounted(fmt().toString());
     const t = setInterval(fmt, 1000);
     refreshStats();
     checkTripwire();
@@ -173,17 +208,30 @@ export default function TruConsole() {
                 Bake brain + KJV + session memory → <span className="text-emerald-300">TRU/ghost/</span>
               </div>
             </div>
-            <button
-              onClick={fireGhost}
-              disabled={busy}
-              className={`relative px-6 py-3 text-xs uppercase tracking-[0.3em] border-2 transition-all ${
-                busy
-                  ? "border-neutral-800 text-neutral-600 cursor-wait"
-                  : "border-emerald-500 text-emerald-300 hover:bg-emerald-500 hover:text-black active:scale-95"
-              }`}
-            >
-              {busy ? "BAKING…" : "▶ TRIGGER GHOST EXPORT"}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={fireGhost}
+                disabled={busy}
+                className={`relative px-6 py-3 text-xs uppercase tracking-[0.3em] border-2 transition-all ${
+                  busy
+                    ? "border-neutral-800 text-neutral-600 cursor-wait"
+                    : "border-emerald-500 text-emerald-300 hover:bg-emerald-500 hover:text-black active:scale-95"
+                }`}
+              >
+                {busy ? "BAKING…" : "BAKE & SAVE"}
+              </button>
+              <button
+                onClick={fireGhostDownload}
+                disabled={busy}
+                className={`relative px-6 py-3 text-xs uppercase tracking-[0.3em] border-2 transition-all ${
+                  busy
+                    ? "border-neutral-800 text-neutral-600 cursor-wait"
+                    : "border-emerald-500 text-emerald-300 hover:bg-emerald-500 hover:text-black active:scale-95"
+                }`}
+              >
+                {busy ? "BAKING…" : "BAKE & DOWNLOAD"}
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-[11px]">
@@ -235,7 +283,7 @@ export default function TruConsole() {
         {/* FOOTER */}
         <div className="mt-8 pt-4 border-t border-neutral-900 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-700">
           <span>TRU · sovereign · airgapped</span>
-          <a href="/" className="hover:text-emerald-400 transition-colors">← public</a>
+          <a href="/onboard" className="hover:text-emerald-400 transition-colors">get offline copy →</a>
         </div>
       </div>
     </div>

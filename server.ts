@@ -312,13 +312,34 @@ app.post("/api/tru/export", async (c) => {
 
 app.post("/api/tru/ghost", async (c) => {
   // Localhost only — this endpoint writes a file on disk.
-  const ip = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "local";
-  if (ip && ip !== "127.0.0.1" && ip !== "::1" && ip !== "local") {
+  // Treat a missing forwarded-for header as "remote" so we never default-open
+  // the gate in a public reverse-proxy deployment.
+  const xff = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "";
+  const ip = xff.split(",")[0]!.trim();
+  const isLocal = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
+  if (!isLocal) {
     return c.json({ ok: false, error: "ghost export is local-only" }, 403);
   }
+  const wantDownload = new URL(c.req.url).searchParams.get("download") === "1";
+
+  // Optional: read uploaded state from request body.
+  let userState: Record<string, unknown> = {};
+  if (c.req.header("content-type")?.includes("application/json")) {
+    try {
+      const raw = await c.req.text();
+      if (raw) {
+        const parsed = JSON.parse(raw) as Record<string, unknown>;
+        userState = parsed && typeof parsed === "object" ? parsed : {};
+      }
+    } catch (e) {
+      return c.json({ ok: false, error: "invalid json body" }, 400);
+    }
+  }
+
   if (!existsSync(GHOST_BRAIN)) {
     return c.json({ ok: false, error: "brain file not found", path: GHOST_BRAIN }, 404);
   }
+
   try {
     const brain = JSON.parse(readFileSync(GHOST_BRAIN, "utf-8"));
     const kjv = existsSync(GHOST_KJV)
@@ -328,80 +349,90 @@ app.post("/api/tru/ghost", async (c) => {
       ? JSON.parse(readFileSync(STATE_SNAPSHOT, "utf-8"))
       : {};
 
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    if (!existsSync(GHOST_DIR)) mkdirSync(GHOST_DIR, { recursive: true });
-    const outPath = join(GHOST_DIR, `TRU_HOLO_GHOST_${ts}.html`);
+    // Merge user's uploaded state on top of the persisted session memory.
+    // userState shape: { text?: string, notes?: string, uploads?: [{name,mime,size,kind,data}] }
+    const mergedMemory: Record<string, unknown> = { ...(memory || {}) };
+    if (userState && typeof userState === "object") {
+      const uploads = Array.isArray((userState as any).uploads) ? (userState as any).uploads : [];
+      const totalBytes = uploads.reduce((acc: number, u: any) => acc + (typeof u?.size === "number" ? u.size : (u?.data?.length || 0)), 0);
+      const MAX_UPLOAD_TOTAL = 32 * 1024 * 1024; // 32 MB ceiling on baked uploads
+      if (totalBytes > MAX_UPLOAD_TOTAL) {
+        return c.json({ ok: false, error: `uploads exceed ${MAX_UPLOAD_TOTAL} bytes`, totalBytes }, 413);
+      }
+      if (typeof (userState as any).text === "string") mergedMemory.text = (userState as any).text;
+      if (typeof (userState as any).notes === "string") mergedMemory.notes = (userState as any).notes;
+      if (uploads.length) mergedMemory.uploads = uploads;
+      mergedMemory._ghostBuild = new Date().toISOString();
+    }
 
-    // The shell: same scripture engine logic as the site, but
-    // BRAIN + KJV + SESSION are baked in. No fetch calls, no
-    // external scripts. The file is sovereign.
-    const shell = `<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<title>TRU · Ghost</title>
-<style>
-  body { background:#03030a; color:#e8e0d0; font-family:ui-monospace,monospace; margin:0; padding:24px; }
-  #root { max-width: 780px; margin: 0 auto; }
-  h1 { color:#d8a657; font-size: 22px; letter-spacing: 0.1em; }
-  .sub { color:#4a4a5e; font-size: 11px; margin-bottom: 18px; }
-  input { width:100%; padding:10px 14px; background:#0a0a14; border:1px solid #1a1a28; color:#e8e0d0; border-radius:6px; font:inherit; }
-  .out { margin-top:18px; padding:12px 14px; border-left:3px solid #d8a657; background:rgba(216,166,87,0.04); }
-  .verdict { font-size:10px; letter-spacing:0.12em; color:#d8a657; }
-  .airgap { font-size:9px; color:#4a4a5e; letter-spacing:0.1em; margin-top:18px; text-align:center; }
-</style>
-</head>
-<body>
-<div id="root">
-  <h1>TRU · GHOST</h1>
-  <div class="sub">baked ${ts} · airgapped · file://</div>
-  <input id="q" placeholder="Ask TRU..." autofocus>
-  <div id="output"></div>
-  <div class="airgap">NO TELEMETRY · NO NETWORK · NO CLOUD</div>
-</div>
-<script>
-  const BRAIN = ${JSON.stringify(brain)};
-  const KJV = ${JSON.stringify(kjv)};
-  const SESSION = ${JSON.stringify(memory)};
-  const STOP = new Set(["the","a","an","and","or","but","in","on","at","to","for","of","with","by","from","is","was","are","be","have","has","do","does","did","will","would","not","no","so","if","it","that","this","i","you","what","when","where","why","all","some"]);
-  const BOOK = { genesis:"gen",exodus:"ex",leviticus:"lev",numbers:"num",deuteronomy:"dt",psalms:"ps",psalm:"ps",proverbs:"prov",isaiah:"isa",jeremiah:"jer",ezekiel:"ezk",daniel:"dan",revelation:"rev",matthew:"mt",mark:"mk",luke:"lk",john:"jn",acts:"ac",romans:"rom","1corinthians":"1cor","2corinthians":"2cor",galatians:"gal",ephesians:"eph",philippians:"phil",colossians:"col","1thessalonians":"1thes","2thessalonians":"2thes","1timothy":"1tim","2timothy":"2tim",hebrews:"heb",james:"jas","1peter":"1pet","2peter":"2pet" };
-  function tok(s){return (s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\\s+/).filter(w=>w.length>1&&!STOP.has(w));}
-  function lev(a,b){const m=a.length,n=b.length;if(!m)return n;if(!n)return m;const d=Array.from({length:m+1},(_,i)=>Array.from({length:n+1},(_,j)=>i?j?0:i:j));for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=a[i-1]===b[j-1]?d[i-1][j-1]:1+Math.min(d[i-1][j],d[i][j-1],d[i-1][j-1]);return d[m][n];}
-  function score(n,q,r){const nw=tok(n.k+" "+n.v);let s=0;for(const w of q)if(nw.includes(w))s+=1;if(!s)return 0;const c=s/Math.max(q.length,1);return c*(n.w||0.5);}
-  function verse(q){const m=q.match(/^([1-3]?\\s*[a-z]+)\\s+(\\d+)\\s*[:\\s]\\s*(\\d+)/i);if(!m)return null;const b=(BOOK[m[1].trim().toLowerCase().replace(/\\s+/g,"")])||m[1].trim().toLowerCase();const ref=b+" "+m[2]+":"+m[3];if(KJV[ref])return{ref,v:KJV[ref]};return null;}
-  function lookup(q){const ql=q.toLowerCase().trim();const v=verse(ql);if(v)return{a:v.ref.toUpperCase()+" — "+v.v,t:"SCRIPTURE",s:100};const qt=tok(ql);if(!qt.length)return null;const hits=[];for(const n of BRAIN){const sc=score(n,qt,ql);if(sc>0.05)hits.push({n,sc});}hits.sort((a,b)=>b.sc-a.sc);if(!hits.length)return null;const top=hits[0];return{a:top.n.v,t:top.n.t||"TRUTH",s:Math.round(Math.min(top.sc*100,100))};}
-  function render(){const q=document.getElementById("q").value;const r=lookup(q);const o=document.getElementById("output");if(!r){o.innerHTML='<div style="color:#4a4a5e">No match. Ask differently.</div>';return;}o.innerHTML='<div class="out"><div class="verdict">'+r.t+' · '+r.s+'%</div><div style="margin-top:8px;line-height:1.7">'+r.a+'</div></div>';}
-  document.getElementById("q").addEventListener("keydown",function(e){if(e.key==="Enter")render();});
-  // Restore session memory into the input on load
-  if(SESSION&&SESSION.last_q)document.getElementById("q").value=SESSION.last_q;
-</script>
-</body></html>`;
+    // Read the clean shell + runtime templates.
+    const shellPath = join(process.cwd(), "src", "tru-ghost-shell.html");
+    const runtimePath = join(process.cwd(), "src", "tru-ghost-runtime.template.js");
+    if (!existsSync(shellPath)) {
+      return c.json({ ok: false, error: "shell template not found", path: shellPath }, 500);
+    }
+    if (!existsSync(runtimePath)) {
+      return c.json({ ok: false, error: "runtime template not found", path: runtimePath }, 500);
+    }
+    let shell = readFileSync(shellPath, "utf-8");
+    let runtime = readFileSync(runtimePath, "utf-8");
 
-    writeFileSync(outPath, shell, "utf-8");
-    const { symlinkSync, unlinkSync, existsSync: existsSync2 } = require("node:fs") as typeof import("node:fs");
-    const latestLink = join(GHOST_DIR, "TRU_HOLO_GHOST_LATEST.html");
-    if (existsSync2(latestLink)) { try { unlinkSync(latestLink); } catch {} }
-    try { symlinkSync(outPath, latestLink); } catch {}
+    const meta = {
+      baked: new Date().toISOString(),
+      uploads: Array.isArray((mergedMemory as any).uploads) ? (mergedMemory as any).uploads.length : 0,
+      brain: Array.isArray(brain) ? brain.length : 0,
+      kjv: Object.keys(kjv).length,
+    };
 
-    const stat = existsSync(outPath) ? readFileSync(outPath).length : 0;
-    if (c.req.query("download") === "1") {
-      const file = readFileSync(outPath, "utf-8");
-      return new Response(file, {
+    // Inject the four data slots. Use JSON.stringify which produces
+    // valid JS literals — the runtime reads them as `const` bindings.
+    // Use split/join to replace ALL occurrences (String.replace only does
+    // the first match, and brain JSON can contain placeholder-like substrings).
+    const brainJson = JSON.stringify(brain);
+    const kjvJson = JSON.stringify(kjv);
+    const sessionJson = JSON.stringify(mergedMemory);
+    const metaJson = JSON.stringify(meta);
+    runtime = runtime
+      .split("__BRAIN__").join(brainJson)
+      .split("__KJV__").join(kjvJson)
+      .split("__SESSION__").join(sessionJson)
+      .split("__META__").join(metaJson);
+
+    const html = shell.replace("/* __TRU_GHOST_RUNTIME__ */", runtime);
+
+    if (wantDownload) {
+      // Stream the bytes straight back as a download. No file is written.
+      const filename = `TRU_GHOST_${meta.baked.replace(/[:.]/g, "-")}.html`;
+      return new Response(html, {
         status: 200,
         headers: {
-          "content-type": "text/html; charset=utf-8",
-          "content-disposition": `attachment; filename="TRU_HOLO_GHOST_${ts}.html"`,
-          "content-length": String(file.length),
-          "cache-control": "no-store",
+          "Content-Type": "text/html; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${filename}"`,
+          "Cache-Control": "no-store",
         },
       });
     }
+
+    // Default: persist to disk under TRU/ghost/ and return stats JSON.
+    const ts = meta.baked.replace(/[:.]/g, "-");
+    if (!existsSync(GHOST_DIR)) mkdirSync(GHOST_DIR, { recursive: true });
+    const outPath = join(GHOST_DIR, `TRU_HOLO_GHOST_${ts}.html`);
+    writeFileSync(outPath, html, "utf-8");
+
+    // Refresh the "latest" symlink.
+    const { symlinkSync, unlinkSync } = require("node:fs") as typeof import("node:fs");
+    const latestLink = join(GHOST_DIR, "TRU_HOLO_GHOST_LATEST.html");
+    if (existsSync(latestLink)) { try { unlinkSync(latestLink); } catch {} }
+    try { symlinkSync(outPath, latestLink); } catch {}
+
     return c.json({
       ok: true,
       path: outPath,
-      bytes: stat,
+      bytes: html.length,
       brain: Array.isArray(brain) ? brain.length : 0,
       kjv: Object.keys(kjv).length,
-      session_keys: Object.keys(memory).length,
+      session_keys: Object.keys(mergedMemory).length,
+      uploads: meta.uploads,
       ts,
     });
   } catch (e) {

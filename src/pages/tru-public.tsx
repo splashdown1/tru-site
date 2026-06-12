@@ -110,7 +110,14 @@ export default function TruPublic() {
       <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
         <div className="mb-12 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-600">
           <span>TRU</span>
-          <span className="text-neutral-700">{now}</span>
+          <div className="flex items-center gap-4">
+            {paymentReady && (
+              <a href="/onboard" className="text-neutral-600 hover:text-neutral-300 transition-colors">
+                get offline copy
+              </a>
+            )}
+            <span className="text-neutral-700">{now}</span>
+          </div>
         </div>
 
         <h1 className="text-2xl sm:text-3xl font-light leading-tight tracking-tight text-neutral-100">
