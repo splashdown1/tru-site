@@ -169,6 +169,448 @@ function parseVerse(q: string): { key: string; book: string; chapter: number; ve
   return { key: `${book} ${chapter}:${verse}`, book, chapter, verse };
 }
 
+type QueryClass = "identity" | "definition" | "dilemma" | "topic";
+
+type NodeRow = {
+  k: string;
+  v: string;
+  t?: string | null;
+  source?: string | null;
+  ref?: string | null;
+  w?: number | null;
+};
+
+const FRAME_KEYS = [
+  "answer_style",
+  "human_conversation_rule",
+  "tru_mission",
+  "tru_personal_mode",
+  "tru_honesty",
+  "tru_voice",
+  "tru_identity",
+];
+const FRAME_KEY_SET = new Set(FRAME_KEYS);
+
+const TYPE_PRIORITY: Record<string, number> = {
+  identity: 70,
+  rule: 58,
+  wisdom: 50,
+  knowledge: 46,
+  concept: 44,
+  fact: 42,
+  dilemma: 32,
+  document: 28,
+  primer: 26,
+  christ_attestation: 22,
+  theology: 21,
+  greek_theology: 20,
+  hebrew_theology: 20,
+  garden: 18,
+  survival: 18,
+  interaction: 2,
+  ghost: 12,
+  bible: 4,
+  lexicon: 4,
+};
+
+const TOPIC_TYPES = new Set(["knowledge","concept","fact","wisdom","document","primer","christ_attestation","greek_theology","hebrew_theology","garden","survival","interaction","dilemma","bible","lexicon","theology"]);
+
+const SOURCE_PRIORITY: Record<string, number> = {
+  TRU_CORE: 10,
+  TRU_BRAIN: 8,
+  CERTIFIED: 7,
+  KNOWLEDGE_BANK: 7,
+  MANIFESTO: 4,
+  TRU_TRUTH: 4,
+  STARTER: 2,
+};
+
+const STOP_WORDS = new Set([
+  "a","an","the","is","are","was","were","be","been","being","do","does","did",
+  "what","who","whom","whose","which","where","when","why","how",
+  "i","you","he","she","it","we","they","me","him","her","us","them",
+  "my","your","his","its","our","their","this","that","these","those",
+  "to","of","in","on","at","for","with","about","into","from","by","as","and","or","but","if","so",
+  "tell","me","about","explain","define","describe","say","says","said",
+  "can","could","would","should","will","shall","may","might","must",
+  "there","here","up","down","out","over","under",
+  "not","no","yes",
+]);
+
+function isQualityText(s: string | null | undefined): boolean {
+  const text = String(s == null ? "" : s).trim();
+  if (text.length < 8) return false;
+  if (text.length > 4000) return false;
+  // Reject nodes whose value is a copy-paste of source code or metadata.
+  const startsAsCode = /^\s*(function|const|let|var|import|export|class|interface|type)\s|;\s*\n\s*\}/;
+  if (startsAsCode.test(text)) return false;
+  // Heuristic: count code-shaped tokens vs real-word tokens.
+  const codeChars = (text.match(/[{};]|=>|->/g) || []).length;
+  const wordCount = (text.match(/[A-Za-z][A-Za-z0-9_-]+/g) || []).length;
+  if (codeChars >= 4 && wordCount < 30) return false;
+  // Reject TRU dilemma metadata fragments that got copy-pasted into values.
+  if (/dilemma_id\s*:|primitive\s*:\s*VP_\d+_/.test(text)) return false;
+  return true;
+}
+function norm(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[\u2019'`_]/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenize(s: string): string[] {
+  return norm(s)
+    .split(" ")
+    .filter((t) => t.length > 1 && !STOP_WORDS.has(t));
+}
+
+function firstSentence(text: string, limit = 220): string {
+  const clean = String(text ?? "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const match = clean.match(/^(.+?[.!?])(?:\s|$)/);
+  const sentence = match?.[1] ?? clean;
+  if (sentence.length <= limit) return sentence;
+  return sentence.slice(0, limit - 1).trimEnd() + "…";
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  const prev = new Array(b.length + 1);
+  const curr = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(
+        curr[j - 1] + 1,
+        prev[j] + 1,
+        prev[j - 1] + cost,
+      );
+    }
+    for (let j = 0; j <= b.length; j++) prev[j] = curr[j];
+  }
+  return prev[b.length];
+}
+
+function classifyQuery(q: string): QueryClass {
+  const n = norm(q);
+  if (/\b(who are you|what are you|what is tru|who is tru|your mission|your style|how do you answer|how do you think|tell me about yourself)\b/.test(n)) {
+    return "identity";
+  }
+  if (/^\s*(define|what is|what are|explain|describe|tell me about|how does|how do|why is|why are)\b/.test(n)) {
+    // "what is mercy" / "define logos" / "explain the golden rule" are
+    // DEFINITION queries, not generic TOPICs. We bucket them separately so
+    // the synthesis path can prefer a real concept/fact/knowledge node
+    // over a generic identity/wisdom rule for the lead answer.
+    return "definition";
+  }
+  if (/\b(should|ought|dilemma|tradeoff|trade-off|choose|risk|what if|conflict|cost)\b/.test(n)) {
+    return "dilemma";
+  }
+  return "topic";
+}
+
+function uniqueByKey(rows: NodeRow[]): NodeRow[] {
+  const seen = new Set<string>();
+  const out: NodeRow[] = [];
+  for (const row of rows) {
+    if (!row.k || seen.has(row.k)) continue;
+    seen.add(row.k);
+    out.push(row);
+  }
+  return out;
+}
+
+function typeBonus(t?: string | null, queryClass: QueryClass = "topic"): number {
+  const kind = String(t ?? "").toLowerCase();
+  let bonus = TYPE_PRIORITY[kind] ?? 0;
+  if (queryClass === "identity") {
+    if (kind === "identity") bonus += 30;
+    if (kind === "rule" || kind === "wisdom") bonus += 18;
+  } else if (queryClass === "definition") {
+    if (kind === "concept" || kind === "fact" || kind === "knowledge") bonus += 12;
+    if (kind === "greek_theology" || kind === "hebrew_theology" || kind === "theology") bonus += 14;
+  } else if (queryClass === "dilemma") {
+    if (kind === "dilemma" || kind === "rule" || kind === "wisdom") bonus += 14;
+  } else {
+    if (kind === "knowledge" || kind === "concept" || kind === "fact" || kind === "wisdom") bonus += 8;
+  }
+  return bonus;
+}
+
+function sourceBonus(source?: string | null): number {
+  return SOURCE_PRIORITY[String(source ?? "")] ?? 0;
+}
+
+function scoreCandidate(node: NodeRow, qNorm: string, qTokens: string[], queryClass: QueryClass): number {
+  if (!isQualityText(node.v)) return 0;
+  const keyNorm = norm(node.k ?? "");
+  const valueNorm = norm(node.v ?? "");
+  const refNorm = norm(node.ref ?? "");
+  let score = 0;
+
+  if (keyNorm === qNorm) score += 180;
+  else if (keyNorm && qNorm && keyNorm.startsWith(qNorm) && qNorm.length >= 2) score += 110;
+  else if (keyNorm && qNorm && keyNorm.includes(qNorm) && qNorm.length >= 2) score += 90;
+  if (valueNorm && qNorm && valueNorm.includes(qNorm) && qNorm.length >= 2) score += 70;
+  if (refNorm && qNorm && refNorm.includes(qNorm) && qNorm.length >= 2) score += 45;
+  // Frame nodes keep their own priority bonus; for non-identity queries we
+  // also gate the unconditional +60 so they do not auto-win every fan-out.
+  if (FRAME_KEY_SET.has(keyNorm)) {
+    score += queryClass === "identity" ? 60 : 12;
+  }
+
+  if (qTokens.length > 0) {
+    const hay = new Set(tokenize(`${node.k} ${node.v} ${node.ref ?? ""}`));
+    let hits = 0;
+    for (const token of qTokens) if (hay.has(token)) hits += 1;
+    if (hits > 0) {
+      const coverage = hits / Math.max(qTokens.length, hay.size || 1);
+      score += coverage * 80;
+      score += hits * 2;
+    }
+  }
+
+  score += typeBonus(node.t, queryClass);
+  score += sourceBonus(node.source);
+  return score;
+}
+
+function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) {
+  const qNorm = norm(query);
+  const qTokens = tokenize(query);
+  const scored = rows
+    .map((node) => ({ node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || (Number(b.node.w ?? 0) - Number(a.node.w ?? 0)))
+    ;
+  const levenshteinDrop = (qTokens.length > 0 && qNorm.length >= 4) ? scored.filter((it) => {
+    const k = norm(it.node.k);
+    if (k === qNorm) return true;
+    // For multi-word queries, only keep nodes whose key starts with the
+    // query or contains a clear match — kill edit-distance lookalikes.
+    if (k.startsWith(qNorm) || k.includes(qNorm)) return true;
+    if (qTokens.length === 1) {
+      // single-word query: allow exact or stemming (prefix >= 3)
+      if (k === qTokens[0] || k.startsWith(qTokens[0])) return true;
+      // reject if key is a different word that just happens to be long
+      // and contains one of the query letters.
+      return false;
+    }
+    // multi-word: require at least one whole query token to appear at a
+    // word boundary in the key (whitespace or underscore delimited).
+    // Raw substring match is too loose: e.g. "golden" matches
+    // "golden_ratio" and the user asking "what is the golden rule" gets
+    // the Golden Ratio phi node as the lead.
+    return qTokens.filter((t) => t.length >= 3).every((t) => k.split(/[\s_]+/).includes(t));
+  }) : scored;
+  if (levenshteinDrop.length > 0) {
+    scored.length = 0;
+    scored.push(...levenshteinDrop);
+  }
+
+  // For very short single-token queries ("mercy", "love", "logos"),
+  // the topic search is what actually lands the right node. Frame
+  // nodes like "answer_style" / "tru_voice" contain the literal
+  // "love" / "mercy" as part of their prose and would otherwise
+  // short-circuit the lead answer. We only enable the topic-override
+  // path for non-identity queries (the identity path is intentional).
+  const shortQuery = qTokens.length >= 1 && qTokens.length <= 3;
+
+  if (scored.length === 0) {
+    return {
+      ok: true,
+      kind: "brain",
+      k: "",
+      v: `I do not have a grounded node for "${query}". Teach me with: remember: ${query} = <your answer>`,
+      t: "GAP",
+      source: "TRU_CORE",
+      score: 0,
+      nodes: [] as string[],
+    };
+  }
+
+  const FRAME_TYPES = new Set(["identity", "rule", "wisdom"]);
+  const isFrame = (row: NodeRow): boolean => {
+    if (FRAME_KEY_SET.has(norm(row.k))) return true;
+    return FRAME_TYPES.has(String(row.t ?? "").toLowerCase());
+  };
+
+  // Pick `best` as the first scored row that is a real semantic match for
+  // the query (its key/value/ref actually contains a query token) AND is
+  // not a frame node. Frame nodes still shape the synthesis, but the
+  // lead answer must come from a topic node that actually mentions the
+  // query. For identity-class queries, fall through to the top frame.
+  const isTopic = (row: NodeRow): boolean => {
+    if (isFrame(row)) return false;
+    return TOPIC_TYPES.has(String(row.t ?? "").toLowerCase());
+  };
+  const isTokenMatch = (row: NodeRow): boolean => {
+    if (!qTokens.length) return false;
+    const keyNorm = norm(row.k);
+    const valueNorm = norm(row.v);
+    const refNorm = norm(row.ref ?? "");
+    if (keyNorm && qNorm && (keyNorm === qNorm || keyNorm.startsWith(qNorm) || keyNorm.includes(qNorm))) return true;
+    for (const t of qTokens) {
+      if (t.length < 2) continue;
+      if (keyNorm.includes(t)) return true;
+      if (valueNorm.includes(t)) return true;
+      if (refNorm.includes(t)) return true;
+    }
+    return false;
+  };
+
+  let best: NodeRow;
+  let bestScore: number;
+  if (queryClass === "identity") {
+    best = scored[0].node;
+    bestScore = scored[0].score;
+  } else if (shortQuery) {
+    // Look only at topic nodes that actually mention a query token.
+    // Skip code-shaped nodes via isQualityText which scoreCandidate
+    // already filters with (returns 0 for bad text).
+    const real = scored.find((it) => isTopic(it.node) && isTokenMatch(it.node))
+      ?? scored.find((it) => isTopic(it.node) && it.node.k !== best.k);
+    best = real ? real.node : scored[0].node;
+    bestScore = real ? real.score : scored[0].score;
+  } else {
+    const real = scored.find((it) => isTopic(it.node) && isTokenMatch(it.node))
+      ?? scored.find((it) => isTopic(it.node) && isTokenMatch(it.node) === false && String(it.node.t ?? "").toLowerCase() !== "concept")
+      ?? scored.find((it) => isTopic(it.node));
+    best = real ? real.node : scored[0].node;
+    bestScore = real ? real.score : scored[0].score;
+  }
+  const next = scored.filter((item) => item.node.k !== best.k);
+  const frame = scored.find((item) => FRAME_KEY_SET.has(norm(item.node.k)))?.node
+    ?? scored.find((item) => ["identity", "rule", "wisdom"].includes(String(item.node.t ?? "").toLowerCase()))?.node;
+
+  const pick = (predicate: (n: NodeRow) => boolean, excludeKeys: string[] = []) => {
+    const hit = next.find((item) => !excludeKeys.includes(item.node.k) && predicate(item.node));
+    return hit?.node ?? null;
+  };
+
+  const eligible = (it: { node: NodeRow }): boolean =>
+    it.node.k !== best.k && isTopic(it.node) && isTokenMatch(it.node);
+
+  const whatItWas = firstSentence(best.v, 220);
+  const whyItMattered = firstSentence(
+    next.find(eligible)?.node.v ?? "",
+    180,
+  );
+  const hiddenEngine = firstSentence(
+    next.find((it) => eligible(it) && ["rule", "wisdom"].includes(String(it.node.t ?? "").toLowerCase()))?.node.v ?? "",
+    180,
+  );
+  const failureMode = firstSentence(
+    next.find((it) => eligible(it) && String(it.node.t ?? "").toLowerCase() === "dilemma")?.node.v ?? "",
+    180,
+  );
+  const teachesNow = "";
+
+  let text = "";
+  if (queryClass === "identity") {
+    text = teachesNow || whatItWas;
+    const extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
+    if (extra.length) text += `\nRelated: ${extra.join(" | ")}`;
+  } else if (bestScore >= 80 && qTokens.length <= 3) {
+    text = whatItWas;
+  } else if (bestScore >= 18) {
+    const lines = [
+      `What it was: ${whatItWas}`,
+      whyItMattered ? `Why it mattered: ${whyItMattered}` : "",
+      hiddenEngine ? `Hidden engine: ${hiddenEngine}` : "",
+      failureMode ? `Failure mode: ${failureMode}` : "",
+      teachesNow ? `What it teaches now: ${teachesNow}` : "",
+    ].filter(Boolean);
+    text = lines.join("\n");
+  } else {
+    const closests = scored.slice(0, 3).map((item) => firstSentence(item.node.v, 120)).filter(Boolean);
+    text = `I do not have a grounded node for "${query}".`;
+    if (closests.length) text += ` Closest: ${closests.join(" · ")}`;
+    if (teachesNow) text += `\nFrame: ${teachesNow}`;
+    text += `\nTeach me with: remember: ${query} = <your answer>`;
+  }
+
+  return {
+    ok: true,
+    kind: "brain",
+    k: best.k,
+    v: text,
+    t: bestScore >= 18 ? String(best.t ?? "SYNTHESIS").toUpperCase() : "GAP",
+    source: best.source ?? "TRU_CORE",
+    score: Math.min(99, Math.round(bestScore)),
+    nodes: scored.slice(0, 5).map((item) => `${item.node.k}:${item.node.t ?? ""}`),
+  };
+}
+
+function collectCandidates(db: Database, query: string, queryClass: QueryClass): NodeRow[] {
+  const rows: NodeRow[] = [];
+  const push = (items: NodeRow[] | unknown) => {
+    if (Array.isArray(items)) rows.push(...(items as NodeRow[]));
+  };
+  const qNorm = norm(query);
+  const qRaw = query.trim().toLowerCase();
+  const qTokens = tokenize(query);
+
+  if (qNorm) {
+    try {
+      push(
+        db.prepare(
+          "SELECT k, v, t, source, ref, w FROM nodes WHERE LOWER(k) = ? OR LOWER(REPLACE(k, '_', ' ')) = ? OR LOWER(v) = ? OR LOWER(ref) = ? ORDER BY w DESC LIMIT 20",
+        ).all(qNorm, qNorm, qNorm, qNorm) as NodeRow[],
+      );
+    } catch {}
+    try {
+      push(
+        db.prepare(
+          "SELECT k, v, t, source, ref, w FROM nodes WHERE LOWER(k) LIKE ? OR LOWER(REPLACE(k, '_', ' ')) LIKE ? OR LOWER(v) LIKE ? OR LOWER(ref) LIKE ? ORDER BY w DESC LIMIT 80",
+        ).all(`%${qRaw}%`, `%${qRaw}%`, `%${qRaw}%`, `%${qRaw}%`) as NodeRow[],
+      );
+    } catch {}
+  }
+
+  if (qTokens.length > 0) {
+    const clauses = qTokens
+      .map(() => "(LOWER(k) LIKE ? OR LOWER(REPLACE(k, '_', ' ')) LIKE ? OR LOWER(v) LIKE ? OR LOWER(ref) LIKE ?)")
+      .join(" OR ");
+    const params = qTokens.flatMap((token) => [`%${token}%`, `%${token}%`, `%${token}%`, `%${token}%`]);
+    try {
+      push(
+        db.prepare(`SELECT k, v, t, source, ref, w FROM nodes WHERE ${clauses} ORDER BY w DESC LIMIT 120`).all(...params) as NodeRow[],
+      );
+    } catch {}
+  }
+
+  const typeGroups: Record<QueryClass, string[]> = {
+    identity: ["identity", "rule", "wisdom", "knowledge", "concept", "fact"],
+    definition: ["concept", "fact", "knowledge", "wisdom", "rule", "identity"],
+    dilemma: ["dilemma", "rule", "wisdom", "identity", "knowledge", "concept", "fact"],
+    topic: ["knowledge", "concept", "fact", "wisdom", "rule", "identity", "dilemma", "document", "primer", "christ_attestation", "greek_theology", "hebrew_theology", "garden", "survival", "interaction"],
+  };
+  const types = typeGroups[queryClass];
+  if (types.length > 0) {
+    try {
+      push(
+        db.prepare(`SELECT k, v, t, source, ref, w FROM nodes WHERE t IN (${types.map(() => "?").join(",")}) ORDER BY w DESC LIMIT 160`).all(...types) as NodeRow[],
+      );
+    } catch {}
+  }
+
+  try {
+    push(
+      db.prepare(`SELECT k, v, t, source, ref, w FROM nodes WHERE k IN (${FRAME_KEYS.map(() => "?").join(",")})`).all(...FRAME_KEYS) as NodeRow[],
+    );
+  } catch {}
+
+  return uniqueByKey(rows);
+}
+
 function mergeSnapshot(payload: Record<string, unknown>) {
   let current: Record<string, unknown> = {};
   if (existsSync(STATE_SNAPSHOT)) {
@@ -272,23 +714,20 @@ app.post("/api/tru/ask", async (c) => {
       } catch {}
     }
   }
-  // Brain lookup
-  if (existsSync(BRAIN_DB)) {
-    try {
-      const db = new Database(BRAIN_DB, { readonly: true });
-      const qLower = q.toLowerCase();
-      const row = db.prepare("SELECT k, v, t, source FROM nodes WHERE k = ? LIMIT 1").get(qLower) as { k: string; v: string; t: string; source: string } | undefined;
-      if (row) { db.close(); return c.json({ ok: true, kind: "brain", k: row.k, v: row.v, t: row.t, source: row.source }); }
-      // contains match on key
-      const r2 = db.prepare("SELECT k, v, t, source FROM nodes WHERE k LIKE ? ORDER BY w DESC LIMIT 1").get(`%${qLower}%`) as { k: string; v: string; t: string; source: string } | undefined;
-      if (r2) { db.close(); return c.json({ ok: true, kind: "brain", k: r2.k, v: r2.v, t: r2.t, source: r2.source }); }
-      // contains match on value text — catches natural-language queries
-      const r3 = db.prepare("SELECT k, v, t, source FROM nodes WHERE LOWER(v) LIKE ? ORDER BY w DESC LIMIT 1").get(`%${qLower}%`) as { k: string; v: string; t: string; source: string } | undefined;
-      db.close();
-      if (r3) return c.json({ ok: true, kind: "brain", k: r3.k, v: r3.v, t: r3.t, source: r3.source });
-    } catch {}
+  if (!existsSync(BRAIN_DB)) {
+    return c.json({ ok: false, kind: "unknown", q, error: "brain.db not found" }, 404);
   }
-  return c.json({ ok: false, kind: "unknown", q, error: "no match" }, 404);
+  try {
+    const db = new Database(BRAIN_DB, { readonly: true });
+    const queryClass = classifyQuery(q);
+    const candidates = collectCandidates(db, q, queryClass);
+    db.close();
+
+    const answer = buildSynthesis(q, queryClass, candidates);
+    return c.json(answer);
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500);
+  }
 });
 
 app.post("/api/tru/export", async (c) => {
@@ -499,7 +938,7 @@ app.get("/api/tru/compile", async (c) => {
   }
   try {
     const db = new Database(BRAIN_DB);
-    const nodes = db.prepare("SELECT k, v, t, w, source, ref, greek_tr, greek_note, meta_json FROM nodes ORDER BY w DESC").all();
+    const nodes = db.prepare("SELECT k, v, t, w, source, ref, greek_tr, greek_note, meta_json FROM nodes ORDER BY w DESC").all() as Array<Record<string, unknown>>;
     db.close();
 
     const starterFacts: Record<string, string> = {};
@@ -517,15 +956,15 @@ app.get("/api/tru/compile", async (c) => {
     }> = [];
 
     for (const n of nodes) {
-      const k = n.k as string;
-      const v = n.v as string;
-      const t = n.t as string | null;
-      const w = n.w as number | null;
-      const source = n.source as string | null;
-      const ref = n.ref as string | null;
-      const greek_tr = n.greek_tr as string | null;
-      const greek_note = n.greek_note as string | null;
-      const meta_json = n.meta_json as string | null;
+      const k = String(n.k ?? "");
+      const v = String(n.v ?? "");
+      const t = n.t ? String(n.t) : null;
+      const w = typeof n.w === "number" ? n.w : null;
+      const source = n.source ? String(n.source) : null;
+      const ref = n.ref ? String(n.ref) : null;
+      const greek_tr = n.greek_tr ? String(n.greek_tr) : null;
+      const greek_note = n.greek_note ? String(n.greek_note) : null;
+      const meta_json = n.meta_json ? String(n.meta_json) : null;
 
       // STARTER_FACTS: top-level doctrinal entries (source=STARTER or t=fact)
       if (source === "STARTER" || (t === "fact" && !k.includes(":"))) {

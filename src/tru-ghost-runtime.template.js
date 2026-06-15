@@ -10,28 +10,22 @@
 (function () {
   "use strict";
 
-  // ────────────────────────────────────────────────────────────
-  // DATA
-  // ────────────────────────────────────────────────────────────
   const BRAIN   = __BRAIN__;
   const KJV     = __KJV__;
   const SESSION = __SESSION__ || {};
   const META    = __META__ || {};
 
-  // ────────────────────────────────────────────────────────────
-  // ROUTING (mirrors server /api/tru/ask)
-  // ────────────────────────────────────────────────────────────
   const STOP = new Set([
     "the","a","an","and","or","but","in","on","at","to","for","of","with","by","from",
     "is","was","are","be","been","being","have","has","had","do","does","did","done",
     "will","would","could","should","may","might","must","can","shall",
     "not","no","nor","so","if","it","its","that","this","these","those",
     "i","you","your","we","they","he","she","him","her","them","us","my","our","their",
-    "what","when","where","why","who","whom","how","all","some","any","each","every"
+    "what","when","where","why","who","whom","how","all","some","any","each","every",
+    "tell","me","about","explain","define","describe","say","says","said"
   ]);
 
   const BOOK = {
-    // OT
     genesis:"gen",ge:"gen",gn:"gen",
     exodus:"exo",ex:"exo",exo:"exo",
     leviticus:"lev",le:"lev",lev:"lev",lv:"lev",
@@ -71,7 +65,6 @@
     haggai:"hag",hag:"hag",
     zechariah:"zec",zech:"zec",zec:"zec",
     malachi:"mal",mal:"mal",
-    // NT
     matthew:"mt",matt:"mt",mt:"mt",
     mark:"mk",mk:"mk",mar:"mk",mr:"mk",
     luke:"lk",lk:"lk",lu:"lk",
@@ -101,106 +94,250 @@
     revelation:"rev",rev:"rev",ap:"rev"
   };
 
-  function tok(s) {
-    return (s || "").toLowerCase()
-      .replace(/[^a-z0-9 ]/g, " ")
-      .split(/\s+/)
-      .filter(function (w) { return w.length > 1 && !STOP.has(w); });
+  const FRAME_KEYS = ["answer_style","human_conversation_rule","tru_mission","tru_personal_mode","tru_honesty","tru_voice","tru_identity"];
+  const FRAME_SET = new Set(FRAME_KEYS);
+  const TYPE_PRIORITY = {
+    identity: 60,
+    rule: 45,
+    wisdom: 40,
+    knowledge: 36,
+    concept: 32,
+    fact: 30,
+    dilemma: 28,
+    document: 24,
+    primer: 22,
+    christ_attestation: 20,
+    greek_theology: 18,
+    hebrew_theology: 18,
+    garden: 16,
+    survival: 16,
+    interaction: 14,
+    ghost: 12,
+    bible: 4,
+    lexicon: 4,
+  };
+  const SOURCE_PRIORITY = { TRU_CORE: 10, TRU_BRAIN: 8, CERTIFIED: 7, KNOWLEDGE_BANK: 7, MANIFESTO: 4, TRU_TRUTH: 4, STARTER: 2 };
+
+  function norm(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[\u2019'`_]/g, " ")
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function tokenize(s) {
+    return norm(s).split(" ").filter(function (t) { return t.length > 1 && !STOP.has(t); });
+  }
+
+  function firstSentence(text, limit) {
+    limit = limit || 220;
+    var clean = String(text || "").replace(/\s+/g, " ").trim();
+    if (!clean) return "";
+    var match = clean.match(/^(.+?[.!?])(?:\s|$)/);
+    var sentence = match && match[1] ? match[1] : clean;
+    if (sentence.length <= limit) return sentence;
+    return sentence.slice(0, limit - 1).trimEnd() + "…";
   }
 
   function parseVerse(q) {
-    var m = (q || "").toLowerCase().trim().match(/^([1-3]?\s?[a-z]+)\s+(\d+)\s*[:.]\s*(\d+)/i);
+    var m = String(q || "").toLowerCase().trim().match(/^([1-3]?\s?[a-z]+)\s+(\d+)\s*[:.]\s*(\d+)/i);
     if (!m) return null;
     var raw = m[1].replace(/\s+/g, "").toLowerCase();
     var book = BOOK[raw] || raw;
     var chapter = parseInt(m[2], 10);
     var verse = parseInt(m[3], 10);
     var ref1 = book + " " + chapter + ":" + verse;
-    var ref2 = book + chapter + ":" + verse; // kjv_lookup uses no space for digit-prefixed books
+    var ref2 = book + chapter + ":" + verse;
     if (KJV[ref1]) return { ref: ref1, text: KJV[ref1] };
     if (KJV[ref2]) return { ref: ref2, text: KJV[ref2] };
-    // last-ditch: try compressing book code (e.g. "1jn" -> "1jn" already; some keys use shorter codes)
     return null;
   }
 
-  function scoreBrain(node, queryTokens) {
-    if (!queryTokens.length) return 0;
-    var haystack = ((node.k || "") + " " + (node.v || "")).toLowerCase();
-    var hits = 0;
-    for (var i = 0; i < queryTokens.length; i++) {
-      if (haystack.indexOf(queryTokens[i]) !== -1) hits++;
+  function classifyQuery(q) {
+    var n = norm(q);
+    if (/\b(who are you|what are you|what is tru|who is tru|your mission|your style|how do you answer|how do you think|tell me about yourself)\b/.test(n)) return "identity";
+    if (/^\s*(define|what is|what are|explain|describe|tell me about|how does|how do|why is|why are)\b/.test(n)) return "definition";
+    if (/\b(should|ought|dilemma|tradeoff|trade-off|choose|risk|what if|conflict|cost)\b/.test(n)) return "dilemma";
+    return "topic";
+  }
+
+  function typeBonus(t, queryClass) {
+    var kind = String(t || "").toLowerCase();
+    var bonus = TYPE_PRIORITY[kind] || 0;
+    if (queryClass === "identity") {
+      if (kind === "identity") bonus += 30;
+      if (kind === "rule" || kind === "wisdom") bonus += 18;
+    } else if (queryClass === "definition") {
+      if (kind === "concept" || kind === "fact" || kind === "knowledge") bonus += 12;
+    } else if (queryClass === "dilemma") {
+      if (kind === "dilemma" || kind === "rule" || kind === "wisdom") bonus += 14;
+    } else {
+      if (kind === "knowledge" || kind === "concept" || kind === "fact" || kind === "wisdom") bonus += 8;
     }
-    if (!hits) return 0;
-    var coverage = hits / queryTokens.length;
-    return coverage * (node.w || 0.5);
+    return bonus;
+  }
+
+  function sourceBonus(source) {
+    return SOURCE_PRIORITY[String(source || "")] || 0;
+  }
+
+  function scoreCandidate(node, qNorm, qTokens, queryClass) {
+    var keyNorm = norm(node.k || "");
+    var valueNorm = norm(node.v || "");
+    var refNorm = norm(node.ref || "");
+    var score = 0;
+
+    if (keyNorm === qNorm) score += 140;
+    if (keyNorm && qNorm && keyNorm.indexOf(qNorm) !== -1 && qNorm.length >= 3) score += 70;
+    if (valueNorm && qNorm && valueNorm.indexOf(qNorm) !== -1 && qNorm.length >= 4) score += 55;
+    if (refNorm && qNorm && refNorm.indexOf(qNorm) !== -1 && qNorm.length >= 4) score += 35;
+    if (FRAME_SET.has(keyNorm)) score += 60;
+
+    if (qTokens.length > 0) {
+      var hay = new Set(tokenize((node.k || "") + " " + (node.v || "") + " " + (node.ref || "")));
+      var hits = 0;
+      for (var i = 0; i < qTokens.length; i++) if (hay.has(qTokens[i])) hits += 1;
+      if (hits > 0) {
+        var coverage = hits / Math.max(qTokens.length, hay.size || 1);
+        score += coverage * 80;
+        score += hits * 2;
+      }
+    }
+
+    score += typeBonus(node.t, queryClass);
+    score += sourceBonus(node.source);
+    return score;
+  }
+
+  function firstMatch(nodes, predicate, excluded) {
+    excluded = excluded || {};
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (excluded[n.k]) continue;
+      if (predicate(n)) return n;
+    }
+    return null;
+  }
+
+  function pickFramingNode(scored) {
+    for (var i = 0; i < scored.length; i++) {
+      if (FRAME_SET.has(norm(scored[i].node.k))) return scored[i].node;
+    }
+    for (var j = 0; j < scored.length; j++) {
+      var kind = String(scored[j].node.t || "").toLowerCase();
+      if (kind === "identity" || kind === "rule" || kind === "wisdom") return scored[j].node;
+    }
+    return null;
+  }
+
+  function buildSynthesis(query, queryClass, nodes) {
+    var qNorm = norm(query);
+    var qTokens = tokenize(query);
+    var scored = nodes
+      .map(function (node) { return { node: node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }; })
+      .filter(function (item) { return item.score > 0; })
+      .sort(function (a, b) { return b.score - a.score || (Number(b.node.w || 0) - Number(a.node.w || 0)); });
+
+    if (scored.length === 0) {
+      return {
+        ok: true,
+        kind: "brain",
+        k: "",
+        v: `I do not have a grounded node for "${query}". Teach me with: remember: ${query} = <your answer>`,
+        t: "GAP",
+        source: "TRU_CORE",
+        score: 0,
+        nodes: []
+      };
+    }
+
+    var best = scored[0].node;
+    var bestScore = scored[0].score;
+    var rest = scored.slice(1).map(function (item) { return item.node; });
+    var frame = pickFramingNode(scored);
+
+    var whatItWas = firstSentence(best.v, 220);
+    var whyItMattered = firstSentence(
+      firstMatch(rest, function (n) {
+        var kind = String(n.t || "").toLowerCase();
+        return kind === "knowledge" || kind === "concept" || kind === "fact" || kind === "wisdom";
+      })?.v || (frame && frame.v) || "",
+      180
+    );
+    var hiddenEngine = firstSentence(
+      firstMatch(rest, function (n) {
+        var kind = String(n.t || "").toLowerCase();
+        return kind === "rule" || kind === "wisdom" || kind === "knowledge" || kind === "concept" || kind === "fact";
+      })?.v || "",
+      180
+    );
+    var failureMode = firstSentence(
+      firstMatch(rest, function (n) { return String(n.t || "").toLowerCase() === "dilemma"; })?.v ||
+        firstMatch(rest, function (n) {
+          var kind = String(n.t || "").toLowerCase();
+          return kind === "rule" || kind === "wisdom";
+        })?.v ||
+        "",
+      180
+    );
+    var teachesNow = firstSentence(
+      (frame && frame.v) ||
+        firstMatch(rest, function (n) {
+          var kind = String(n.t || "").toLowerCase();
+          return kind === "identity" || kind === "rule" || kind === "wisdom";
+        })?.v ||
+        "",
+      180
+    );
+
+    var text = "";
+    if (queryClass === "identity") {
+      text = teachesNow || whatItWas;
+      var extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
+      if (extra.length) text += "\nRelated: " + extra.join(" | ");
+    } else if (bestScore >= 80 && qTokens.length <= 3) {
+      text = whatItWas;
+    } else if (bestScore >= 18) {
+      var lines = [
+        `What it was: ${whatItWas}`,
+        whyItMattered ? `Why it mattered: ${whyItMattered}` : "",
+        hiddenEngine ? `Hidden engine: ${hiddenEngine}` : "",
+        failureMode ? `Failure mode: ${failureMode}` : "",
+        teachesNow ? `What it teaches now: ${teachesNow}` : "",
+      ].filter(Boolean);
+      text = lines.join("\n");
+    } else {
+      var closests = scored.slice(0, 3).map(function (item) { return firstSentence(item.node.v, 120); }).filter(Boolean);
+      text = `I do not have a grounded node for "${query}".`;
+      if (closests.length) text += " Closest: " + closests.join(" · ");
+      if (teachesNow) text += "\nFrame: " + teachesNow;
+      text += `\nTeach me with: remember: ${query} = <your answer>`;
+    }
+
+    return {
+      ok: true,
+      kind: "brain",
+      k: best.k,
+      v: text,
+      t: bestScore >= 18 ? String(best.t || "SYNTHESIS").toUpperCase() : "GAP",
+      source: best.source || "TRU_CORE",
+      score: Math.min(99, Math.round(bestScore)),
+      nodes: scored.slice(0, 5).map(function (item) { return item.node.k + ":" + (item.node.t || ""); })
+    };
   }
 
   function lookup(q) {
     if (!q) return null;
-    var ql = q.toLowerCase().trim();
-
-    // 1. Scripture shortcut
-    var v = parseVerse(ql);
+    var v = parseVerse(q);
     if (v) {
       return { kind: "scripture", text: v.text, ref: v.ref, score: 100 };
     }
-
-    // 2. Exact key match
-    for (var i = 0; i < BRAIN.length; i++) {
-      if ((BRAIN[i].k || "").toLowerCase() === ql) {
-        return {
-          kind: "brain",
-          text: BRAIN[i].v || "",
-          t: BRAIN[i].t || "TRUTH",
-          ref: BRAIN[i].ref,
-          source: BRAIN[i].source,
-          score: 95
-        };
-      }
-    }
-
-    // 3. Token-coverage ranking
-    var qt = tok(ql);
-    if (!qt.length) return null;
-    var hits = [];
-    for (var j = 0; j < BRAIN.length; j++) {
-      var sc = scoreBrain(BRAIN[j], qt);
-      if (sc > 0.05) hits.push({ n: BRAIN[j], s: sc });
-    }
-    hits.sort(function (a, b) { return b.s - a.s; });
-    if (hits.length) {
-      var top = hits[0];
-      return {
-        kind: "brain",
-        text: top.n.v || "",
-        t: top.n.t || "TRUTH",
-        ref: top.n.ref,
-        source: top.n.source,
-        score: Math.round(Math.min(top.s * 100, 99))
-      };
-    }
-
-    // 4. Session-memory fallback (user's own notes)
-    if (SESSION.notes) {
-      var noteLow = SESSION.notes.toLowerCase();
-      var qLow = ql;
-      if (noteLow.indexOf(qLow) !== -1 || qLow.length < 12) {
-        return {
-          kind: "brain",
-          text: SESSION.notes,
-          t: "NOTE",
-          source: "session",
-          score: 60
-        };
-      }
-    }
-
-    return { kind: "unknown", text: "No match. Ask differently, or teach: remember: " + q + " = <your answer>.", score: 0 };
+    var queryClass = classifyQuery(q);
+    return buildSynthesis(q, queryClass, BRAIN);
   }
 
-  // ────────────────────────────────────────────────────────────
-  // RENDER
-  // ────────────────────────────────────────────────────────────
   function esc(s) {
     return String(s == null ? "" : s)
       .replace(/&/g, "&amp;")
@@ -241,7 +378,6 @@
     var images  = uploads.filter(function (u) { return u.kind === "image"; });
     var files   = uploads.filter(function (u) { return u.kind === "file"; });
 
-    // Gallery
     var gPanel = document.getElementById("uploadsPanel");
     var gBody  = document.getElementById("galleryBody");
     if (images.length === 0) {
@@ -256,7 +392,6 @@
       }).join("") + '</div>';
     }
 
-    // Files
     var fPanel = document.getElementById("filesPanel");
     var fBody  = document.getElementById("filesBody");
     if (files.length === 0) {
@@ -273,7 +408,7 @@
       }).join("") + '</ul>';
     }
 
-    document.getElementById("statImg").textContent    = String(images.length);
+    document.getElementById("statImg").textContent = String(images.length);
     document.getElementById("statFiles").textContent = String(files.length);
   }
 
@@ -309,9 +444,6 @@
     qEl.focus();
   }
 
-  // ────────────────────────────────────────────────────────────
-  // BOOT (file:// safe — no network)
-  // ────────────────────────────────────────────────────────────
   function boot() {
     renderStats();
     renderNotes();
