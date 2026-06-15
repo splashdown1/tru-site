@@ -6,6 +6,11 @@ import { Hono } from "hono";
 import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import Database from "bun:sqlite";
+import {
+  buildLockable,
+  computeLock,
+  loadAssetsConfig,
+} from "../TRU/primaries/canon";
 
 // AI agents: read README.md for navigation and contribution guidance.
 type Mode = "development" | "production";
@@ -83,6 +88,84 @@ function ensureBrainDb(): void {
 const GHOST_DIR = join(process.cwd(), "..", "TRU", "ghost");
 const GHOST_BRAIN = join(process.cwd(), "..", "TRU", "TRU_BRAIN_41.json");
 const GHOST_KJV = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+
+// ═══════════════════════════════════════════════════════════════
+// PRIMARIES VERIFICATION — boot tripwire
+// The shared canon module (TRU/primaries/canon.ts) is the single source
+// of truth. The lock script and this server import the same `computeLock`
+// function so the canonical format can never drift.
+// ═══════════════════════════════════════════════════════════════
+const TRU_ROOT = join(process.cwd(), "..", "TRU");
+const PRIMARIES_DIR = join(TRU_ROOT, "primaries");
+const PRIMARIES_LOCK = join(PRIMARIES_DIR, "primaries.lock");
+const PRIMARIES_ASSETS_JSON = join(PRIMARIES_DIR, "assets.json");
+// Single source of truth — see TRU/primaries/assets.json. Both the
+// server boot tripwire and tools/import-primaries/lock.ts import from
+// this file so the two never drift.
+
+async function verifyPrimariesAtBoot(): Promise<{ ok: boolean; details: Record<string, unknown> }> {
+  const details: Record<string, unknown> = { assets: {} as Record<string, string>, stored: null, computed: null };
+  if (!existsSync(PRIMARIES_LOCK)) {
+    console.error("[primaries] FAIL: primaries.lock missing at", PRIMARIES_LOCK);
+    return { ok: false, details };
+  }
+  const storedLock = (await Bun.file(PRIMARIES_LOCK).text()).trim();
+  (details as any).stored = storedLock.slice(0, 16) + "…";
+
+  // Single source of truth: see TRU/primaries/canon.ts. The same
+  // function the lock script uses to write the lock is what we use
+  // here to verify it. No possibility of canonical-format drift.
+  let assets;
+  try {
+    assets = loadAssetsConfig(PRIMARIES_ASSETS_JSON);
+  } catch (err) {
+    console.error("[primaries] FAIL: assets.json unreadable:", err);
+    return { ok: false, details };
+  }
+  let lockable;
+  try {
+    lockable = buildLockable(TRU_ROOT, assets);
+  } catch (err) {
+    console.error("[primaries] FAIL: buildLockable threw:", err);
+    return { ok: false, details };
+  }
+  // Surface any missing primary so joe sees the exact file, not just a hash drift.
+  for (const [name, info] of Object.entries(lockable.primary)) {
+    if (info === null) {
+      console.error("[primaries] FAIL: missing primary asset", name);
+      return { ok: false, details };
+    }
+  }
+  (details as any).assets = Object.fromEntries(
+    Object.entries(lockable.primary).map(([k, v]) => [
+      k, v ? v.hash.slice(0, 16) + "…" : "MISSING",
+    ]),
+  );
+  const computedLock = computeLock(lockable);
+  (details as any).computed = computedLock.slice(0, 16) + "…";
+
+  if (computedLock !== storedLock) {
+    console.error(`[primaries] FAIL: lock drift — stored=${storedLock.slice(0, 16)}… computed=${computedLock.slice(0, 16)}…`);
+    return { ok: false, details };
+  }
+  console.log(`[primaries] OK: lock verified (${storedLock.slice(0, 16)}…)`);
+  return { ok: true, details };
+}
+
+let _primariesOk = false;
+let _primariesDetails: Record<string, unknown> = {};
+let __PRIMARIES_REPORT: { status: string; stored: string; computed: string; assets: Record<string, string> } | undefined;
+await verifyPrimariesAtBoot().then((r) => {
+  _primariesOk = r.ok;
+  _primariesDetails = r.details;
+  if (!r.ok) process.exit(1);
+  __PRIMARIES_REPORT = {
+    status: r.ok ? "PASS" : "FAIL",
+    stored: (r.details as any).stored,
+    computed: (r.details as any).computed,
+    assets: (r.details as any).assets,
+  };
+});
 
 const MAX_EXPORT_BYTES = 256 * 1024; // 256 KB cap on session payload
 
@@ -650,6 +733,44 @@ function mergeSnapshot(payload: Record<string, unknown>) {
 
 app.get("/api/hello-zo", (c) => c.json({ msg: "Hello from Zo" }));
 
+// Primaries verification audit — returns the report from the last boot check.
+app.get("/api/tru/primaries", (c) => {
+  if (!__PRIMARIES_REPORT) {
+    return c.json({ ok: false, error: "primaries verification did not run" }, 503);
+  }
+  return c.json({ ok: __PRIMARIES_REPORT.status === "PASS", ...__PRIMARIES_REPORT });
+});
+
+// Truth-layer proof route — returns the verified primary asset metadata
+// (sizes + SHA-256) by routing through @tru/truth-layer. This is the
+// canonical "what does TRU believe" surface; every primary consumer in
+// TRU Online should defer to it.
+import { load as loadTruth } from "../TRU/packages/truth-layer/src/index";
+let _truthCache: Awaited<ReturnType<typeof loadTruth>> | null = null;
+let _truthCacheAt = 0;
+async function getTruth() {
+  if (_truthCache && Date.now() - _truthCacheAt < 30_000) return _truthCache;
+  _truthCache = await loadTruth(join(process.cwd(), "..", "TRU"));
+  _truthCacheAt = Date.now();
+  return _truthCache;
+}
+app.get("/api/tru/primaries-data", async (c) => {
+  try {
+    const t = await getTruth();
+    return c.json({
+      ok: true,
+      lock: t.lock,
+      primary: Object.fromEntries(
+        Object.entries(t.primary).map(([k, v]) => [k, { size: v.size, hash: v.hash }])
+      ),
+      brainCount: t.brain.length,
+      kjvCount: Object.keys(t.kjv).length,
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: String(err) }, 503);
+  }
+});
+
 // Stats for console dashboard
 app.get("/api/tru/stats", (c) => {
   let brain = 0;
@@ -831,14 +952,23 @@ app.post("/api/tru/ghost", async (c) => {
     let shell = readFileSync(shellPath, "utf-8");
     let runtime = readFileSync(runtimePath, "utf-8");
 
+    // Read the primaries lock that the boot tripwire already verified.
+    // We refuse to bake a ghost without an integrity receipt — the
+    // ghost inherits the same guarantee the server asserted on boot.
+    if (!existsSync(PRIMARIES_LOCK)) {
+      return c.json({ ok: false, error: "primaries.lock missing — run tools/import-primaries/lock.ts" }, 503);
+    }
+    const primariesLock = readFileSync(PRIMARIES_LOCK, "utf-8").trim();
+
     const meta = {
       baked: new Date().toISOString(),
       uploads: Array.isArray((mergedMemory as any).uploads) ? (mergedMemory as any).uploads.length : 0,
       brain: Array.isArray(brain) ? brain.length : 0,
       kjv: Object.keys(kjv).length,
+      primariesLock: primariesLock.slice(0, 16) + "…",
     };
 
-    // Inject the four data slots. Use JSON.stringify which produces
+    // Inject the data slots. Use JSON.stringify which produces
     // valid JS literals — the runtime reads them as `const` bindings.
     // Use split/join to replace ALL occurrences (String.replace only does
     // the first match, and brain JSON can contain placeholder-like substrings).
@@ -850,7 +980,8 @@ app.post("/api/tru/ghost", async (c) => {
       .split("__BRAIN__").join(brainJson)
       .split("__KJV__").join(kjvJson)
       .split("__SESSION__").join(sessionJson)
-      .split("__META__").join(metaJson);
+      .split("__META__").join(metaJson)
+      .split("__PRIMARIES__").join(primariesLock);
 
     const html = shell.replace("/* __TRU_GHOST_RUNTIME__ */", runtime);
 

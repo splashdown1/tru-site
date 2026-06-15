@@ -7,6 +7,7 @@
 //   __KJV__     — JSON.stringify of the KJV lookup object
 //   __SESSION__ — JSON.stringify of merged user state (text, notes, uploads)
 //   __META__    — JSON.stringify of { baked, brain, kjv, uploads }
+//   __PRIMARIES__ — lock string injected at boot
 (function () {
   "use strict";
 
@@ -469,6 +470,7 @@
     });
     var qEl = document.getElementById("q");
     if (qEl) qEl.focus();
+    console.log("[ghost] primaries lock: " + __PRIMARIES__);
   }
 
   if (document.readyState === "loading") {
