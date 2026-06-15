@@ -259,14 +259,31 @@
     var frame = pickFramingNode(scored);
 
     var whatItWas = firstSentence(best.v, 220);
-    var whyItMattered = firstSentence(
+
+    // Extract labelled sub-clauses from the lead node's value text first,
+    // so nodes that embed "The hidden engine: ..." or "Why it mattered: ..."
+    // get the full synthesis without needing a neighbour.
+    var bestVText = String(best.v || "");
+    function extractClause(label) {
+      var re = new RegExp(
+        "(?:^|[\\s\\.;\\(\\)\\-])" + label + "\\s*:\\s*([^\\n;]+(?:[\\n;](?!\\s*(?:Lesson|See also|Why|What|Hidden|Failure|What it teaches|Source|Note)\\s*:)[^\\n;]+)*)",
+        "i"
+      );
+      var m = bestVText.match(re);
+      if (!m) return "";
+      return firstSentence(m[1], 180);
+    }
+    var embeddedHidden = extractClause("The hidden engine");
+    var embeddedWhy = extractClause("Why it mattered");
+
+    var whyItMattered = embeddedWhy || firstSentence(
       firstMatch(rest, function (n) {
         var kind = String(n.t || "").toLowerCase();
         return kind === "knowledge" || kind === "concept" || kind === "fact" || kind === "wisdom";
       })?.v || (frame && frame.v) || "",
       180
     );
-    var hiddenEngine = firstSentence(
+    var hiddenEngine = embeddedHidden || firstSentence(
       firstMatch(rest, function (n) {
         var kind = String(n.t || "").toLowerCase();
         return kind === "rule" || kind === "wisdom" || kind === "knowledge" || kind === "concept" || kind === "fact";
@@ -297,8 +314,6 @@
       text = teachesNow || whatItWas;
       var extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
       if (extra.length) text += "\nRelated: " + extra.join(" | ");
-    } else if (bestScore >= 80 && qTokens.length <= 3) {
-      text = whatItWas;
     } else if (bestScore >= 18) {
       var lines = [
         `What it was: ${whatItWas}`,
