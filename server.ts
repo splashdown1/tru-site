@@ -499,11 +499,28 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     it.node.k !== best.k && isTopic(it.node) && isTokenMatch(it.node);
 
   const whatItWas = firstSentence(best.v, 220);
-  const whyItMattered = firstSentence(
+
+  // Extract labelled sub-clauses from the lead node's value text itself,
+  // so nodes that already embed "The hidden engine: ...", "Why it mattered: ..."
+  // get the full synthesis without needing a neighbour node.
+  const bestV = String(best.v ?? "");
+  const extractClause = (label: string): string => {
+    const re = new RegExp(
+      `(?:^|[\\s\\.;\\(\\)\\-])${label}\\s*:\\s*([^\\n;]+(?:[\\n;](?!\\s*(?:Lesson|See also|Why|What|Hidden|Failure|What it teaches|Source|Note)\\s*:)[^\\n;]+)*)`,
+      "i",
+    );
+    const m = bestV.match(re);
+    if (!m) return "";
+    return firstSentence(m[1], 180);
+  };
+  const embeddedHidden = extractClause("The hidden engine");
+  const embeddedWhy = extractClause("Why it mattered");
+
+  const whyItMattered = embeddedWhy || firstSentence(
     next.find(eligible)?.node.v ?? "",
     180,
   );
-  const hiddenEngine = firstSentence(
+  const hiddenEngine = embeddedHidden || firstSentence(
     next.find((it) => eligible(it) && ["rule", "wisdom"].includes(String(it.node.t ?? "").toLowerCase()))?.node.v ?? "",
     180,
   );
@@ -518,8 +535,6 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     text = teachesNow || whatItWas;
     const extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
     if (extra.length) text += `\nRelated: ${extra.join(" | ")}`;
-  } else if (bestScore >= 80 && qTokens.length <= 3) {
-    text = whatItWas;
   } else if (bestScore >= 18) {
     const lines = [
       `What it was: ${whatItWas}`,
