@@ -493,31 +493,21 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     // the Golden Ratio phi node as the lead.
     return qTokens.filter((t) => t.length >= 3).every((t) => k.split(/[\s_]+/).includes(t));
   }) : scored;
-  if (levenshteinDrop.length > 0) {
-    scored.length = 0;
-    scored.push(...levenshteinDrop);
-  }
-
-  // For very short single-token queries ("mercy", "love", "logos"),
-  // the topic search is what actually lands the right node. Frame
-  // nodes like "answer_style" / "tru_voice" contain the literal
-  // "love" / "mercy" as part of their prose and would otherwise
-  // short-circuit the lead answer. We only enable the topic-override
-  // path for non-identity queries (the identity path is intentional).
-  const shortQuery = qTokens.length >= 1 && qTokens.length <= 3;
-
   if (scored.length === 0) {
     return {
       ok: true,
       kind: "brain",
       k: "",
-      v: `I do not have a grounded node for "${query}". Teach me with: remember: ${query} = <your answer>`,
+      v: `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ${query} = <the truth you would have it hold>`,
       t: "GAP",
       source: "TRU_CORE",
+      blank: true,
       score: 0,
       nodes: [] as string[],
     };
   }
+
+  const shortQuery = qTokens.length >= 1 && qTokens.length <= 3;
 
   const FRAME_TYPES = new Set(["identity", "rule", "wisdom"]);
   const isFrame = (row: NodeRow): boolean => {
@@ -558,8 +548,7 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     // Look only at topic nodes that actually mention a query token.
     // Skip code-shaped nodes via isQualityText which scoreCandidate
     // already filters with (returns 0 for bad text).
-    const real = scored.find((it) => isTopic(it.node) && isTokenMatch(it.node))
-      ?? scored.find((it) => isTopic(it.node) && it.node.k !== best.k);
+    const real = scored.find((it) => isTopic(it.node) && isTokenMatch(it.node));
     best = real ? real.node : scored[0].node;
     bestScore = real ? real.score : scored[0].score;
   } else {
@@ -629,10 +618,10 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     text = lines.join("\n");
   } else {
     const closests = scored.slice(0, 3).map((item) => firstSentence(item.node.v, 120)).filter(Boolean);
-    text = `I do not have a grounded node for "${query}".`;
+    text = `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.`;
     if (closests.length) text += ` Closest: ${closests.join(" · ")}`;
     if (teachesNow) text += `\nFrame: ${teachesNow}`;
-    text += `\nTeach me with: remember: ${query} = <your answer>`;
+    text += `\nFormat: remember: ${query} = <the truth you would have it hold>`;
   }
 
   return {

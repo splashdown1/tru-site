@@ -246,7 +246,7 @@
         ok: true,
         kind: "brain",
         k: "",
-        v: `I do not have a grounded node for "${query}". Teach me with: remember: ${query} = <your answer>`,
+        v: `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ${query} = <the truth you would have it hold>`,
         t: "GAP",
         source: "TRU_CORE",
         score: 0,
@@ -326,10 +326,10 @@
       text = lines.join("\n");
     } else {
       var closests = scored.slice(0, 3).map(function (item) { return firstSentence(item.node.v, 120); }).filter(Boolean);
-      text = `I do not have a grounded node for "${query}".`;
-      if (closests.length) text += " Closest: " + closests.join(" · ");
+      text = `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.`;
+      if (closests.length) text += "\nClosest: " + closests.join(" · ");
       if (teachesNow) text += "\nFrame: " + teachesNow;
-      text += `\nTeach me with: remember: ${query} = <your answer>`;
+      text += `\nFormat: remember: ${query} = <the truth you would have it hold>`;
     }
 
     return {
@@ -376,7 +376,7 @@
              (r.ref ? '<span class="src">ref: ' + esc(r.ref) + '</span>' : '') +
              '</div>';
     }
-    return '<div class="verdict unknown">UNKNOWN</div>' +
+    return '<div class="verdict unknown">NO GROUNDED NODE</div>' +
            '<div class="answer">' + esc(r.text) + '</div>';
   }
 
