@@ -3,6 +3,7 @@ import TruPublic from "./pages/tru-public";
 import TruConsole from "./pages/tru-console";
 import TruOnboard from "./pages/tru-onboard";
 import TruVision from "./pages/tru-vision";
+import TruWhitepaper from "./pages/tru-whitepaper";
 import { ThemeProvider } from "@/components/theme-provider";
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<TruPublic />} />
           <Route path="/vision" element={<TruVision />} />
+          <Route path="/whitepaper" element={<TruWhitepaper />} />
           <Route path="/onboard" element={<TruOnboard />} />
           <Route path="/console" element={<TruConsole />} />
           <Route path="*" element={<TruPublic />} />

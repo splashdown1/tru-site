@@ -269,12 +269,20 @@ export default function TruVision() {
           <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-700">
             13 pieces · 4 pillars · 1 mythos
           </div>
-          <a
-            href="/"
-            className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
-          >
-            talk to tru →
-          </a>
+          <div className="flex gap-6">
+            <a
+              href="/whitepaper"
+              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
+            >
+              read the protocol →
+            </a>
+            <a
+              href="/"
+              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
+            >
+              talk to tru →
+            </a>
+          </div>
         </div>
       </div>
 
