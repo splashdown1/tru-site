@@ -131,6 +131,13 @@ export default function TruPublic() {
           does not need the internet to think.
         </p>
 
+        <a
+          href="/vision"
+          className="mt-6 inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-white transition-colors border border-neutral-900 hover:border-neutral-600 px-4 py-2"
+        >
+          see the codex →
+        </a>
+
         <form onSubmit={ask} className="mt-10 flex gap-2">
           <input
             ref={inputRef}
