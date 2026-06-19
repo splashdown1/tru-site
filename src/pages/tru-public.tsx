@@ -200,12 +200,20 @@ export default function TruPublic() {
           <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-700">
             Airgapped · Sovereign · No telemetry
           </div>
-          <a
-            href="/console"
-            className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
-          >
-            console →
-          </a>
+          <div className="flex items-center gap-8">
+            <a
+              href="/vision"
+              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
+            >
+              vision →
+            </a>
+            <a
+              href="/console"
+              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
+            >
+              console →
+            </a>
+          </div>
         </div>
       </div>
     </div>
