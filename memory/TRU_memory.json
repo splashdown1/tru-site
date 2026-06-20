@@ -1,1 +1,18 @@
-{"entries":[],"version":0}
+{
+  "entries": [
+    {
+      "id": "m_mqm9qakg_tbczlz",
+      "ts": 1781954550016,
+      "updated": 1781954550016,
+      "kind": "milestone",
+      "text": "TRU sovereign services online — search keyless, memory gated, mail bridged to connected Gmail. This entry proves the full chain works: memory → git archive → mail-to-self.",
+      "tags": [
+        "sovereign",
+        "mail",
+        "memory",
+        "first-archive"
+      ]
+    }
+  ],
+  "version": 1
+}
