@@ -3,8 +3,9 @@ import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
-import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, renameSync } from "node:fs";
 import { join, dirname } from "node:path";
+import { execSync } from "node:child_process";
 import Database from "bun:sqlite";
 import {
   buildLockable,
@@ -1021,6 +1022,267 @@ app.get("/api/tru/state", (c) => {
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
   }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TRU SOVEREIGN SERVICES — search · memory · mail
+//   Search : keyless (DuckDuckGo), public, read-only.
+//   Memory : JSON working store (load/create/update/delete/search) +
+//            durability archive (git commit+push + mail-to-self).
+//   Mail   : bridges to Zo's already-connected Gmail (no Gmail key
+//            in TRU or the owner's hands). Requires ZO_API_KEY env.
+// Write/mail routes gated by bearer TRU_API_KEY (env secret). The
+// offline ghost (TRU/) is untouched and remains airgapped by the
+// frozen architecture contract.
+// ═══════════════════════════════════════════════════════════════
+const MEMORY_DIR = join(process.cwd(), "memory");
+if (!existsSync(MEMORY_DIR)) mkdirSync(MEMORY_DIR, { recursive: true });
+const MEMORY_FILE = join(MEMORY_DIR, "TRU_memory.json");
+const OWNER_EMAIL = "legendofsplashdown@gmail.com";
+const ZO_ASK_URL = "https://api.zo.computer/zo/ask";
+const ZO_MODEL = "vercel:zai/glm-5.2";
+
+function requireGate(c: any): boolean {
+  const secret = process.env.TRU_API_KEY;
+  if (!secret) return false;
+  const auth = c.req.header("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return false;
+  return auth.slice(7) === secret;
+}
+
+function loadMemory(): { entries: any[]; version: number } {
+  if (!existsSync(MEMORY_FILE)) return { entries: [], version: 0 };
+  try {
+    const raw = JSON.parse(readFileSync(MEMORY_FILE, "utf8"));
+    if (Array.isArray(raw?.entries)) return { entries: raw.entries, version: raw.version || 0 };
+    return { entries: [], version: 0 };
+  } catch {
+    return { entries: [], version: 0 };
+  }
+}
+
+function saveMemory(mem: { entries: any[]; version: number }): void {
+  const tmp = MEMORY_FILE + ".tmp";
+  writeFileSync(tmp, JSON.stringify(mem, null, 2));
+  renameSync(tmp, MEMORY_FILE);
+}
+
+function genId(): string {
+  return "m_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+function decodeEntities(s: string): string {
+  return s.replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+}
+
+// ── SEARCH (keyless, public) ─────────────────────────────────────
+app.get("/api/tru/search", async (c) => {
+  const q = (c.req.query("q") || "").trim();
+  if (!q) return c.json({ ok: false, error: "missing q" }, 400);
+  try {
+    const ddg = await fetch(
+      "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q) + "&kl=us-en",
+      {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 TRU/1.0" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(9000),
+      },
+    );
+    if (!ddg.ok) return c.json({ ok: false, error: "upstream " + ddg.status }, 502);
+    const html = await ddg.text();
+    const links: { href: string; title: string }[] = [];
+    const linkRe = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+    let m: RegExpExecArray | null;
+    while ((m = linkRe.exec(html)) !== null) {
+      let href = m[1];
+      const uddg = /uddg=([^&]+)/.exec(href);
+      if (uddg) {
+        try { href = decodeURIComponent(uddg[1]); } catch { /* keep raw */ }
+      } else if (href.startsWith("//")) {
+        href = "https:" + href;
+      }
+      links.push({ href, title: decodeEntities(m[2]) });
+    }
+    const snippets: string[] = [];
+    const snipRe = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+    while ((m = snipRe.exec(html)) !== null) snippets.push(decodeEntities(m[1]));
+    const results = links.map((l, i) => ({ title: l.title, url: l.href, snippet: snippets[i] || "" }));
+    return c.json({ ok: true, q, count: results.length, results });
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 502);
+  }
+});
+
+// ── MEMORY (load / create / update / delete / search) ────────────
+app.get("/api/tru/memory", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const mem = loadMemory();
+  const id = c.req.query("id");
+  const q = (c.req.query("q") || "").toLowerCase();
+  if (id) {
+    const entry = mem.entries.find((e) => e.id === id);
+    return entry ? c.json({ ok: true, entry }) : c.json({ ok: false, error: "not found" }, 404);
+  }
+  let entries = mem.entries;
+  if (q) {
+    entries = entries.filter((e: any) =>
+      (e.text || "").toLowerCase().includes(q) ||
+      (Array.isArray(e.tags) ? e.tags : []).some((t: string) => t.toLowerCase().includes(q)));
+  }
+  return c.json({ ok: true, version: mem.version, count: entries.length, entries });
+});
+
+app.post("/api/tru/memory", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  const text = (body?.text || "").toString().trim();
+  if (!text) return c.json({ ok: false, error: "missing text" }, 400);
+  const mem = loadMemory();
+  const id = (body?.id || "").toString().trim();
+  const now = Date.now();
+  let entry: any;
+  const idx = mem.entries.findIndex((e) => e.id === id);
+  if (id && idx >= 0) {
+    entry = mem.entries[idx];
+    entry.text = text;
+    entry.kind = body?.kind ?? entry.kind;
+    entry.tags = Array.isArray(body?.tags) ? body.tags : entry.tags;
+    entry.updated = now;
+  } else {
+    entry = {
+      id: id || genId(),
+      ts: now,
+      updated: now,
+      kind: body?.kind || "note",
+      text,
+      tags: Array.isArray(body?.tags) ? body.tags : [],
+    };
+    mem.entries.push(entry);
+  }
+  mem.version = (mem.version || 0) + 1;
+  saveMemory(mem);
+  return c.json({ ok: true, entry, version: mem.version });
+});
+
+app.delete("/api/tru/memory", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const id = (c.req.query("id") || "").trim();
+  if (!id) return c.json({ ok: false, error: "missing id" }, 400);
+  const mem = loadMemory();
+  const before = mem.entries.length;
+  mem.entries = mem.entries.filter((e) => e.id !== id);
+  if (mem.entries.length === before) return c.json({ ok: false, error: "not found" }, 404);
+  mem.version = (mem.version || 0) + 1;
+  saveMemory(mem);
+  return c.json({ ok: true, deleted: id, version: mem.version });
+});
+
+// ── MAIL BRIDGE — to Zo's connected Gmail via /zo/ask ────────────
+async function bridgeMail(action: string, payload: any): Promise<{ ok: boolean; detail: any }> {
+  const token = process.env.ZO_API_KEY;
+  if (!token) return { ok: false, detail: "ZO_API_KEY not set — add it in Settings > Advanced (Access Tokens)" };
+  let prompt: string;
+  if (action === "send") {
+    const to = (payload.to || OWNER_EMAIL).toString();
+    const subject = (payload.subject || "TRU memory archive").toString();
+    const bodyText = (payload.body || "").toString();
+    prompt =
+      `You are a mail bridge for the TRU system. Use the use_app_gmail tool with action ` +
+      `"gmail-send-email" to send an email FROM the connected Gmail account TO ${to} ` +
+      `with subject "${subject.replace(/"/g, '\\"')}" and a plain-text body of:\n\n${bodyText}\n\n` +
+      `After attempting the send, respond with exactly one line: either "SENT <recipient>" ` +
+      `on success or "FAIL <short reason>" on failure. Add nothing else.`;
+  } else if (action === "read") {
+    const query = (payload.query || "from:me subject:TRU").toString();
+    const max = Math.min(20, Math.max(1, parseInt(payload.max || "5", 10)));
+    prompt =
+      `You are a mail bridge for the TRU system. Use the use_app_gmail tools to search and read ` +
+      `the connected Gmail inbox. Gmail search query: "${query.replace(/"/g, '\\"')}". ` +
+      `Return up to ${max} messages as a compact JSON array of objects with keys ` +
+      `id, date, subject, from, snippet. Respond with ONLY the JSON array, no prose.`;
+  } else {
+    return { ok: false, detail: "unknown action: " + action };
+  }
+  try {
+    const resp = await fetch(ZO_ASK_URL, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + token,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({ input: prompt, model_name: ZO_MODEL }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data: any = await resp.json();
+    return { ok: resp.ok, detail: data?.output ?? data };
+  } catch (e) {
+    return { ok: false, detail: String(e) };
+  }
+}
+
+// ── MEMORY ARCHIVE — git commit+push + mail-to-self durability ──
+app.post("/api/tru/memory/archive", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const mem = loadMemory();
+  if (mem.entries.length === 0) return c.json({ ok: false, error: "nothing to archive" }, 400);
+  const archive = {
+    archivedAt: new Date().toISOString(),
+    version: mem.version,
+    count: mem.entries.length,
+    entries: mem.entries,
+  };
+  const report: any = { ok: true, version: mem.version, count: mem.entries.length, git: null, mail: null };
+  // 1) Git durability — memory/ is tracked, so history = durable memory.
+  try {
+    const cwd = process.cwd();
+    execSync(
+      `git add -A memory/TRU_memory.json && git commit -m "TRU memory archive v${mem.version} (${mem.entries.length} entries)" --quiet`,
+      { cwd, stdio: "ignore" },
+    );
+    let pushed = "commit-only (push not attempted)";
+    try {
+      execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" });
+      pushed = "pushed";
+    } catch (e) {
+      pushed = "commit-only (push failed: " + String(e).slice(0, 140) + ")";
+    }
+    report.git = { ok: true, pushed };
+  } catch (e) {
+    report.git = { ok: false, error: String(e).slice(0, 200) };
+  }
+  // 2) Mail-to-self long-term archive (RFC822 — survives the box).
+  const mail = await bridgeMail("send", {
+    to: OWNER_EMAIL,
+    subject: `TRU memory archive v${mem.version} · ${mem.entries.length} entries`,
+    body: JSON.stringify(archive, null, 2),
+  });
+  report.mail = mail;
+  return c.json(report);
+});
+
+// ── MAIL — send / read via the bridge ────────────────────────────
+app.post("/api/tru/mail", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  const action = (body?.action || "send").toString();
+  if (action === "send") {
+    if (!body?.to) return c.json({ ok: false, error: "missing to" }, 400);
+    if (!body?.subject && !body?.body) return c.json({ ok: false, error: "missing subject/body" }, 400);
+  } else if (action !== "read") {
+    return c.json({ ok: false, error: "unknown action (send|read)" }, 400);
+  }
+  const result = await bridgeMail(action, body);
+  return c.json(result);
+});
+
+app.get("/api/tru/mail/status", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  return c.json({ ok: true, gate: !!process.env.TRU_API_KEY, bridge: !!process.env.ZO_API_KEY, owner: OWNER_EMAIL });
 });
 
 // ═══════════════════════════════════════════════════════════════
