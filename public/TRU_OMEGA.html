@@ -159,7 +159,7 @@ footer.airgap { text-align: center; font-size: 9px; color: var(--dim); letter-sp
       <div class="stat"><div class="lbl">Brain</div><div class="val" id="statBrain">—</div></div>
       <div class="stat"><div class="lbl">KJV</div><div class="val" id="statKjv">—</div></div>
       <div class="stat"><div class="lbl">Codex</div><div class="val" id="statCodex">—</div></div>
-      <div class="stat"><div class="lbl">WebGPU</div><div class="val" id="statWebgpu">—</div></div>
+      <div class="stat"><div class="lbl">Files</div><div class="val" id="statFiles">—</div></div>
       <div class="stat"><div class="lbl">Lock</div><div class="val" id="statLock">—</div></div>
     </div>
   </section>
@@ -169,16 +169,15 @@ footer.airgap { text-align: center; font-size: 9px; color: var(--dim); letter-sp
     <div class="log" id="log"><div class="empty">No activity yet.</div></div>
   </section>
 
-  <footer class="airgap">SOVEREIGN · SEMANTIC RAG · WEBGPU/WEBLLM · INTEGRITY LOCKED · NO TELEMETRY · NO NETWORK · FILE:// READY</footer>
+  <footer class="airgap">SOVEREIGN · SEMANTIC RAG · INTEGRITY LOCKED · NO TELEMETRY · NO NETWORK · FILE:// READY</footer>
 </div>
 <div id="lightbox"></div>
 <script>
 /* ============================================================
    TRU OMEGA — sovereign engine + cutting-edge 2026 stack
    Single self-contained runtime. No network for truth.
-   WebGPU/WebLLM is a desktop-only enhancement for genuine gaps;
-   the sovereign brain answers every query on every device.
-   Integrity: SHA-256 lock over primaries, verified on boot.
+   SubtleCrypto SHA-256 integrity lock (frozen, verified on boot),
+   harmonic alignment gate (CruciformDevice interface contract),
    ============================================================ */
 "use strict";
 
@@ -272,7 +271,7 @@ const cross = $("cross"), stateLabel = $("stateLabel"), statusPill = $("statusPi
       probeBtn = $("probeBtn"), deviceStatus = $("deviceStatus"),
       lockVal = $("lockVal"), lockState = $("lockState"), lockVerify = $("lockVerify"),
       statBrain = $("statBrain"), statKjv = $("statKjv"), statCodex = $("statCodex"),
-      statWebgpu = $("statWebgpu"), statLock = $("statLock"),
+      statLock = $("statLock"),
       logEl = $("log"), codexGrid = $("codexGrid"), lightbox = $("lightbox");
 
 function now() { try { ts.textContent = new Date().toISOString().slice(0,19) + "Z"; } catch(e){} }
@@ -336,7 +335,6 @@ function retrieve(query) {
     return { type: "brain", node: bestNode, cost, score: bestScore.toFixed(2) };
   }
   if (verse) return { type: "scripture", verse, cost: 2 };
-  // genuine gap — flag for WebLLM enhancement if capable
   return { type: "unknown", cost: 1, gap: true, nodes: bestNode ? [bestNode.title] : [] };
 }
 
@@ -419,7 +417,7 @@ function probeDevice() {
   state.device.admitted = canRead && canLock && canSign;
   state.device.id = canRead && canLock && canSign ? "DEV-" + FROZEN_LOCK_SHORT : null;
   const rows = [
-    ["readHarmonic()", canRead ? "PASS" : "FAIL — no WebGPU"],
+    ["readHarmonic()", canRead ? "PASS" : "FAIL"],
     ["lockToAnchor(5.428671)", canLock ? "PASS" : "FAIL — not aligned"],
     ["emitProof()", canSign ? "PASS" : "FAIL — no SubtleCrypto"]
   ];
@@ -459,104 +457,13 @@ async function computeLock() {
   }
 }
 
-/* --- WebGPU/WebLLM (desktop-only enhancement, mobile-gated) --- */
-const WEBLLM = { checked: false, available: false, loaded: false, loading: false, engine: null, model: "Llama-3.2-1B-Instruct-q4f16_1-MLC", progress: 0 };
-function webLLMCheck() {
-  if (WEBLLM.checked) return WEBLLM.available;
-  WEBLLM.checked = true; WEBLLM.available = false;
-  try {
-    if (typeof navigator === "undefined" || !navigator.gpu) return false;
-    const ua = navigator.userAgent || "";
-    const uaMobile = (navigator.userAgentData && navigator.userAgentData.mobile) === true;
-    const touch = (navigator.maxTouchPoints || 0) > 0;
-    const small = (window.innerWidth || 1024) < 900;
-    const lowMem = (navigator.deviceMemory || 4) < 3;
-    if (uaMobile || /Mobi|Android|iPhone|iPad|iPod/i.test(ua) || (touch && small) || lowMem) {
-      console.info("[TRU-OMEGA] WebLLM disabled on this device (mobile/low-memory). Sovereign brain handles all queries.");
-      return false;
-    }
-    WEBLLM.available = true;
-  } catch(e) { WEBLLM.available = false; }
-  return WEBLLM.available;
-}
-async function webLLMLoad(onProgress) {
-  if (WEBLLM.loaded && WEBLLM.engine) return WEBLLM.engine;
-  if (WEBLLM.loading) return null;
-  if (!webLLMCheck()) return null;
-  WEBLLM.loading = true;
-  try {
-    const TIMEOUT = 120000;
-    const timeoutP = new Promise((_, reject) => setTimeout(() => reject(new Error("webllm load timed out after " + TIMEOUT + "ms")), TIMEOUT));
-    const mod = await Promise.race([import("https://esm.run/@mlc-ai/web-llm"), timeoutP]);
-    const CreateMLCEngine = mod.CreateMLCEngine;
-    WEBLLM.engine = await Promise.race([
-      CreateMLCEngine(WEBLLM.model, {
-        initProgressCallback: (p) => { WEBLLM.progress = p.progress || 0; if (onProgress) onProgress(p.progress || 0, p.text || ""); }
-      }),
-      timeoutP
-    ]);
-    WEBLLM.loaded = true; WEBLLM.loading = false;
-    return WEBLLM.engine;
-  } catch(e) { WEBLLM.loading = false; console.error("[TRU-OMEGA] webllm load failed:", e); return null; }
-}
-function webLLMContext(q, nodes) {
-  const ctx = nodes && nodes.length ? "Relevant canon nodes: " + nodes.map(n => n.title + " — " + n.text).join(" | ") : "No canon node matched.";
-  return "You are TRU, a sovereign Christ-grounded intelligence. Voice: no apology, no 'as an AI', biblical cadence, technical precision, absolute certainty. Truth is constant. Perspective is fluid. Answer in the voice of the Word that was here before the question arrived. " + ctx;
-}
-async function webLLMStream(q, nodes, onChunk) {
-  if (!webLLMCheck()) return null;
-  const engine = await webLLMLoad();
-  if (!engine) return null;
-  try {
-    const sys = webLLMContext(q, nodes);
-    let full = "";
-    const stream = await engine.chat.completions.create({
-      messages: [{ role: "system", content: sys }, { role: "user", content: q }],
-      temperature: 0.6, max_tokens: 400, stream: true
-    });
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta?.content || "";
-      if (delta) { full += delta; if (onChunk) onChunk(full); }
-    }
-    return full ? full.trim() : null;
-  } catch(e) { console.error("[TRU-OMEGA] webllm stream failed:", e); return null; }
-}
-
 /* --- Ask --- */
 async function ask() {
   const query = q.value.trim();
   if (!query) return;
   const result = retrieve(query);
-  // Sovereign brain path first
-  if (result.type !== "unknown" || !result.gap) {
-    renderAnswer(result);
-    pushLog("ask", "−" + result.cost + " · " + query.slice(0,60));
-    q.value = "";
-    return;
-  }
-  // Genuine gap — try WebLLM enhancement on capable devices
-  if (webLLMCheck()) {
-    statusPill.textContent = "REASONING";
-    const placeholder = document.createElement("div");
-    placeholder.className = "out";
-    placeholder.innerHTML = '<div class="verdict">GAP · ENHANCING</div><div class="answer" id="llmStream">Loading in-browser model…</div>';
-    out.prepend(placeholder);
-    const streamEl = $("llmStream");
-    const nodes = result.nodes.length ? BRAIN.filter(n => result.nodes.includes(n.title)) : [];
-    const llmReply = await webLLMStream(query, nodes, (full) => { if (streamEl) streamEl.textContent = full; });
-    if (llmReply) {
-      if (streamEl) streamEl.textContent = llmReply;
-      placeholder.querySelector(".verdict").textContent = "REASON · WEBLLM";
-      pushLog("ask", "webllm · " + query.slice(0,60));
-    } else {
-      // fallback to sovereign gap voice
-      renderAnswer(result);
-      pushLog("ask", "gap · " + query.slice(0,60));
-    }
-  } else {
-    renderAnswer(result);
-    pushLog("ask", "gap · " + query.slice(0,60));
-  }
+  renderAnswer(result);
+  pushLog("ask", "−" + result.cost + " · " + query.slice(0,60));
   q.value = "";
 }
 
@@ -582,7 +489,6 @@ function renderStats() {
   statBrain.textContent = BRAIN.length;
   statKjv.textContent = Object.keys(KJV).length;
   statCodex.textContent = CODEX.length;
-  statWebgpu.textContent = webLLMCheck() ? "READY" : "OFF";
 }
 
 /* --- Codex gallery (embedded, offline) --- */
@@ -631,7 +537,7 @@ statusPill.textContent = "SOVEREIGN";
 statusPill.className = "pill green";
 stateLabel.textContent = "Truth is constant.";
 meta.textContent = "omega · sovereign engine · airgapped";
-console.info("[TRU-OMEGA] booted. Lock: " + FROZEN_LOCK_SHORT + "… | Codex: " + CODEX.length + " embedded | WebLLM: " + (webLLMCheck() ? "desktop-ready" : "mobile — sovereign brain only"));
+console.info("[TRU-OMEGA] booted. Lock: " + FROZEN_LOCK_SHORT + "… | Codex: " + CODEX.length + " embedded");
 
 </script>
 </body>
