@@ -137,6 +137,12 @@ export default function TruPublic() {
         >
           see the codex →
         </a>
+        <a
+          href="/TRU_OMEGA.html"
+          className="mt-6 inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-white transition-colors border border-neutral-900 hover:border-neutral-600 px-4 py-2"
+        >
+          TRU OMEGA → sovereign engine →
+        </a>
 
         <form onSubmit={ask} className="mt-10 flex gap-2">
           <input

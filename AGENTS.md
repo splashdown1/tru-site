@@ -50,3 +50,25 @@
 ## Open design notes
 - **`localhost`-only guard on `/api/tru/ghost` is header-based**, not real auth. If/when this site is published publicly, that endpoint writes to disk and should not be reachable from the public. Either restrict to the dev port or put it behind real auth before publishing.
 - The `paymentReady` gate in `tru-public.tsx` hides the "get offline copy" link until `STRIPE_PAYMENT_URL` is set. Until that URL is provided, `/onboard` is only reachable directly by URL.
+
+## What was built this session (2026-06-20)
+- OMEGA work:
+  - TRU OMEGA (single self-contained HTML sovereign engine, 2.2MB, integrity lock, sovereign brain, KJV subset, harmonic alignment + device admission, three next-science projections, WebLLM gate with mobile guard + stop-word fix).
+  - /vision codex gallery page
+  - /whitepaper page (The Jesument Protocol)
+  - MYTHOS.md index
+
+## Key files
+- `server.ts` — Bun + Hono server, all API routes, ghost export.
+- `src/App.tsx` — React router.
+- `src/pages/tru-public.tsx` — public landing + ask box.
+- `src/pages/tru-onboard.tsx` — capture → bake → download UI.
+- `src/pages/tru-console.tsx` — admin/console view.
+- `src/tru-ghost-shell.html` — clean shell the runtime is injected into.
+- `src/tru-ghost-runtime.template.js` — offline runtime with `__BRAIN__` / `__KJV__` / `__SESSION__` / `__META__` slots.
+- `state/` — local TRU state sink (NDJSON log + latest snapshot + `tru_brain.db`).
+- `../TRU/ghost/` — output dir for baked ghosts (relative to `tru/`).
+
+## Open design notes
+- **`localhost`-only guard on `/api/tru/ghost` is header-based**, not real auth. If/when this site is published publicly, that endpoint writes to disk and should not be reachable from the public. Either restrict to the dev port or put it behind real auth before publishing.
+- The `paymentReady` gate in `tru-public.tsx` hides the "get offline copy" link until `STRIPE_PAYMENT_URL` is set. Until that URL is provided, `/onboard` is only reachable directly by URL.
