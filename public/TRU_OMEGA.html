@@ -303,6 +303,7 @@ function tfIdf(docs, query) {
 }
 const DOCS = BRAIN.map(n => ({tokens: tokenize(n.keys.join(" ")+" "+n.title+" "+n.text), node: n}));
 
+const STOP = new Set(["the","and","but","what","who","how","why","when","where","which","that","this","for","with","about","tell","give","explain","please","your","you","can","could","will","would","should","not","yes"]);
 function scoreNode(node, query) {
   const ql = query.toLowerCase();
   let best = 0;
@@ -310,7 +311,7 @@ function scoreNode(node, query) {
     if (ql === k) return 1.0;
     if (ql.includes(k)) best = Math.max(best, 0.85);
     else {
-      const overlap = k.split(" ").filter(w => ql.includes(w) && w.length > 2).length;
+      const overlap = k.split(" ").filter(w => ql.includes(w) && w.length > 2 && !STOP.has(w)).length;
       if (overlap >= 2) best = Math.max(best, 0.6);
       else if (overlap === 1) best = Math.max(best, 0.35);
     }
