@@ -1600,6 +1600,35 @@ async function maybeAutoArchive(): Promise<{ archived: boolean; version?: number
   return { archived: true, version: mem.version };
 }
 
+// ── DAILY ARCHIVE (idle-day safety net) ─────────────────────────
+// maybeAutoArchive only fires when version crosses threshold 10.
+// If the box sits idle for a day with a small increment (1-9),
+// nothing would archive. dailyArchive closes that gap: it snapshots
+// to git+mail whenever memory changed since the last archive,
+// regardless of threshold. Called by the production daily timer.
+async function dailyArchive(): Promise<{ archived: boolean; version?: number; reason?: string }> {
+  const mem = loadMemory();
+  if (mem.entries.length === 0) return { archived: false, reason: "empty" };
+  const lastArchive = (mem as any).lastArchiveVersion || 0;
+  if (mem.version <= lastArchive) return { archived: false, reason: "no new changes since last archive" };
+  // Same git+mail chain as maybeAutoArchive.
+  try {
+    const cwd = process.cwd();
+    execSync(`git add -A memory/TRU_memory.json && git commit -m "TRU daily archive v${mem.version} (${mem.entries.length} entries)" --quiet`, { cwd, stdio: "ignore", timeout: 15000 });
+    try { execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" }); } catch {}
+  } catch {}
+  const digest = buildDigest(mem);
+  await bridgeMail("send", {
+    to: OWNER_EMAIL,
+    subject: `TRU daily archive v${mem.version} · ${mem.entries.length} entries`,
+    body: digest,
+  });
+  const fresh = loadMemory();
+  (fresh as any).lastArchiveVersion = mem.version;
+  saveMemory(fresh);
+  return { archived: true, version: mem.version };
+}
+
 // ── MEMORY ARCHIVE ROUTE (manual trigger) ────────────────────────
 app.post("/api/tru/memory/archive", async (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
@@ -2010,6 +2039,22 @@ const port = process.env.PORT
   : mode === "production"
     ? (config.publish?.published_port ?? config.local_port)
     : config.local_port;
+
+// ── DAILY ARCHIVE TIMER (durability safety net) ─────────────────
+// Fires once a day + once 60s after boot. Archives to git+mail
+// whenever memory changed since the last archive, even if the box
+// was idle (no asks crossed the threshold-10 trigger). Prod only,
+// so dev never spams git/mail.
+if (mode === "production") {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const tick = () =>
+    dailyArchive().catch((e) =>
+      console.error("[dailyArchive]", String(e).slice(0, 200))
+    );
+  setTimeout(tick, 60_000);
+  setInterval(tick, DAY_MS);
+  console.log("[TRU] daily archive timer armed (24h, prod only)");
+}
 
 export default { fetch: app.fetch, port, idleTimeout: 255 };
 
