@@ -876,7 +876,13 @@ app.post("/api/tru/ask/sovereign", async (c) => {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
         const refKey = v.key.toLowerCase().replace(/(\d+) /, "$1 ");
         const text = kjv[refKey] || kjv[v.key.toLowerCase()];
-        if (text) return c.json(foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q));
+        if (text) {
+          const ans = foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q);
+          const learned = autoLearn(q, ans);
+          logAsk({ ts: Date.now(), q, kind: "scripture", gap: false, learned });
+          if (learned.length) (ans as any).learned = learned;
+          return c.json(ans);
+        }
       } catch {}
     }
   }
@@ -888,11 +894,22 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     const queryClass = classifyQuery(q);
     const candidates = collectCandidates(db, q, queryClass);
     db.close();
-    const answer = buildSynthesis(q, queryClass, candidates);
-    return c.json(foldMemory(answer, q));
+    const answer = foldMemory(buildSynthesis(q, queryClass, candidates), q);
+    // Self-writing memory: extract teachings/identity/preferences, log for reflection.
+    const learned = autoLearn(q, answer);
+    logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", gap: answer.t === "GAP" || answer.blank === true, learned });
+    if (learned.length) (answer as any).learned = learned;
+    return c.json(answer);
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
   }
+});
+
+// ── REFLECT — LLM distillation of gap asks into durable memory ──
+app.post("/api/tru/reflect", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const result = await reflectOnAsks();
+  return c.json(result);
 });
 
 app.post("/api/tru/export", async (c) => {
@@ -1170,6 +1187,130 @@ function foldMemory(answer: any, query: string): any {
   if (!out.nodes) out.nodes = [];
   out.nodes.push(...recall.map((r) => `memory:${r.id}`));
   return out;
+}
+
+// ── SELF-WRITING MEMORY — deterministic auto-capture from asks ──
+const ASK_LOG = join(MEMORY_DIR, "TRU_asks.log.ndjson");
+
+interface AskRecord { ts: number; q: string; kind: string; gap: boolean; learned: string[] }
+
+function logAsk(rec: AskRecord): void {
+  try { appendFileSync(ASK_LOG, JSON.stringify(rec) + "\n"); } catch {}
+}
+
+function readAskLog(limit = 50): AskRecord[] {
+  if (!existsSync(ASK_LOG)) return [];
+  try {
+    const lines = readFileSync(ASK_LOG, "utf8").trim().split("\n").slice(-limit);
+    return lines.map((l) => JSON.parse(l)).filter(Boolean);
+  } catch { return []; }
+}
+
+// Deterministic extraction — no LLM, no credits. Detects teachings,
+// identity statements, and preferences from the query text itself.
+function autoLearn(query: string, answer: any): string[] {
+  const learned: string[] = [];
+  const mem = loadMemory();
+  const now = Date.now();
+
+  const hasSimilar = (kind: string, text: string): boolean => {
+    const norm = text.toLowerCase().slice(0, 80);
+    return mem.entries.some((e: any) =>
+      String(e.kind || "") === kind &&
+      String(e.text || "").toLowerCase().includes(norm.slice(0, 40))
+    );
+  };
+
+  const addEntry = (kind: string, text: string, tags: string[]): boolean => {
+    if (hasSimilar(kind, text)) return false;
+    mem.entries.push({ id: genId(), ts: now, updated: now, kind, text, tags });
+    learned.push(`[${kind}] ${text.slice(0, 60)}`);
+    return true;
+  };
+
+  // 1) Teaching pattern: "remember: X = Y"
+  const teachRe = /remember:\s*(.+?)\s*=\s*(.+)/i;
+  const teachM = query.match(teachRe);
+  if (teachM) {
+    addEntry("teaching", `${teachM[1].trim()} = ${teachM[2].trim()}`, ["taught", "remember"]);
+  }
+
+  // 2) Identity / preference patterns
+  const patterns: { re: RegExp; kind: string; tags: string[] }[] = [
+    { re: /(?:^|\s)(?:my name is|i am|i'm)\s+([a-z][\w-]{1,30})/i, kind: "identity", tags: ["identity", "name"] },
+    { re: /(?:^|\s)i live in\s+([a-z][\w\s,]{2,40})/i, kind: "identity", tags: ["identity", "location"] },
+    { re: /(?:^|\s)i(?:'m| am) from\s+([a-z][\w\s,]{2,40})/i, kind: "identity", tags: ["identity", "location"] },
+    { re: /(?:^|\s)my timezone is\s+([\w/+-]{2,30})/i, kind: "identity", tags: ["identity", "timezone"] },
+    { re: /(?:^|\s)i prefer\s+([a-z][\w\s,]{2,50})/i, kind: "preference", tags: ["preference"] },
+    { re: /(?:^|\s)i use\s+([a-z][\w\s,]{2,40})/i, kind: "preference", tags: ["preference", "tools"] },
+    { re: /(?:^|\s)i(?:'m| am) building\s+([a-z][\w\s,]{2,50})/i, kind: "project", tags: ["project"] },
+    { re: /(?:^|\s)i work on\s+([a-z][\w\s,]{2,50})/i, kind: "project", tags: ["project"] },
+  ];
+  for (const p of patterns) {
+    const m = query.match(p.re);
+    if (m) {
+      const captured = m[1].trim().replace(/\s+/g, " ");
+      addEntry(p.kind, captured, p.tags);
+    }
+  }
+
+  // 3) GAP answers — the question itself is a signal of what TRU doesn't know yet.
+  //    We don't auto-write the gap (too noisy), but we tag it for reflection.
+  if (learned.length > 0) {
+    mem.version = (mem.version || 0) + 1;
+    saveMemory(mem);
+  }
+  return learned;
+}
+
+// ── REFLECT — use the Zo bridge to distill durable facts from asks ──
+async function reflectOnAsks(): Promise<{ ok: boolean; distilled: any[]; detail: any }> {
+  const token = process.env.ZO_API_KEY;
+  if (!token) return { ok: false, distilled: [], detail: "ZO_API_KEY not set" };
+  const recent = readAskLog(30).filter((r) => r.gap || r.learned.length > 0);
+  if (recent.length === 0) {
+    return { ok: true, distilled: [], detail: "no gap/learned asks to reflect on" };
+  }
+  const asks = recent.map((r) => r.q).join("\n");
+  const prompt =
+    `You are the reflection layer for TRU, a sovereign knowledge engine. Below are recent questions ` +
+    `TRU was asked but could not fully answer (gaps). Extract durable facts worth remembering — ` +
+    `not the questions themselves, but the underlying truths or user-revealed facts implied by them. ` +
+    `Respond as a JSON array of objects with keys: kind (identity|preference|teaching|project|note), ` +
+    `text (the fact, max 200 chars), tags (array of short strings). Respond with ONLY the JSON array.\n\n` +
+    `Questions:\n${asks}`;
+  try {
+    const resp = await fetch(ZO_ASK_URL, {
+      method: "POST",
+      headers: { authorization: "Bearer " + token, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ input: prompt, model_name: ZO_MODEL }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const data: any = await resp.json();
+    let distilled: any[] = [];
+    if (typeof data?.output === "string") {
+      try { distilled = JSON.parse(data.output); } catch {}
+    } else if (Array.isArray(data?.output)) {
+      distilled = data.output;
+    }
+    // Persist distilled facts that don't duplicate existing memory.
+    if (Array.isArray(distilled) && distilled.length > 0) {
+      const mem = loadMemory();
+      const now = Date.now();
+      for (const d of distilled) {
+        if (!d?.text || typeof d.text !== "string") continue;
+        const exists = mem.entries.some((e: any) => String(e.text || "").toLowerCase().includes(d.text.toLowerCase().slice(0, 40)));
+        if (!exists) {
+          mem.entries.push({ id: genId(), ts: now, updated: now, kind: d.kind || "note", text: String(d.text).slice(0, 300), tags: Array.isArray(d.tags) ? d.tags : ["reflected"] });
+        }
+      }
+      mem.version = (mem.version || 0) + 1;
+      saveMemory(mem);
+    }
+    return { ok: resp.ok, distilled, detail: data?.output ?? data };
+  } catch (e) {
+    return { ok: false, distilled: [], detail: String(e) };
+  }
 }
 
 // ── SOVEREIGN METRICS (public, self-knowing) ────────────────────

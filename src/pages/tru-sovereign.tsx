@@ -18,8 +18,10 @@ export default function TruSovereign() {
 
   // sovereign metrics
   const [metrics, setMetrics] = useState<any>(null);
-  const [alsoAskTru, setAlsoAskTru] = useState(true);
-  const [truRead, setTruRead] = useState<{ kind: string; text: string; v?: string; score?: number; source?: string } | null>(null);
+  const [alsoAskTru, setAlsoAskTru] = useState(false);
+  const [truRead, setTruRead] = useState<{ kind?: string; v?: string; text?: string; score?: number; source?: string; ref?: string } | null>(null);
+  const [reflecting, setReflecting] = useState(false);
+  const [reflectResult, setReflectResult] = useState<any>(null);
 
   const [askQ, setAskQ] = useState("");
   const [askA, setAskA] = useState<any>(null);
@@ -116,7 +118,6 @@ export default function TruSovereign() {
     if (!sq.trim() || searching) return;
     setSearching(true);
     setResults([]);
-    setTruRead(null);
     push(`SEARCH · ${sq}`);
     try {
       const r = await fetch(`/api/tru/search?q=${encodeURIComponent(sq)}`);
@@ -124,26 +125,45 @@ export default function TruSovereign() {
       if (j.ok) {
         setResults(j.results || []);
         push(`SEARCH · ${j.count} results`);
-        // ∑ also ask TRU's brain for the same topic (sovereign synthesis)
-        if (alsoAskTru) {
-          try {
-            const ar = await fetch("/api/tru/ask", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ q: sq.trim() }),
-            });
-            const aj = await ar.json();
-            if (aj.ok) {
-              setTruRead({ kind: aj.t || aj.kind || "TRU", text: aj.v || aj.text || "", score: aj.score });
-              push(`TRU · read · ${aj.kind || "brain"} · ${aj.score ?? "—"}%`);
-            }
-          } catch { push("TRU · read · skipped"); }
-        }
       } else push(`SEARCH · fail · ${j.error}`);
     } catch {
       push("SEARCH · fail · network");
     } finally {
       setSearching(false);
+    }
+    // Also ask TRU if toggled on
+    if (alsoAskTru && sq.trim()) {
+      setTruRead(null);
+      try {
+        const tr = await fetch("/api/tru/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: sq.trim() }) });
+        const tj = await tr.json();
+        if (tj.ok) {
+          setTruRead({ kind: tj.t || tj.kind, v: tj.v || tj.text, text: tj.text, score: tj.score, source: tj.source, ref: tj.ref });
+          push(`TRU · read · ${tj.t || tj.kind} · ${tj.score ?? 0}%`);
+        }
+      } catch {
+        push("TRU · read · fail");
+      }
+    }
+  };
+
+  const doReflect = async () => {
+    if (reflecting) return;
+    setReflecting(true);
+    setReflectResult(null);
+    push("REFLECT · distilling recent asks…");
+    try {
+      const r = await fetch("/api/tru/reflect", { method: "POST", headers: { ...authH() } });
+      const j = await r.json();
+      setReflectResult(j);
+      if (j.ok) {
+        push(`REFLECT · ${j.written || 0} memories written · ${j.skipped || 0} skipped`);
+        if (j.written > 0) loadMem();
+      } else push(`REFLECT · fail · ${j.error || j.detail || "—"}`);
+    } catch {
+      push("REFLECT · fail · network");
+    } finally {
+      setReflecting(false);
     }
   };
 
@@ -403,8 +423,19 @@ export default function TruSovereign() {
                   {askA.ref && <span className="text-emerald-300">{askA.ref}</span>}
                   <span>score {askA.score ?? 0}</span>
                   {askA.memory?.length > 0 && <span className="text-amber-400">memory · {askA.memory.length}</span>}
+                  {askA.learned?.length > 0 && <span className="text-cyan-400">auto-learned · {askA.learned.length}</span>}
                 </div>
                 <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed">{askA.v || askA.text || ""}</div>
+                {askA.learned?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-900">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-500 mb-1">self-written</div>
+                    {askA.learned.map((l: any) => (
+                      <div key={l.id} className="text-[11px] text-neutral-400 mb-1">
+                        <span className="text-cyan-600">[{l.kind}]</span> {l.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {askA.memory?.length > 0 && (
                   <div className="mt-3 pt-3 border-t border-neutral-900">
                     <div className="text-[10px] uppercase tracking-[0.2em] text-amber-500 mb-1">remembered</div>
@@ -476,6 +507,9 @@ export default function TruSovereign() {
                 <button onClick={archive} disabled={memBusy || entries.length === 0} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-emerald-700 text-emerald-300 hover:bg-emerald-700/30 disabled:border-neutral-800 disabled:text-neutral-600">
                   {memBusy ? "…" : "archive"}
                 </button>
+                <button onClick={doReflect} disabled={reflecting} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-amber-700 text-amber-300 hover:bg-amber-700/30 disabled:border-neutral-800 disabled:text-neutral-600">
+                  {reflecting ? "…" : "reflect"}
+                </button>
                 <button onClick={loadMem} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-neutral-800 text-neutral-400 hover:text-emerald-300">reload</button>
               </div>
             </div>
@@ -486,6 +520,13 @@ export default function TruSovereign() {
                 <span className="text-emerald-300">git={archiveReport.git?.pushed || archiveReport.git?.error || "—"}</span>
                 <span className="text-neutral-600"> · </span>
                 <span className={archiveReport.mail?.ok ? "text-emerald-300" : "text-amber-400"}>mail={archiveReport.mail?.ok ? "sent" : archiveReport.mail?.detail || "—"}</span>
+              </div>
+            )}
+
+            {reflectResult && (
+              <div className="border border-amber-900/50 bg-black/50 p-3 mb-4 text-[11px]">
+                <span className="text-amber-500">reflect: </span>
+                <span className="text-amber-300">{reflectResult.ok ? `${reflectResult.written || 0} written · ${reflectResult.skipped || 0} skipped · ${reflectResult.distilled || "—"} distilled` : reflectResult.error || reflectResult.detail || "fail"}</span>
               </div>
             )}
 
