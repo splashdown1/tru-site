@@ -1611,17 +1611,28 @@ app.post("/api/tru/memory/archive", async (c) => {
   try {
     const cwd = process.cwd();
     execSync(
-      `git add -A memory/TRU_memory.json && git commit -m "TRU memory archive v${mem.version} (${mem.entries.length} entries)" --quiet`,
+      `git add -A memory/TRU_memory.json`,
       { cwd, stdio: "ignore" },
     );
-    let pushed = "commit-only (push not attempted)";
-    try {
-      execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" });
-      pushed = "pushed";
-    } catch (e) {
-      pushed = "commit-only (push failed: " + String(e).slice(0, 140) + ")";
+    // Check if there are staged changes before committing.
+    let staged = "";
+    try { staged = execSync("git diff --cached --name-only", { cwd, timeout: 4000 }).toString().trim(); } catch {}
+    if (staged) {
+      execSync(
+        `git commit -m "TRU memory archive v${mem.version} (${mem.entries.length} entries)" --quiet`,
+        { cwd, stdio: "ignore" },
+      );
+      let pushed = "commit-only (push not attempted)";
+      try {
+        execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" });
+        pushed = "pushed";
+      } catch (e) {
+        pushed = "commit-only (push failed: " + String(e).slice(0, 140) + ")";
+      }
+      report.git = { ok: true, pushed };
+    } else {
+      report.git = { ok: true, pushed: "no changes (already committed)" };
     }
-    report.git = { ok: true, pushed };
   } catch (e) {
     report.git = { ok: false, error: String(e).slice(0, 200) };
   }
