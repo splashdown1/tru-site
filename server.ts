@@ -1561,7 +1561,7 @@ function buildDigest(mem: { entries: any[]; version: number }): string {
   md += `Entries: ${mem.entries.length}\n\n`;
   md += `---\n\n`;
   for (const kind of ordered) {
-    md += `## ${kind.charAt(0).toUpperCase() + kind.slice(1)}s (${byKind[kind].length})\n\n`;
+    const plural: Record<string,string> = { identity: "Identities" }; const label = plural[kind] || (kind.charAt(0).toUpperCase() + kind.slice(1) + "s"); md += `## ${label} (${byKind[kind].length})\n\n`;
     for (const e of byKind[kind]) {
       const date = new Date(e.ts || e.updated || 0).toISOString().slice(0, 10);
       const tags = Array.isArray(e.tags) && e.tags.length ? ` · ${e.tags.map((t) => "#" + t).join(" ")}` : "";
