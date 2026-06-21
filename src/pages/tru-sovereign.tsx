@@ -334,8 +334,8 @@ export default function TruSovereign() {
               <div className="mt-4 pt-4 border-t border-neutral-900">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mb-2">sovereign stack</div>
                 <div className="flex flex-wrap gap-2">
-                  {metrics.stack.map((s: string) => (
-                    <span key={s} className="text-[10px] uppercase tracking-[0.2em] text-emerald-600 border border-neutral-800 px-2 py-1">{s}</span>
+                  {metrics.stack.map((s: any) => (
+                    <span key={s.name} title={s.role} className="text-[10px] uppercase tracking-[0.2em] text-emerald-600 border border-neutral-800 px-2 py-1">{s.name}</span>
                   ))}
                 </div>
               </div>
