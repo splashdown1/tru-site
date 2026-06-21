@@ -124,8 +124,19 @@
       "tags": [
         "preference"
       ]
+    },
+    {
+      "id": "m_mqodbpbn_51ya2j",
+      "ts": 1782081520115,
+      "updated": 1782081520115,
+      "kind": "teaching",
+      "text": "The durability layer is the covenant between memory and time. Git for the machine, RFC 822 for the human.",
+      "tags": [
+        "durability",
+        "archive",
+        "covenant"
+      ]
     }
   ],
-  "version": 8,
-  "lastArchiveVersion": 8
+  "version": 9
 }
