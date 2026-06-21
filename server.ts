@@ -3,7 +3,7 @@ import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
-import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, renameSync } from "node:fs";
+import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, renameSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import Database from "bun:sqlite";
@@ -1649,6 +1649,112 @@ app.post("/api/tru/memory/archive", async (c) => {
   (fresh as any).lastArchiveVersion = mem.version;
   saveMemory(fresh);
   return c.json(report);
+});
+
+// ── MEMORY EXPORT — full JSON snapshot for import on a new box ──
+// Gated. Returns the complete memory store as a downloadable JSON file.
+// This is the "take your memory with you" primitive — the owner can save
+// this file, move to a new TRU instance, and POST it to /memory/restore.
+app.get("/api/tru/memory/export", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  const mem = loadMemory();
+  const snapshot = {
+    exportedAt: new Date().toISOString(),
+    version: mem.version,
+    count: mem.entries.length,
+    entries: mem.entries,
+    lastArchiveVersion: (mem as any).lastArchiveVersion || 0,
+  };
+  const filename = `TRU_memory_export_v${mem.version}_${Date.now()}.json`;
+  return new Response(JSON.stringify(snapshot, null, 2), {
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    },
+  });
+});
+
+// ── MEMORY VERSIONS — list git history of memory.json ──────────
+// Gated. Returns commit hashes, timestamps, and messages for every
+// archived version of memory.json, so the owner can pick one to restore.
+app.get("/api/tru/memory/versions", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  try {
+    const cwd = process.cwd();
+    const log = execSync(
+      "git log --format=%H|%ct|%s -- memory/TRU_memory.json",
+      { cwd, timeout: 8000 },
+    ).toString().trim();
+    if (!log) return c.json({ ok: true, versions: [] });
+    const versions = log.split("\n").map((line) => {
+      const [hash, ct, subject] = line.split("|");
+      return { hash, ts: parseInt(ct, 10) * 1000, subject: subject || "" };
+    });
+    return c.json({ ok: true, count: versions.length, versions });
+  } catch (e) {
+    return c.json({ ok: false, error: String(e).slice(0, 200) }, 500);
+  }
+});
+
+// ── MEMORY RESTORE — reload from git, a version hash, or JSON body ──
+// Gated. Three modes:
+//   1) body.source === "git-latest"  → restore from the latest git commit of memory.json
+//   2) body.source === "git" + body.hash → restore from a specific commit hash
+//   3) body.entries (array)          → restore from a JSON payload (e.g. an exported file)
+// Wipes the current memory.json first (backed up to .bak-<epoch>), then writes
+// the restored content. Returns before/after counts so the owner can verify.
+app.post("/api/tru/memory/restore", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  const before = loadMemory();
+  const beforeCount = before.entries.length;
+  let restored: { entries: any[]; version: number } | null = null;
+  const source = (body?.source || "").toString();
+
+  // Mode 1/2: restore from git
+  if (source === "git-latest" || (source === "git" && body?.hash)) {
+    try {
+      const cwd = process.cwd();
+      const ref = body?.hash ? String(body.hash).slice(0, 40) : "HEAD";
+      const raw = execSync(`git show ${ref}:memory/TRU_memory.json`, {
+        cwd, timeout: 8000,
+      }).toString();
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed?.entries)) {
+        restored = { entries: parsed.entries, version: parsed.version || 0 };
+      } else {
+        return c.json({ ok: false, error: "git version has no entries array" }, 400);
+      }
+    } catch (e) {
+      return c.json({ ok: false, error: "git restore failed: " + String(e).slice(0, 200) }, 500);
+    }
+  }
+  // Mode 3: restore from JSON payload
+  else if (Array.isArray(body?.entries)) {
+    restored = { entries: body.entries, version: body.version || body.entries.length };
+  } else {
+    return c.json({ ok: false, error: "specify source=git-latest, source=git+hash, or entries array" }, 400);
+  }
+
+  if (!restored) return c.json({ ok: false, error: "restore produced no data" }, 500);
+
+  // Back up the current file before overwriting.
+  try {
+    if (existsSync(MEMORY_FILE)) {
+      const bak = MEMORY_FILE + `.bak-${Date.now()}`;
+      copyFileSync(MEMORY_FILE, bak);
+    }
+  } catch {}
+  // Write the restored memory.
+  saveMemory(restored);
+  return c.json({
+    ok: true,
+    source: source || "json-payload",
+    before: beforeCount,
+    after: restored.entries.length,
+    version: restored.version,
+  });
 });
 
 // ── MAIL — send / read via the bridge ────────────────────────────

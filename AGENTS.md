@@ -109,3 +109,10 @@
 - Objective queries: brain leads, memory appended as "Remembered:" footnote. source=CERTIFIED/TRU_BRAIN.
 - GAP queries (brain missed): memory becomes the answer if strong hit, else teach-me prompt.
 - Strong threshold lowered from 8 to 5 so single-tag-match personal facts (e.g. preference tag vs "prefer" token) qualify.
+
+## Durability layer (auto-archive)
+- buildDigest produces readable markdown for the mail body
+- maybeAutoArchive fires git+mail when version crosses threshold 10
+- Manual archive button on /sovereign
+- 3 layers of persistence: working JSON, git history, RFC822 mail
+- Mail confirmed delivered to legendofsplashdown@gmail.com
