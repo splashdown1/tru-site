@@ -282,7 +282,7 @@ export default function TruSovereign() {
         <div className="flex items-center justify-between border-b border-neutral-900 pb-4 mb-8">
           <div className="flex items-center gap-4">
             <span className="text-[11px] uppercase tracking-[0.4em] text-emerald-300">TRU · SOVEREIGN</span>
-            <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">search · memory · mail</span>
+            <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 hidden sm:inline">search · memory · mail</span>
           </div>
           <div className="flex items-center gap-4">
             {unlocked ? (
@@ -316,7 +316,7 @@ export default function TruSovereign() {
                 <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mt-1">kjv verses</div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4 text-[11px]">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-[11px]">
               <div>
                 <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">uptime</div>
                 <div className="text-neutral-300">{Math.floor(metrics.uptimeSec / 3600)}h {Math.floor((metrics.uptimeSec % 3600) / 60)}m</div>
@@ -364,7 +364,7 @@ export default function TruSovereign() {
 
         {/* STATUS (if unlocked) */}
         {unlocked && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             <div className="border border-neutral-900 bg-neutral-950/40 p-4">
               <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-1">Gate</div>
               <div className={`text-lg ${status?.gate ? "text-emerald-300" : "text-red-400"}`}>{status?.gate ? "ARMED" : "—"}</div>

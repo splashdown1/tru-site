@@ -89,3 +89,9 @@
 - GAP case: if the brain has no node but memory has a matching entry, that remembered entry becomes the answer.
 - UI: the `/sovereign` page now has an "Ask TRU · brain + memory" box (gated).
 - Commit: `c0cac24`.
+
+## Sovereign public surface (2026-06-21)
+- Manifesto block on public landing (`src/pages/tru-public.tsx`) — sovereign voice per TRU/SOUL.md.
+- `GET /api/tru/metrics` (public, read-only): daysSovereign (from first git commit), commits, brain nodes, KJV verses, uptime, brain MB, epoch, sovereign stack manifest.
+- Sovereign page `/sovereign`: metrics panel (always visible), "also ask TRU" toggle on search (fires brain synthesis alongside web results), sovereign stack showcase.
+- Fix: stack items are objects {name,role} not strings — render s.name with title=s.role.
