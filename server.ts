@@ -2060,20 +2060,63 @@ const port = process.env.PORT
     ? (config.publish?.published_port ?? config.local_port)
     : config.local_port;
 
+// Silent reconciliation at boot: if lastArchiveVersion is stale but
+// memory/TRU_memory.json is already committed in git (no uncommitted
+// changes), the content is already durable in git history — just sync
+// the flag, no mail, no redundant commit. Only fire the real
+// git+mail archive when there are genuine uncommitted changes.
+function memoryHasUncommittedChanges(): boolean {
+  try {
+    const out = execSync("git status --porcelain memory/TRU_memory.json", {
+      cwd: process.cwd(),
+      timeout: 5000,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).toString().trim();
+    return out.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function bootReconcileArchive(): Promise<{ action: string; version?: number; reason?: string }> {
+  const mem = loadMemory();
+  if (mem.entries.length === 0) return { action: "skip", reason: "empty" };
+  const lastArchive = (mem as any).lastArchiveVersion || 0;
+  if (mem.version <= lastArchive) return { action: "skip", reason: "flag current" };
+  // New content since the recorded archive version.
+  if (memoryHasUncommittedChanges()) {
+    // Genuine uncommitted changes → fire the real git+mail archive.
+    const r = await dailyArchive();
+    return { action: r.archived ? "archived" : "noop", version: r.version, reason: r.reason };
+  }
+  // No uncommitted changes → memory is already durable in git at this
+  // version. Silently sync the flag so the daily tick doesn't re-fire.
+  (mem as any).lastArchiveVersion = mem.version;
+  saveMemory(mem);
+  console.log(`[TRU] boot reconcile: lastArchiveVersion synced to ${mem.version} (already in git, no mail)`);
+  return { action: "reconciled", version: mem.version };
+}
+
 // ── DAILY ARCHIVE TIMER (durability safety net) ─────────────────
-// Fires once a day + once 60s after boot. Archives to git+mail
-// whenever memory changed since the last archive, even if the box
-// was idle (no asks crossed the threshold-10 trigger). Prod only,
-// so dev never spams git/mail.
+// Fires once a day + a silent reconcile 60s after boot. The boot
+// reconcile only sends git+mail when memory.json has actual
+// uncommitted changes; if the content is already committed in git it
+// just syncs the lastArchiveVersion flag (no boot mail spam on every
+// service restart). The daily interval tick runs the real archive.
+// Prod only, so dev never spams git/mail.
 if (mode === "production") {
   const DAY_MS = 24 * 60 * 60 * 1000;
-  const tick = () =>
+  const bootTick = () =>
+    bootReconcileArchive().catch((e) =>
+      console.error("[bootReconcileArchive]", String(e).slice(0, 200))
+    );
+  const dailyTick = () =>
     dailyArchive().catch((e) =>
       console.error("[dailyArchive]", String(e).slice(0, 200))
     );
-  setTimeout(tick, 60_000);
-  setInterval(tick, DAY_MS);
-  console.log("[TRU] daily archive timer armed (24h, prod only)");
+  setTimeout(bootTick, 60_000);
+  setInterval(dailyTick, DAY_MS);
+  console.log("[TRU] daily archive timer armed (boot reconcile + 24h daily, prod only)");
 }
 
 export default { fetch: app.fetch, port, idleTimeout: 255 };
