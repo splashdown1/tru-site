@@ -16,6 +16,10 @@ export default function TruSovereign() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
+  const [askQ, setAskQ] = useState("");
+  const [askA, setAskA] = useState<any>(null);
+  const [asking, setAsking] = useState(false);
+
   const [entries, setEntries] = useState<MemEntry[]>([]);
   const [version, setVersion] = useState(0);
   const [memFilter, setMemFilter] = useState("");
@@ -109,6 +113,27 @@ export default function TruSovereign() {
       push("SEARCH · fail · network");
     } finally {
       setSearching(false);
+    }
+  };
+
+  const doAsk = async () => {
+    if (!askQ.trim() || asking || !unlocked) return;
+    setAsking(true);
+    setAskA(null);
+    push(`TRU · ${askQ}`);
+    try {
+      const r = await fetch("/api/tru/ask/sovereign", {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ q: askQ.trim() }),
+      });
+      const j = await r.json();
+      setAskA(j);
+      push(`TRU · ${j.ok ? j.kind : "fail"} · score=${j.score ?? "—"} mem=${j.memory?.length ?? 0}`);
+    } catch {
+      push("TRU · fail · network");
+    } finally {
+      setAsking(false);
     }
   };
 
@@ -272,6 +297,46 @@ export default function TruSovereign() {
               <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-1">Archive To</div>
               <div className="text-[11px] text-neutral-300 truncate" title={status?.owner}>{status?.owner || "—"}</div>
             </div>
+          </div>
+        )}
+
+        {/* SOVEREIGN ASK — gated, memory-augmented retrieval */}
+        {unlocked && (
+          <div className="border border-neutral-900 bg-neutral-950/40 p-6 mb-8">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-3">Sovereign Ask · brain + scripture + memory</div>
+            <div className="flex gap-3 mb-4">
+              <input
+                value={askQ}
+                onChange={(e) => setAskQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && doAsk()}
+                placeholder="ask TRU — it consults its own memory…"
+                className="flex-1 bg-black border border-neutral-800 px-3 py-2 text-sm text-emerald-200 outline-none focus:border-emerald-700"
+              />
+              <button onClick={doAsk} disabled={asking || !askQ.trim()} className="px-6 py-2 text-xs uppercase tracking-[0.3em] border-2 border-emerald-500 text-emerald-300 hover:bg-emerald-500 hover:text-black disabled:border-neutral-800 disabled:text-neutral-600">
+                {asking ? "…" : "ask"}
+              </button>
+            </div>
+            {askA && (
+              <div className="border border-neutral-800 bg-black/50 p-4">
+                <div className="flex items-center gap-3 mb-2 text-[10px] uppercase tracking-[0.2em] text-neutral-600">
+                  <span className="text-emerald-400">{askA.kind || "—"}</span>
+                  {askA.ref && <span className="text-emerald-300">{askA.ref}</span>}
+                  <span>score {askA.score ?? 0}</span>
+                  {askA.memory?.length > 0 && <span className="text-amber-400">memory · {askA.memory.length}</span>}
+                </div>
+                <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed">{askA.v || askA.text || ""}</div>
+                {askA.memory?.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-neutral-900">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-amber-500 mb-1">remembered</div>
+                    {askA.memory.map((m: any) => (
+                      <div key={m.id} className="text-[11px] text-neutral-400 mb-1">
+                        <span className="text-amber-600">[{m.kind}]</span> {m.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

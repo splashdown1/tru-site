@@ -856,6 +856,45 @@ app.post("/api/tru/ask", async (c) => {
   }
 });
 
+// SOVEREIGN ASK — gated. Same retrieval as /ask, but folds TRU's own
+// remembered memory into the answer. Public /ask stays brain+KJV only;
+// memory is the owner's private knowledge and must not leak to anon
+// queries. In the GAP case, a strong memory match becomes the answer.
+app.post("/api/tru/ask/sovereign", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  let body: { q?: string } = {};
+  try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  const q = (body.q || "").trim();
+  if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+  ensureBrainDb();
+  // Scripture shortcut — same as public /ask.
+  const v = parseVerse(q);
+  if (v) {
+    const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+    if (existsSync(kjvPath)) {
+      try {
+        const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
+        const refKey = v.key.toLowerCase().replace(/(\d+) /, "$1 ");
+        const text = kjv[refKey] || kjv[v.key.toLowerCase()];
+        if (text) return c.json(foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q));
+      } catch {}
+    }
+  }
+  if (!existsSync(BRAIN_DB)) {
+    return c.json({ ok: false, error: "brain.db not found" }, 404);
+  }
+  try {
+    const db = new Database(BRAIN_DB, { readonly: true });
+    const queryClass = classifyQuery(q);
+    const candidates = collectCandidates(db, q, queryClass);
+    db.close();
+    const answer = buildSynthesis(q, queryClass, candidates);
+    return c.json(foldMemory(answer, q));
+  } catch (e) {
+    return c.json({ ok: false, error: String(e) }, 500);
+  }
+});
+
 app.post("/api/tru/export", async (c) => {
   const raw = await c.req.text().catch(() => "");
   if (raw.length > MAX_EXPORT_BYTES) {
@@ -1075,6 +1114,62 @@ function decodeEntities(s: string): string {
   return s.replace(/<[^>]+>/g, "")
     .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim();
+}
+
+// ── MEMORY RECALL — score remembered entries against a query ────
+// Read-only. Memory is TRU's own accumulated knowledge; recall is
+// not gated (writes + mail are). Returns entries whose text or tags
+// overlap the query tokens, ranked by overlap strength.
+function gatherMemory(query: string, limit = 5): { id: string; kind: string; text: string; tags: string[]; ts: number; score: number }[] {
+  const mem = loadMemory();
+  if (!mem.entries.length) return [];
+  const qTokens = tokenize(query).filter((t) => t.length >= 3);
+  if (!qTokens.length) return [];
+  const scored = mem.entries.map((e: any) => {
+    const textNorm = norm(String(e.text || ""));
+    const tagsNorm = (Array.isArray(e.tags) ? e.tags : []).map((t: string) => norm(String(t)));
+    let score = 0;
+    for (const t of qTokens) {
+      if (textNorm.includes(t)) score += 3;
+      for (const tag of tagsNorm) {
+        if (tag === t || tag.startsWith(t)) score += 5;
+      }
+    }
+    // exact phrase match bonus
+    if (textNorm.includes(norm(query)) && norm(query).length >= 4) score += 8;
+    return { id: e.id, kind: String(e.kind || "note"), text: String(e.text || ""), tags: Array.isArray(e.tags) ? e.tags : [], ts: Number(e.ts || 0), score };
+  }).filter((m) => m.score > 0).sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit);
+}
+
+// Fold remembered entries into a synthesis answer. In the GAP case
+// (brain had nothing), a strongly-matching memory entry becomes the
+// answer itself — TRU remembers what it was taught even outside the
+// curated brain.
+function foldMemory(answer: any, query: string): any {
+  const hits = gatherMemory(query, 5);
+  if (!hits.length) return answer;
+  const strong = hits.filter((h) => h.score >= 8);
+  const out = { ...answer, memory: hits.map((h) => ({ id: h.id, kind: h.kind, text: h.text, score: h.score })) };
+  // GAP case: brain missed, but memory has a strong match → memory IS the answer.
+  if (answer.blank === true || answer.t === "GAP") {
+    if (strong.length) {
+      const top = strong[0];
+      out.v = `${top.text}\n\n[remembered · ${top.kind}]`;
+      out.t = "MEMORY";
+      out.source = "TRU_MEMORY";
+      out.blank = false;
+      out.score = Math.min(99, top.score * 3);
+      return out;
+    }
+  }
+  // Non-GAP: append a recalled-context line so TRU consults its memory.
+  const recall = strong.length ? strong : hits.slice(0, 2);
+  const recallLine = `Remembered: ${recall.map((r) => firstSentence(r.text, 140)).join(" · ")}`;
+  out.v = `${answer.v}\n${recallLine}`;
+  if (!out.nodes) out.nodes = [];
+  out.nodes.push(...recall.map((r) => `memory:${r.id}`));
+  return out;
 }
 
 // ── SEARCH (keyless, public) ─────────────────────────────────────
