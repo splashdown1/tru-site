@@ -1682,7 +1682,7 @@ app.get("/api/tru/memory/versions", (c) => {
   try {
     const cwd = process.cwd();
     const log = execSync(
-      "git log --format=%H|%ct|%s -- memory/TRU_memory.json",
+      "git log --format='%H|%ct|%s' -- memory/TRU_memory.json",
       { cwd, timeout: 8000 },
     ).toString().trim();
     if (!log) return c.json({ ok: true, versions: [] });
