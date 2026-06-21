@@ -1166,7 +1166,7 @@ function gatherMemory(query: string, limit = 5): { id: string; kind: string; tex
 function foldMemory(answer: any, query: string): any {
   const hits = gatherMemory(query, 5);
   if (!hits.length) return answer;
-  const strong = hits.filter((h) => h.score >= 8);
+  const strong = hits.filter((h) => h.score >= 5);
   const out = { ...answer, memory: hits.map((h) => ({ id: h.id, kind: h.kind, text: h.text, score: h.score })) };
   // GAP case: brain missed, but memory has a strong match → memory IS the answer.
   if (answer.blank === true || answer.t === "GAP") {
