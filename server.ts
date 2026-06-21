@@ -1734,7 +1734,7 @@ app.post("/api/tru/memory/restore", async (c) => {
   else if (Array.isArray(body?.entries)) {
     restored = { entries: body.entries, version: body.version || body.entries.length };
   } else {
-    return c.json({ ok: false, error: "specify source=git-latest, source=git+hash, or entries array" }, 400);
+    return c.json({ ok: false, error: "specify source=git-latest, source=git (with hash), or entries array" }, 400);
   }
 
   if (!restored) return c.json({ ok: false, error: "restore produced no data" }, 500);

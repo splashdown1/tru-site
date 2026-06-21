@@ -22,6 +22,9 @@ export default function TruSovereign() {
   const [truRead, setTruRead] = useState<{ kind?: string; v?: string; text?: string; score?: number; source?: string; ref?: string } | null>(null);
   const [reflecting, setReflecting] = useState(false);
   const [reflectResult, setReflectResult] = useState<any>(null);
+  // restore + export state
+  const [versions, setVersions] = useState<any[]>([]);
+  const [restoreReport, setRestoreReport] = useState<any>(null);
 
   const [askQ, setAskQ] = useState("");
   const [askA, setAskA] = useState<any>(null);
@@ -249,6 +252,57 @@ export default function TruSovereign() {
     } finally {
       setMemBusy(false);
     }
+  };
+
+  const exportMem = async () => {
+    try {
+      const r = await fetch("/api/tru/memory/export", { headers: authH() });
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `TRU_memory_export_v${version}_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      push("EXPORT · downloaded");
+    } catch {
+      push("EXPORT · fail");
+    }
+  };
+
+  const loadVersions = async () => {
+    try {
+      const r = await fetch("/api/tru/memory/versions", { headers: authH() });
+      const j = await r.json();
+      if (j.ok) { setVersions(j.versions || []); push(`VERSIONS · ${j.count} git versions`); }
+      else push(`VERSIONS · fail · ${j.error}`);
+    } catch { push("VERSIONS · fail · network"); }
+  };
+
+  const restoreLatest = async () => {
+    setMemBusy(true); setRestoreReport(null);
+    try {
+      const r = await fetch("/api/tru/memory/restore", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git-latest" }) });
+      const j = await r.json();
+      setRestoreReport(j);
+      if (j.ok) { await loadMem(); push(`RESTORE · git-latest · ${j.before}→${j.after} entries`); }
+      else push(`RESTORE · fail · ${j.error}`);
+    } catch { push("RESTORE · fail · network"); }
+    finally { setMemBusy(false); }
+  };
+
+  const restoreFromHash = async (hash: string) => {
+    setMemBusy(true); setRestoreReport(null);
+    try {
+      const r = await fetch("/api/tru/memory/restore", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git", hash }) });
+      const j = await r.json();
+      setRestoreReport(j);
+      if (j.ok) { await loadMem(); push(`RESTORE · ${hash.slice(0,8)} · ${j.before}→${j.after} entries`); }
+      else push(`RESTORE · fail · ${j.error}`);
+    } catch { push("RESTORE · fail · network"); }
+    finally { setMemBusy(false); }
   };
 
   const sendMail = async () => {
@@ -507,6 +561,12 @@ export default function TruSovereign() {
                 <button onClick={archive} disabled={memBusy || entries.length === 0} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-emerald-700 text-emerald-300 hover:bg-emerald-700/30 disabled:border-neutral-800 disabled:text-neutral-600">
                   {memBusy ? "…" : "archive"}
                 </button>
+                <button onClick={exportMem} disabled={entries.length === 0} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-neutral-700 text-neutral-300 hover:text-emerald-300 disabled:border-neutral-800 disabled:text-neutral-600">
+                  export
+                </button>
+                <button onClick={loadVersions} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-neutral-700 text-neutral-300 hover:text-emerald-300">
+                  versions
+                </button>
                 <button onClick={doReflect} disabled={reflecting} className="px-4 py-2 text-[10px] uppercase tracking-[0.3em] border border-amber-700 text-amber-300 hover:bg-amber-700/30 disabled:border-neutral-800 disabled:text-neutral-600">
                   {reflecting ? "…" : "reflect"}
                 </button>
@@ -527,6 +587,29 @@ export default function TruSovereign() {
               <div className="border border-amber-900/50 bg-black/50 p-3 mb-4 text-[11px]">
                 <span className="text-amber-500">reflect: </span>
                 <span className="text-amber-300">{reflectResult.ok ? `${reflectResult.written || 0} written · ${reflectResult.skipped || 0} skipped · ${reflectResult.distilled || "—"} distilled` : reflectResult.error || reflectResult.detail || "fail"}</span>
+              </div>
+            )}
+
+            {restoreReport && (
+              <div className="border border-cyan-900/50 bg-black/50 p-3 mb-4 text-[11px]">
+                <span className="text-cyan-500">restore: </span>
+                <span className={restoreReport.ok ? "text-emerald-300" : "text-red-400"}>{restoreReport.ok ? `${restoreReport.source} · ${restoreReport.before}→${restoreReport.after} entries · v${restoreReport.version}` : restoreReport.error || "fail"}</span>
+              </div>
+            )}
+
+            {versions.length > 0 && (
+              <div className="border border-neutral-900 bg-black/50 p-3 mb-4">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mb-2">git history · click to restore</div>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {versions.map((v, i) => (
+                    <div key={i} className="flex items-center gap-3 text-[11px]">
+                      <button onClick={() => restoreFromHash(v.hash)} disabled={memBusy} className="text-cyan-400 hover:text-cyan-200 disabled:text-neutral-700 tabular-nums">{v.hash.slice(0, 8)}</button>
+                      <span className="text-neutral-500">{new Date(v.ts).toISOString().slice(0, 16).replace("T", " ")}</span>
+                      <span className="text-neutral-600 truncate">{v.subject}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={restoreLatest} disabled={memBusy} className="mt-2 px-3 py-1 text-[10px] uppercase tracking-[0.2em] border border-cyan-700 text-cyan-300 hover:bg-cyan-700/30 disabled:border-neutral-800 disabled:text-neutral-600">restore latest</button>
               </div>
             )}
 
