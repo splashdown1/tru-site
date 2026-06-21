@@ -113,6 +113,7 @@
 ## Durability layer (auto-archive)
 - buildDigest produces readable markdown for the mail body
 - maybeAutoArchive fires git+mail when version crosses threshold 10
+- **dailyArchive() + production-only 24h setInterval** — idle-day safety net: archives to git+mail whenever memory changed since last archive, regardless of threshold. Initial 60s post-boot sweep, then every 24h. Errors caught+logged, never thrown. Commit cbc3ff0.
 - Manual archive button on /sovereign
 - 3 layers of persistence: working JSON, git history, RFC822 mail
 - Mail confirmed delivered to legendofsplashdown@gmail.com
