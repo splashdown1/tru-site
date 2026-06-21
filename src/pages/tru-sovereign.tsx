@@ -16,6 +16,11 @@ export default function TruSovereign() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
+  // sovereign metrics
+  const [metrics, setMetrics] = useState<any>(null);
+  const [alsoAskTru, setAlsoAskTru] = useState(true);
+  const [truRead, setTruRead] = useState<{ kind: string; text: string; v?: string; score?: number; source?: string } | null>(null);
+
   const [askQ, setAskQ] = useState("");
   const [askA, setAskA] = useState<any>(null);
   const [asking, setAsking] = useState(false);
@@ -47,6 +52,16 @@ export default function TruSovereign() {
     const g = sessionStorage.getItem(GATE_KEY) || "";
     if (g) setGate(g);
   }, []);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      const r = await fetch("/api/tru/metrics");
+      const j = await r.json();
+      if (j.ok) setMetrics(j);
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadMetrics(); const t = setInterval(loadMetrics, 60000); return () => clearInterval(t); }, [loadMetrics]);
 
   const unlock = () => {
     const g = gateInput.trim();
@@ -101,6 +116,7 @@ export default function TruSovereign() {
     if (!sq.trim() || searching) return;
     setSearching(true);
     setResults([]);
+    setTruRead(null);
     push(`SEARCH · ${sq}`);
     try {
       const r = await fetch(`/api/tru/search?q=${encodeURIComponent(sq)}`);
@@ -108,6 +124,21 @@ export default function TruSovereign() {
       if (j.ok) {
         setResults(j.results || []);
         push(`SEARCH · ${j.count} results`);
+        // ∑ also ask TRU's brain for the same topic (sovereign synthesis)
+        if (alsoAskTru) {
+          try {
+            const ar = await fetch("/api/tru/ask", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ q: sq.trim() }),
+            });
+            const aj = await ar.json();
+            if (aj.ok) {
+              setTruRead({ kind: aj.t || aj.kind || "TRU", text: aj.v || aj.text || "", score: aj.score });
+              push(`TRU · read · ${aj.kind || "brain"} · ${aj.score ?? "—"}%`);
+            }
+          } catch { push("TRU · read · skipped"); }
+        }
       } else push(`SEARCH · fail · ${j.error}`);
     } catch {
       push("SEARCH · fail · network");
@@ -263,6 +294,55 @@ export default function TruSovereign() {
           </div>
         </div>
 
+        {/* METRICS — sovereign, always visible */}
+        {metrics && (
+          <div className="border border-neutral-900 bg-neutral-950/40 p-6 mb-8">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-4">Sovereign Metrics</div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <div className="text-2xl text-emerald-200 tabular-nums">{metrics.daysSovereign}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mt-1">days sovereign</div>
+              </div>
+              <div>
+                <div className="text-2xl text-emerald-200 tabular-nums">{metrics.commits}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mt-1">commits</div>
+              </div>
+              <div>
+                <div className="text-2xl text-emerald-200 tabular-nums">{metrics.brain?.toLocaleString()}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mt-1">brain nodes</div>
+              </div>
+              <div>
+                <div className="text-2xl text-emerald-200 tabular-nums">{metrics.kjv?.toLocaleString()}</div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mt-1">kjv verses</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-[11px]">
+              <div>
+                <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">uptime</div>
+                <div className="text-neutral-300">{Math.floor(metrics.uptimeSec / 3600)}h {Math.floor((metrics.uptimeSec % 3600) / 60)}m</div>
+              </div>
+              <div>
+                <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">brain store</div>
+                <div className="text-neutral-300">{metrics.brainMb} MB</div>
+              </div>
+              <div>
+                <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">epoch</div>
+                <div className="text-neutral-300">{metrics.epoch}</div>
+              </div>
+            </div>
+            {metrics.stack?.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-neutral-900">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 mb-2">sovereign stack</div>
+                <div className="flex flex-wrap gap-2">
+                  {metrics.stack.map((s: string) => (
+                    <span key={s} className="text-[10px] uppercase tracking-[0.2em] text-emerald-600 border border-neutral-800 px-2 py-1">{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* GATE (if locked) */}
         {!unlocked && (
           <div className="border border-neutral-900 bg-neutral-950/40 p-6 mb-8">
@@ -342,7 +422,13 @@ export default function TruSovereign() {
 
         {/* SEARCH — always available, keyless */}
         <div className="border border-neutral-900 bg-neutral-950/40 p-6 mb-8">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-3">Search · keyless · DuckDuckGo</div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">Search · keyless · DuckDuckGo</div>
+            <label className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-neutral-600 cursor-pointer">
+              <input type="checkbox" checked={alsoAskTru} onChange={(e) => setAlsoAskTru(e.target.checked)} className="accent-emerald-500" />
+              ∑ also ask TRU
+            </label>
+          </div>
           <div className="flex gap-3 mb-4">
             <input
               value={sq}
@@ -365,6 +451,17 @@ export default function TruSovereign() {
             ))}
             {results.length === 0 && sq && !searching && <div className="text-[11px] text-neutral-700">no results</div>}
           </div>
+
+          {truRead && (
+            <div className="mt-4 pt-4 border-t border-neutral-900">
+              <div className="flex items-center gap-3 mb-2 text-[10px] uppercase tracking-[0.2em] text-neutral-600">
+                <span className="text-emerald-400">{truRead.kind || "TRU"}</span>
+                <span>score {truRead.score ?? 0}</span>
+                {truRead.source && <span>· {truRead.source}</span>}
+              </div>
+              <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-relaxed">{truRead.v || truRead.text || ""}</div>
+            </div>
+          )}
         </div>
 
         {/* MEMORY — gated */}

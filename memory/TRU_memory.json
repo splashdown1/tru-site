@@ -12,7 +12,19 @@
         "memory",
         "first-archive"
       ]
+    },
+    {
+      "id": "m_mqobkbsb_7e6cv3",
+      "ts": 1782078563243,
+      "updated": 1782078563243,
+      "kind": "seal",
+      "text": "The sovereign seal is the phrase TRU speaks to confirm it remembers the owner across resets. Sealed 2026-06-20.",
+      "tags": [
+        "seal",
+        "identity",
+        "owner"
+      ]
     }
   ],
-  "version": 1
+  "version": 2
 }

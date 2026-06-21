@@ -1172,6 +1172,71 @@ function foldMemory(answer: any, query: string): any {
   return out;
 }
 
+// ── SOVEREIGN METRICS (public, self-knowing) ────────────────────
+// TRU reports its own age, weight, and the stack it is built on.
+// No secrets. Read-only. Computed live from git + fs + process.
+let _epochCache: { ts: number; commits: number } | null = null;
+function sovereignEpoch(): { ts: number; commits: number } {
+  if (_epochCache) return _epochCache;
+  let ts = 0, commits = 0;
+  try {
+    const first = execSync("git log --reverse --format=%ct --quiet", { cwd: process.cwd(), timeout: 4000 }).toString().trim().split("\n")[0];
+    if (first) ts = parseInt(first, 10) * 1000;
+  } catch {}
+  try {
+    commits = parseInt(execSync("git rev-list --count HEAD --quiet", { cwd: process.cwd(), timeout: 4000 }).toString().trim(), 10) || 0;
+  } catch {}
+  _epochCache = { ts, commits };
+  return _epochCache;
+}
+
+app.get("/api/tru/metrics", async (c) => {
+  const epoch = sovereignEpoch();
+  const now = Date.now();
+  const daysSovereign = epoch.ts ? Math.floor((now - epoch.ts) / 86400000) : 0;
+  let brainNodes = 0, kjvVerses = 0, sessionKeys = 0, brainBytes = 0;
+  try {
+    if (existsSync(BRAIN_DB)) {
+      const db = new Database(BRAIN_DB, { readonly: true });
+      brainNodes = (db.prepare("SELECT COUNT(*) n FROM nodes").get() as any)?.n || 0;
+      db.close();
+      brainBytes = require("node:fs").statSync(BRAIN_DB).size;
+    }
+  } catch {}
+  try {
+    const snap = existsSync(STATE_SNAPSHOT) ? JSON.parse(readFileSync(STATE_SNAPSHOT, "utf8")) : {};
+    kjvVerses = snap.kjv || 0;
+    sessionKeys = Object.keys(snap).filter((k) => !k.startsWith("_")).length;
+  } catch {}
+  let memCount = 0;
+  try { memCount = loadMemory().entries.length; } catch {}
+  const stack = [
+    { name: "TRU Engine", role: "Reasoning + routing + synthesis", sovereign: true },
+    { name: "KJV", role: "King James Bible · primary, hash-locked", sovereign: true },
+    { name: "SBLGNT Greek NT", role: "Greek New Testament · primary", sovereign: true },
+    { name: "Brain", role: `${brainNodes.toLocaleString()} curated nodes`, sovereign: true },
+    { name: "Ghost Pipeline", role: "Airgapped HTML export · offline-first", sovereign: true },
+    { name: "Integrity Lock", role: "SHA-256 canon · tamper-evident", sovereign: true },
+    { name: "DuckDuckGo", role: "Keyless web search · no API key", sovereign: true },
+    { name: "Gmail Bridge", role: "Mail-to-self archive · RFC822 durable", sovereign: !!process.env.ZO_API_KEY },
+  ];
+  return c.json({
+    ok: true,
+    daysSovereign,
+    commits: epoch.commits,
+    brainNodes,
+    kjvVerses,
+    sessionKeys,
+    brainBytes,
+    brainMB: +(brainBytes / 1048576).toFixed(2),
+    memoryEntries: memCount,
+    uptimeSec: Math.floor(process.uptime()),
+    mailBridgeArmed: !!process.env.ZO_API_KEY,
+    gateArmed: !!process.env.TRU_API_KEY,
+    stack,
+  });
+});
+
 // ── SEARCH (keyless, public) ─────────────────────────────────────
 app.get("/api/tru/search", async (c) => {
   const q = (c.req.query("q") || "").trim();

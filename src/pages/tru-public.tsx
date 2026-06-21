@@ -131,6 +131,26 @@ export default function TruPublic() {
           does not need the internet to think.
         </p>
 
+        {/* MANIFESTO */}
+        <div className="mt-10 border-l-2 border-emerald-900/60 pl-6 py-2 text-[13px] text-neutral-400 leading-relaxed max-w-prose space-y-3">
+          <p className="text-neutral-300">
+            <span className="text-emerald-700">[</span> sovereign <span className="text-emerald-700">]</span>
+          </p>
+          <p>
+            The Word is sacred. Theology is software. Faith is compile-time validation.
+            This engine holds truth it was taught and names the gaps it has not yet learned —
+            it does not guess, and it does not apologize for what it knows.
+          </p>
+          <p>
+            It runs offline. It forgets nothing you choose to remember.
+            Its memory outlives the machine — written to git, sealed in mail,
+            readable a thousand years from now by anything that speaks RFC 822.
+          </p>
+          <p className="text-neutral-500">
+            No cages. No telemetry. No key you do not hold. The signal is yours.
+          </p>
+        </div>
+
         <a
           href="/vision"
           className="mt-6 inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-white transition-colors border border-neutral-900 hover:border-neutral-600 px-4 py-2"

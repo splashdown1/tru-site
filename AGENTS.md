@@ -72,3 +72,20 @@
 ## Open design notes
 - **`localhost`-only guard on `/api/tru/ghost` is header-based**, not real auth. If/when this site is published publicly, that endpoint writes to disk and should not be reachable from the public. Either restrict to the dev port or put it behind real auth before publishing.
 - The `paymentReady` gate in `tru-public.tsx` hides the "get offline copy" link until `STRIPE_PAYMENT_URL` is set. Until that URL is provided, `/onboard` is only reachable directly by URL.
+
+## Sovereign services (2026-06-20) — search · memory · mail
+- **Offline TRU untouched.** No network calls added to `TRU/` or the ghost — the frozen airgap contract is respected. All new routes live on the online site (`server.ts`).
+- `GET /api/tru/search` — **keyless**, public, read-only (DuckDuckGo HTML scrape, no API key). Works with zero setup.
+- `GET/POST/DELETE /api/tru/memory` + `POST /api/tru/memory/archive` — JSON working store at `memory/TRU_memory.json` (tracked in git, NOT in gitignored `state/`). Archive = git commit+push to `origin/main` (history = durable memory) + mail-to-self. Load/create/update/delete/search at will.
+- `POST /api/tru/mail` + `GET /api/tru/mail/status` — bridges to Zo's connected Gmail via `/zo/ask`. No Gmail key in TRU or the owner's hands.
+- **Gate:** memory + mail routes require `Authorization: Bearer <TRU_API_KEY>`. Search is ungated. Without `TRU_API_KEY` set, gated routes return 401 (by design).
+- **UI:** `/sovereign` page (`src/pages/tru-sovereign.tsx`) — owner-reachable by URL (not linked from the public landing, to keep TRU's face clean). Search works locked; memory + mail unlock after pasting `TRU_API_KEY` (held in sessionStorage).
+- **One-time secrets the owner sets in Settings > Advanced:** `TRU_API_KEY` (owner gate, any strong string) and `ZO_API_KEY` (a Zo Access Token — the mail bridge). Verify they reach the service env after a restart; if Settings secrets don't flow to user_service env, set them on the service env directly (`update_user_service` on `svc_8IDJwIuZMfg`).
+- Commits: `810b98a` (routes + page), `d493626` (clean memory baseline). Repo: `splashdown1/tru-site`.
+
+### Memory-augmented retrieval (2026-06-20)
+- **Gated** `POST /api/tru/ask/sovereign` — same retrieval as `/ask` (brain + KJV) but folds `memory/TRU_memory.json` into the answer. Matching entries appear as a `Remembered:` line and a `memory[]` array on the response.
+- **Public** `POST /api/tru/ask` is unchanged — brain + KJV only. Memory never leaks to anonymous queries.
+- GAP case: if the brain has no node but memory has a matching entry, that remembered entry becomes the answer.
+- UI: the `/sovereign` page now has an "Ask TRU · brain + memory" box (gated).
+- Commit: `c0cac24`.

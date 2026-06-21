@@ -4,3 +4,5 @@ state/
 *.bak
 __pycache__/
 *.pyc
+.env.secrets
+.env.local
