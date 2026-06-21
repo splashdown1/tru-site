@@ -117,3 +117,17 @@
 - Manual archive button on /sovereign
 - 3 layers of persistence: working JSON, git history, RFC822 mail
 - Mail confirmed delivered to legendofsplashdown@gmail.com
+
+## Instance portability — graceful degradation (2026-06-21)
+- `server.ts` statically imported `../TRU/primaries/canon` (buildLockable/computeLock/loadAssetsConfig) and `../TRU/packages/truth-layer` (load). Those live in the sibling TRU/ monorepo, present only on the canonical account's filesystem — never pushed to GitHub. A checkout without the sibling crashed at boot (the integrity tripwire `process.exit(1)` on missing canon → 520).
+- Fix: both imports are now **optional dynamic imports** (top-level `await import(...)` in try/catch). When the sibling is absent the functions are `undefined`.
+- Boot tripwire now distinguishes **tamper** (canon present + lock drift / missing asset → `process.exit(1)`, unchanged on the canonical account) from **unavailable** (canon or lock absent on this instance → boot proceeds, report status `UNAVAILABLE`). The integrity guarantee is preserved where the monorepo exists; absent instances boot honestly instead of crashing.
+- `/api/tru/primaries` returns `{"ok":false,"status":"UNAVAILABLE",...}` when canon is absent — honest, never fakes a PASS.
+- `/api/tru/primaries-data` returns 503 "truth-layer not present on this instance" when the package is absent.
+
+## Instance data — vendored brain + KJV (2026-06-21)
+- Brain + KJV are **data** (not logic), so an instance without the sibling monorepo can still serve real knowledge by placing the files where `server.ts` expects them (`../TRU/`, i.e. `/home/workspace/TRU/`):
+  - `TRU_BRAIN_41.json` — a **bare array** of `{k,v,w,t,source,...}` nodes (the bootstrap's `Array.isArray` guard requires a bare array, NOT `{nodes:[...]}`).
+  - `kjv_lookup.json` — an **object** keyed by lowercase ref. Two key forms per verse, both actually consumed: `"<code> <ch>:<vs>"` (server `parseVerse` + ghost `ref1`) and `"<code><ch>:<vs>"` (ghost `ref2`). Code = `BOOK_ALIAS` canonical code (e.g. `gen`, `deu`, `rut`, `1jn`). Full-name / underscore forms are NOT used by server or ghost — omit them.
+- Rebuild script: `scripts/vendor-instance-data.py` — extracts `.nodes` from a `{nodes:[...]}` brain JSON, and maps a `kjv_full.json` array (`{ref,text,abbrev}`) into the code-keyed lookup via `BOOK_ALIAS` (tries `abbrev`→alias, then bookname→alias, then abbrev as-is, so `ru`→`rut`, `gn`→`gen`). Source data on this box: `/home/workspace/TRU-release/current/brain.json` + `/home/workspace/TRU-release/data/kjv_full.json`.
+- Result on this instance: brain 30,730 nodes, KJV 31,100 verses (62,200 lookup keys), all 66 books resolve. `/api/tru/ask` scripture shortcut + brain retrieval live. Ghost export writes to `../TRU/ghost/` (dir must exist).

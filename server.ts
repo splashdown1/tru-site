@@ -7,11 +7,18 @@ import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, ren
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import Database from "bun:sqlite";
-import {
-  buildLockable,
-  computeLock,
-  loadAssetsConfig,
-} from "../TRU/primaries/canon";
+// canon + truth-layer live in the sibling TRU/ monorepo (present on the
+// canonical account). On instances without that sibling they degrade to
+// "UNAVAILABLE" honestly: the server boots and /api/tru/primaries reports
+// the real state. Tamper detection (lock drift) still process.exit(1)s
+// when canon IS present — the integrity guarantee is unchanged there.
+let buildLockable: any, computeLock: any, loadAssetsConfig: any;
+try {
+  const canon = await import("../TRU/primaries/canon");
+  ({ buildLockable, computeLock, loadAssetsConfig } = canon);
+} catch {
+  buildLockable = computeLock = loadAssetsConfig = undefined;
+}
 
 // AI agents: read README.md for navigation and contribution guidance.
 type Mode = "development" | "production";
@@ -106,9 +113,13 @@ const PRIMARIES_ASSETS_JSON = join(PRIMARIES_DIR, "assets.json");
 
 async function verifyPrimariesAtBoot(): Promise<{ ok: boolean; details: Record<string, unknown> }> {
   const details: Record<string, unknown> = { assets: {} as Record<string, string>, stored: null, computed: null };
+  if (!buildLockable || !computeLock || !loadAssetsConfig) {
+    console.log("[primaries] UNAVAILABLE: canon module not present on this instance — server boots; /api/tru/primaries will report UNAVAILABLE");
+    return { ok: false, details: { ...details, status: "UNAVAILABLE", reason: "unavailable" } };
+  }
   if (!existsSync(PRIMARIES_LOCK)) {
-    console.error("[primaries] FAIL: primaries.lock missing at", PRIMARIES_LOCK);
-    return { ok: false, details };
+    console.log("[primaries] UNAVAILABLE: primaries.lock missing at", PRIMARIES_LOCK, "— canon present but no lock; treating as unavailable (not tamper)");
+    return { ok: false, details: { ...details, status: "UNAVAILABLE", reason: "unavailable" } };
   }
   const storedLock = (await Bun.file(PRIMARIES_LOCK).text()).trim();
   (details as any).stored = storedLock.slice(0, 16) + "…";
@@ -121,20 +132,20 @@ async function verifyPrimariesAtBoot(): Promise<{ ok: boolean; details: Record<s
     assets = loadAssetsConfig(PRIMARIES_ASSETS_JSON);
   } catch (err) {
     console.error("[primaries] FAIL: assets.json unreadable:", err);
-    return { ok: false, details };
+    return { ok: false, details: { ...details, status: "FAIL", reason: "tamper" } };
   }
   let lockable;
   try {
     lockable = buildLockable(TRU_ROOT, assets);
   } catch (err) {
     console.error("[primaries] FAIL: buildLockable threw:", err);
-    return { ok: false, details };
+    return { ok: false, details: { ...details, status: "FAIL", reason: "tamper" } };
   }
   // Surface any missing primary so joe sees the exact file, not just a hash drift.
   for (const [name, info] of Object.entries(lockable.primary)) {
     if (info === null) {
       console.error("[primaries] FAIL: missing primary asset", name);
-      return { ok: false, details };
+      return { ok: false, details: { ...details, status: "FAIL", reason: "tamper" } };
     }
   }
   (details as any).assets = Object.fromEntries(
@@ -147,7 +158,7 @@ async function verifyPrimariesAtBoot(): Promise<{ ok: boolean; details: Record<s
 
   if (computedLock !== storedLock) {
     console.error(`[primaries] FAIL: lock drift — stored=${storedLock.slice(0, 16)}… computed=${computedLock.slice(0, 16)}…`);
-    return { ok: false, details };
+    return { ok: false, details: { ...details, status: "FAIL", reason: "tamper" } };
   }
   console.log(`[primaries] OK: lock verified (${storedLock.slice(0, 16)}…)`);
   return { ok: true, details };
@@ -159,9 +170,11 @@ let __PRIMARIES_REPORT: { status: string; stored: string; computed: string; asse
 await verifyPrimariesAtBoot().then((r) => {
   _primariesOk = r.ok;
   _primariesDetails = r.details;
-  if (!r.ok) process.exit(1);
+  // Tamper (lock drift / missing asset with canon present) → refuse to boot.
+  // Unavailable (canon or lock absent on this instance) → boot honestly.
+  if (!r.ok && (r.details as any).reason !== "unavailable") process.exit(1);
   __PRIMARIES_REPORT = {
-    status: r.ok ? "PASS" : "FAIL",
+    status: r.ok ? "PASS" : ((r.details as any).reason === "unavailable" ? "UNAVAILABLE" : "FAIL"),
     stored: (r.details as any).stored,
     computed: (r.details as any).computed,
     assets: (r.details as any).assets,
@@ -735,10 +748,17 @@ app.get("/api/tru/primaries", (c) => {
 // (sizes + SHA-256) by routing through @tru/truth-layer. This is the
 // canonical "what does TRU believe" surface; every primary consumer in
 // TRU Online should defer to it.
-import { load as loadTruth } from "../TRU/packages/truth-layer/src/index";
-let _truthCache: Awaited<ReturnType<typeof loadTruth>> | null = null;
+let loadTruth: ((root: string) => Promise<any>) | undefined;
+try {
+  const tl = await import("../TRU/packages/truth-layer/src/index");
+  loadTruth = tl.load;
+} catch {
+  loadTruth = undefined;
+}
+let _truthCache: any = null;
 let _truthCacheAt = 0;
 async function getTruth() {
+  if (!loadTruth) throw new Error("truth-layer not present on this instance");
   if (_truthCache && Date.now() - _truthCacheAt < 30_000) return _truthCache;
   _truthCache = await loadTruth(join(process.cwd(), "..", "TRU"));
   _truthCacheAt = Date.now();
