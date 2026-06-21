@@ -1181,9 +1181,17 @@ function foldMemory(answer: any, query: string): any {
     }
   }
   // Non-GAP: append a recalled-context line so TRU consults its memory.
+  const isPersonal = /\b(i|my|me|mine|myself)\b/i.test(query);
   const recall = strong.length ? strong : hits.slice(0, 2);
   const recallLine = `Remembered: ${recall.map((r) => firstSentence(r.text, 140)).join(" · ")}`;
-  out.v = `${answer.v}\n${recallLine}`;
+  if (isPersonal && strong.length > 0) {
+    out.v = `${strong[0].text}\n\n[remembered · ${strong[0].kind}]`;
+    out.t = "MEMORY";
+    out.source = "TRU_MEMORY";
+    out.score = Math.min(99, strong[0].score * 3);
+  } else {
+    out.v = `${answer.v}\n${recallLine}`;
+  }
   if (!out.nodes) out.nodes = [];
   out.nodes.push(...recall.map((r) => `memory:${r.id}`));
   return out;

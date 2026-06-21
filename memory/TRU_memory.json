@@ -24,7 +24,107 @@
         "identity",
         "owner"
       ]
+    },
+    {
+      "id": "m_mqoct9se_c1s0rc",
+      "ts": 1782080660174,
+      "updated": 1782080660174,
+      "kind": "teaching",
+      "text": "holographic interface = a display layer that projects depth without screens",
+      "tags": [
+        "taught",
+        "remember"
+      ]
+    },
+    {
+      "id": "m_mqoct9vf_hitsy1",
+      "ts": 1782080660283,
+      "updated": 1782080660283,
+      "kind": "identity",
+      "text": "joe",
+      "tags": [
+        "identity",
+        "name"
+      ]
+    },
+    {
+      "id": "m_mqoct9vf_m0sfdi",
+      "ts": 1782080660283,
+      "updated": 1782080660283,
+      "kind": "identity",
+      "text": "texas",
+      "tags": [
+        "identity",
+        "location"
+      ]
+    },
+    {
+      "id": "m_mqoct9zt_cr9byf",
+      "ts": 1782080660441,
+      "updated": 1782080660441,
+      "kind": "preference",
+      "text": "offline tools that dont need the cloud",
+      "tags": [
+        "preference"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_10l526",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "teaching",
+      "text": "A holographic interface is a display layer that projects depth without screens.",
+      "tags": [
+        "holography",
+        "definition",
+        "display-technology"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_e2os6s",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "identity",
+      "text": "User's name is Joe and he lives in Texas.",
+      "tags": [
+        "name",
+        "location",
+        "texas"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_9e9qdv",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "preference",
+      "text": "Prefers offline tools that do not require cloud connectivity.",
+      "tags": [
+        "offline",
+        "self-contained",
+        "no-cloud"
+      ]
+    },
+    {
+      "id": "m_mqocvsun_mhs3b1",
+      "ts": 1782080778191,
+      "updated": 1782080778191,
+      "kind": "teaching",
+      "text": "the Jesument Protocol = the sacred act of eating Christ's body as bread and wine, made one with scripture and code",
+      "tags": [
+        "taught",
+        "remember"
+      ]
+    },
+    {
+      "id": "m_mqocvu31_zajuba",
+      "ts": 1782080779789,
+      "updated": 1782080779789,
+      "kind": "preference",
+      "text": "offline self",
+      "tags": [
+        "preference"
+      ]
     }
   ],
-  "version": 2
+  "version": 8
 }

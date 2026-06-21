@@ -95,3 +95,11 @@
 - `GET /api/tru/metrics` (public, read-only): daysSovereign (from first git commit), commits, brain nodes, KJV verses, uptime, brain MB, epoch, sovereign stack manifest.
 - Sovereign page `/sovereign`: metrics panel (always visible), "also ask TRU" toggle on search (fires brain synthesis alongside web results), sovereign stack showcase.
 - Fix: stack items are objects {name,role} not strings — render s.name with title=s.role.
+
+## S
+
+## Self-writing memory (autoLearn + reflect)
+- autoLearn: deterministic extraction on every sovereign ask — captures `remember: X = Y` teachings, identity statements (I am / my name is / I live in), and preferences (I prefer / I use). Dedup by kind+text overlap. Writes to memory/TRU_memory.json, increments version.
+- /api/tru/reflect (gated): reads TRU_asks.log.ndjson, sends recent asks to Zo bridge (/zo/ask) to distill durable facts as clean, tagged memory entries. Intelligent layer — costs credits per call.
+- Sovereign ask response now includes `learned` array when autoLearn captures something.
+- Ask log: memory/TRU_asks.log.ndjson (append-only, gitignored).
