@@ -1204,10 +1204,18 @@ app.get("/api/tru/metrics", async (c) => {
     }
   } catch {}
   try {
-    const snap = existsSync(STATE_SNAPSHOT) ? JSON.parse(readFileSync(STATE_SNAPSHOT, "utf8")) : {};
-    kjvVerses = snap.kjv || 0;
-    sessionKeys = Object.keys(snap).filter((k) => !k.startsWith("_")).length;
+    const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+    if (existsSync(kjvPath)) {
+      const k = JSON.parse(readFileSync(kjvPath, "utf8"));
+      kjvVerses = Object.keys(k).length;
+    }
   } catch {}
+  if (existsSync(STATE_SNAPSHOT)) {
+    try {
+      const s = JSON.parse(readFileSync(STATE_SNAPSHOT, "utf8"));
+      sessionKeys = Object.keys(s).filter(k => k !== "_lastWrite").length;
+    } catch {}
+  }
   let memCount = 0;
   try { memCount = loadMemory().entries.length; } catch {}
   const stack = [
