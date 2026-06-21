@@ -103,3 +103,9 @@
 - /api/tru/reflect (gated): reads TRU_asks.log.ndjson, sends recent asks to Zo bridge (/zo/ask) to distill durable facts as clean, tagged memory entries. Intelligent layer — costs credits per call.
 - Sovereign ask response now includes `learned` array when autoLearn captures something.
 - Ask log: memory/TRU_asks.log.ndjson (append-only, gitignored).
+
+## Memory recall ranking (foldMemory)
+- Personal-pronoun queries (I/my/me/mine/myself) lead with MEMORY when strong hit exists (score>=5). Brain demoted to footnote. source=TRU_MEMORY.
+- Objective queries: brain leads, memory appended as "Remembered:" footnote. source=CERTIFIED/TRU_BRAIN.
+- GAP queries (brain missed): memory becomes the answer if strong hit, else teach-me prompt.
+- Strong threshold lowered from 8 to 5 so single-tag-match personal facts (e.g. preference tag vs "prefer" token) qualify.

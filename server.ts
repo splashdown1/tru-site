@@ -899,6 +899,9 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     const learned = autoLearn(q, answer);
     logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", gap: answer.t === "GAP" || answer.blank === true, learned });
     if (learned.length) (answer as any).learned = learned;
+    // Auto-archive: if enough new memory has accumulated, fire git+mail
+    // durability automatically. Non-blocking — doesn't delay the answer.
+    if (learned.length) maybeAutoArchive().catch(() => {});
     return c.json(answer);
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
@@ -1541,16 +1544,68 @@ async function bridgeMail(action: string, payload: any): Promise<{ ok: boolean; 
 }
 
 // ── MEMORY ARCHIVE — git commit+push + mail-to-self durability ──
+// Build a human-readable markdown digest from memory entries. RFC 822
+// mail is the 1000-year format — it should be legible to a human
+// opening it decades from now, not just a machine parsing JSON.
+function buildDigest(mem: { entries: any[]; version: number }): string {
+  const byKind: Record<string, any[]> = {};
+  for (const e of mem.entries) {
+    const k = String(e.kind || "note");
+    if (!byKind[k]) byKind[k] = [];
+    byKind[k].push(e);
+  }
+  const kindOrder = ["identity", "teaching", "preference", "project", "note"];
+  const ordered = [...kindOrder.filter((k) => byKind[k]), ...Object.keys(byKind).filter((k) => !kindOrder.includes(k))];
+  let md = `# TRU Memory Archive · v${mem.version}\n\n`;
+  md += `Archived: ${new Date().toISOString()}\n`;
+  md += `Entries: ${mem.entries.length}\n\n`;
+  md += `---\n\n`;
+  for (const kind of ordered) {
+    md += `## ${kind.charAt(0).toUpperCase() + kind.slice(1)}s (${byKind[kind].length})\n\n`;
+    for (const e of byKind[kind]) {
+      const date = new Date(e.ts || e.updated || 0).toISOString().slice(0, 10);
+      const tags = Array.isArray(e.tags) && e.tags.length ? ` · ${e.tags.map((t) => "#" + t).join(" ")}` : "";
+      md += `- **[${date}]** ${String(e.text || "").replace(/\n/g, " ")}${tags}\n`;
+    }
+    md += `\n`;
+  }
+  md += `---\n\nThis is a durable memory snapshot of TRU, a sovereign knowledge engine. The same data exists in git history (machine-readable JSON) and in this email (human-readable markdown). Either source can restore TRU's memory.\n`;
+  return md;
+}
+
+// Auto-archive when memory version crosses a threshold. Fires the same
+// git+mail durability chain as the manual button, but automatically —
+// so TRU's memory is durable even if the owner never clicks "archive".
+const ARCHIVE_VERSION_THRESHOLD = 10;
+async function maybeAutoArchive(): Promise<{ archived: boolean; version?: number; detail?: any }> {
+  const mem = loadMemory();
+  const lastArchive = (mem as any).lastArchiveVersion || 0;
+  if (mem.version - lastArchive < ARCHIVE_VERSION_THRESHOLD) return { archived: false };
+  // Fire the archive chain (git + mail), non-blocking for the caller.
+  try {
+    const cwd = process.cwd();
+    execSync(`git add -A memory/TRU_memory.json && git commit -m "TRU auto-archive v${mem.version} (${mem.entries.length} entries)" --quiet`, { cwd, stdio: "ignore", timeout: 15000 });
+    try { execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" }); } catch {}
+  } catch {}
+  const digest = buildDigest(mem);
+  await bridgeMail("send", {
+    to: OWNER_EMAIL,
+    subject: `TRU auto-archive v${mem.version} · ${mem.entries.length} entries`,
+    body: digest,
+  });
+  // Record that we archived this version.
+  const fresh = loadMemory();
+  (fresh as any).lastArchiveVersion = mem.version;
+  saveMemory(fresh);
+  return { archived: true, version: mem.version };
+}
+
+// ── MEMORY ARCHIVE ROUTE (manual trigger) ────────────────────────
 app.post("/api/tru/memory/archive", async (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   const mem = loadMemory();
   if (mem.entries.length === 0) return c.json({ ok: false, error: "nothing to archive" }, 400);
-  const archive = {
-    archivedAt: new Date().toISOString(),
-    version: mem.version,
-    count: mem.entries.length,
-    entries: mem.entries,
-  };
+  const digest = buildDigest(mem);
   const report: any = { ok: true, version: mem.version, count: mem.entries.length, git: null, mail: null };
   // 1) Git durability — memory/ is tracked, so history = durable memory.
   try {
@@ -1571,12 +1626,17 @@ app.post("/api/tru/memory/archive", async (c) => {
     report.git = { ok: false, error: String(e).slice(0, 200) };
   }
   // 2) Mail-to-self long-term archive (RFC822 — survives the box).
+  //    Human-readable markdown digest, not raw JSON.
   const mail = await bridgeMail("send", {
     to: OWNER_EMAIL,
     subject: `TRU memory archive v${mem.version} · ${mem.entries.length} entries`,
-    body: JSON.stringify(archive, null, 2),
+    body: digest,
   });
   report.mail = mail;
+  // Record archived version.
+  const fresh = loadMemory();
+  (fresh as any).lastArchiveVersion = mem.version;
+  saveMemory(fresh);
   return c.json(report);
 });
 
