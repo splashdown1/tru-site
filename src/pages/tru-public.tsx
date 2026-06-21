@@ -215,6 +215,12 @@ export default function TruPublic() {
           </div>
           <div className="flex items-center gap-8">
             <a
+              href="/sovereign"
+              className="text-[10px] uppercase tracking-[0.3em] text-emerald-600 hover:text-emerald-300 transition-colors"
+            >
+              sovereign →
+            </a>
+            <a
               href="/vision"
               className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
             >
