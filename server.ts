@@ -576,8 +576,20 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
   let best: NodeRow;
   let bestScore: number;
   if (queryClass === "identity") {
-    best = scored[0].node;
-    bestScore = scored[0].score;
+    // Prefer the best GROUNDED node (real token overlap). Without this,
+    // "what is TRU" matches john_18:38 ("what is truth?") at score 99
+    // because "what is tru" is a substring of "what is truth" — a false
+    // positive that beats tru_identity (98) and triggers web fallback.
+    const groundedHit = scored.find((it) => {
+      const meaningful = qTokens.filter((t) => t.length >= 3);
+      if (!meaningful.length) return true;
+      const hay = new Set(tokenize(`${it.node.k} ${it.node.v} ${it.node.ref ?? ""}`));
+      let hits = 0;
+      for (const t of meaningful) if (hay.has(t)) hits++;
+      return hits / meaningful.length >= (meaningful.length <= 2 ? 1.0 : 0.5);
+    });
+    best = groundedHit ? groundedHit.node : scored[0].node;
+    bestScore = groundedHit ? groundedHit.score : scored[0].score;
   } else if (shortQuery) {
     // Look only at topic nodes that actually mention a query token.
     // Skip code-shaped nodes via isQualityText which scoreCandidate
