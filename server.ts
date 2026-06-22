@@ -21,6 +21,23 @@ try {
 }
 
 // AI agents: read README.md for navigation and contribution guidance.
+// ── SECRETS FALLBACK ──────────────────────────────────────────────
+// publish_site restarts the backing service and can wipe env_vars set
+// via update_user_service. To keep TRU_API_KEY / ZO_API_KEY / OWNER_EMAIL
+// alive across publishes, we also load them from a gitignored
+// state/tru-secrets.json at boot (process.env still wins if present).
+try {
+  const _secPath = join(process.cwd(), "state", "tru-secrets.json");
+  if (existsSync(_secPath)) {
+    const _sec = JSON.parse(readFileSync(_secPath, "utf-8")) as Record<string, string>;
+    if (!process.env.TRU_API_KEY && _sec.TRU_API_KEY) process.env.TRU_API_KEY = _sec.TRU_API_KEY;
+    if (!process.env.ZO_API_KEY && _sec.ZO_API_KEY) process.env.ZO_API_KEY = _sec.ZO_API_KEY;
+    if (!process.env.OWNER_EMAIL && _sec.OWNER_EMAIL) process.env.OWNER_EMAIL = _sec.OWNER_EMAIL;
+  }
+} catch (e) {
+  console.error("[secrets] fallback load failed:", String(e).slice(0, 120));
+}
+
 type Mode = "development" | "production";
 const app = new Hono();
 
@@ -1244,12 +1261,37 @@ function autoLearn(query: string, answer: any): string[] {
   const mem = loadMemory();
   const now = Date.now();
 
+  // Token-overlap dedup (matches the offline prune logic): two entries
+  // are similar if same kind AND Jaccard >= 0.5 OR one token set ⊆ the other.
+  // Catches paraphrases the substring check missed (e.g. "joe" vs "User's
+  // name is Joe and he lives in Texas.").
+  const STOP = new Set(("a an the is are was were i my mine me he she it its " +
+    "we our us they them and or of to in on for with at by from that this " +
+    "name user user's living lived prefer prefers use uses used self need " +
+    "needs require requires dont don do does done make get got like want " +
+    "good great new old first last time now thing stuff way").split(" "));
+  const toks = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+      .filter((w) => w.length > 1 && !STOP.has(w));
+  const jaccard = (a: Set<string>, b: Set<string>) => {
+    let inter = 0; for (const t of a) if (b.has(t)) inter++;
+    const uni = a.size + b.size - inter;
+    return uni === 0 ? 0 : inter / uni;
+  };
   const hasSimilar = (kind: string, text: string): boolean => {
-    const norm = text.toLowerCase().slice(0, 80);
-    return mem.entries.some((e: any) =>
-      String(e.kind || "") === kind &&
-      String(e.text || "").toLowerCase().includes(norm.slice(0, 40))
-    );
+    const nt = new Set(toks(text));
+    if (nt.size === 0) return false;
+    return mem.entries.some((e: any) => {
+      if (String(e.kind || "") !== kind) return false;
+      const et = new Set(toks(String(e.text || "")));
+      if (et.size === 0) return false;
+      // subset either way = same fact
+      let sub = true; for (const t of nt) if (!et.has(t)) { sub = false; break; }
+      if (sub) return true;
+      sub = true; for (const t of et) if (!nt.has(t)) { sub = false; break; }
+      if (sub) return true;
+      return jaccard(nt, et) >= 0.5;
+    });
   };
 
   const addEntry = (kind: string, text: string, tags: string[]): boolean => {
@@ -1281,6 +1323,8 @@ function autoLearn(query: string, answer: any): string[] {
     const m = query.match(p.re);
     if (m) {
       const captured = m[1].trim().replace(/\s+/g, " ");
+      // Gerund guard: "i am building/working/making..." is an action, not a name.
+      if (p.kind === "identity" && p.tags.includes("name") && /ing$/i.test(captured.split(/\s+/)[0])) continue;
       addEntry(p.kind, captured, p.tags);
     }
   }
@@ -2097,6 +2141,80 @@ async function bootReconcileArchive(): Promise<{ action: string; version?: numbe
   return { action: "reconciled", version: mem.version };
 }
 
+// ── MEMORY DEDUP (token-overlap prune, matches offline prune script) ──
+// Collapses near-duplicate entries within a kind using token Jaccard
+// overlap (>=0.5) or subset containment, keeping the richest (longest)
+// text per cluster. Idempotent and transitive. Only fires at boot when
+// it actually finds dupes (no-op on clean memory). Mirrors the offline
+// scripts/prune_memory.py logic exactly.
+const DEDUP_STOP = new Set(("a an the is are was were i my he she it and or of to in on that this name user users lives live prefer prefers use uses need require dont don't do not for with as at by from".split(/\s+/)));
+function tokensOf(text: string): Set<string> {
+  return new Set(
+    text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/)
+      .filter((t) => t.length > 1 && !DEDUP_STOP.has(t))
+  );
+}
+function textSimilar(a: string, b: string): boolean {
+  const ta = tokensOf(a), tb = tokensOf(b);
+  if (ta.size === 0 || tb.size === 0) return false;
+  let inter = 0; for (const t of ta) if (tb.has(t)) inter++;
+  const uni = ta.size + tb.size - inter;
+  const jaccard = inter / uni;
+  const subset = inter === ta.size || inter === tb.size;
+  return jaccard >= 0.5 || subset;
+}
+function pruneMemoryDuplicates(): { pruned: boolean; before: number; after: number; dropped: string[] } {
+  const mem = loadMemory();
+  const entries = mem.entries || [];
+  if (entries.length === 0) return { pruned: false, before: 0, after: 0, dropped: [] };
+  const dropped: string[] = [];
+  const byKind = new Map<string, any[]>();
+  for (const e of entries) {
+    const k = String(e.kind || "note");
+    if (!byKind.has(k)) byKind.set(k, []);
+    byKind.get(k)!.push(e);
+  }
+  const kept: any[] = [];
+  for (const [, group] of byKind) {
+    const clusters: any[][] = [];
+    for (const e of group) {
+      let placed = false;
+      for (const cl of clusters) {
+        if (textSimilar(String(e.text || ""), String(cl[0].text || ""))) {
+          cl.push(e); placed = true; break;
+        }
+      }
+      if (!placed) clusters.push([e]);
+    }
+    let changed = true;
+    while (changed) {
+      changed = false;
+      outer: for (let i = 0; i < clusters.length; i++) {
+        for (let j = i + 1; j < clusters.length; j++) {
+          if (textSimilar(String(clusters[i][0].text || ""), String(clusters[j][0].text || ""))) {
+            clusters[i].push(...clusters[j]);
+            clusters.splice(j, 1); changed = true; break outer;
+          }
+        }
+      }
+    }
+    for (const cl of clusters) {
+      cl.sort((x, y) => String(y.text || "").length - String(x.text || "").length);
+      kept.push(cl[0]);
+      for (let m = 1; m < cl.length; m++) {
+        dropped.push(`[${cl[m].kind || "?"}] ${String(cl[m].text || "").slice(0, 50)}`);
+      }
+    }
+  }
+  if (dropped.length === 0) return { pruned: false, before: entries.length, after: entries.length, dropped: [] };
+  const keptIds = new Set(kept.map((e) => e.id));
+  mem.entries = entries.filter((e) => keptIds.has(e.id));
+  mem.version = (mem.version || 0) + 1;
+  saveMemory(mem);
+  console.log(`[TRU] memory dedup: ${entries.length} -> ${mem.entries.length} (dropped ${dropped.length} dupes)`);
+  return { pruned: true, before: entries.length, after: mem.entries.length, dropped };
+}
+
 // ── DAILY ARCHIVE TIMER (durability safety net) ─────────────────
 // Fires once a day + a silent reconcile 60s after boot. The boot
 // reconcile only sends git+mail when memory.json has actual
@@ -2114,6 +2232,8 @@ if (mode === "production") {
     dailyArchive().catch((e) =>
       console.error("[dailyArchive]", String(e).slice(0, 200))
     );
+  // One-time memory dedup 45s after boot (no-op on clean memory).
+  setTimeout(() => pruneMemoryDuplicates(), 45_000);
   setTimeout(bootTick, 60_000);
   setInterval(dailyTick, DAY_MS);
   console.log("[TRU] daily archive timer armed (boot reconcile + 24h daily, prod only)");

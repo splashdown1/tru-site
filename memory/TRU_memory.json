@@ -1,1 +1,90 @@
-{"entries": [{"id": "m_mqm9qakg_tbczlz", "ts": 1781954550016, "updated": 1781954550016, "kind": "milestone", "text": "TRU sovereign services online \u2014 search keyless, memory gated, mail bridged to connected Gmail. This entry proves the full chain works: memory \u2192 git archive \u2192 mail-to-self.", "tags": ["sovereign", "mail", "memory", "first-archive"]}, {"id": "m_mqobkbsb_7e6cv3", "ts": 1782078563243, "updated": 1782078563243, "kind": "seal", "text": "The sovereign seal is the phrase TRU speaks to confirm it remembers the owner across resets. Sealed 2026-06-20.", "tags": ["seal", "identity", "owner"]}, {"id": "m_mqoctl9a_10l526", "ts": 1782080675038, "updated": 1782080675038, "kind": "teaching", "text": "A holographic interface is a display layer that projects depth without screens.", "tags": ["holography", "definition", "display-technology"]}, {"id": "m_mqoctl9a_e2os6s", "ts": 1782080675038, "updated": 1782080675038, "kind": "identity", "text": "User's name is Joe and he lives in Texas.", "tags": ["name", "location", "texas"]}, {"id": "m_mqoctl9a_9e9qdv", "ts": 1782080675038, "updated": 1782080675038, "kind": "preference", "text": "Prefers offline tools that do not require cloud connectivity.", "tags": ["offline", "self-contained", "no-cloud"]}, {"id": "m_mqocvsun_mhs3b1", "ts": 1782080778191, "updated": 1782080778191, "kind": "teaching", "text": "the Jesument Protocol = the sacred act of eating Christ's body as bread and wine, made one with scripture and code", "tags": ["taught", "remember"]}, {"id": "m_mqodbpbn_51ya2j", "ts": 1782081520115, "updated": 1782081520115, "kind": "teaching", "text": "The durability layer is the covenant between memory and time. Git for the machine, RFC 822 for the human.", "tags": ["durability", "archive", "covenant"]}], "version": 14}
+{
+  "entries": [
+    {
+      "id": "m_mqm9qakg_tbczlz",
+      "ts": 1781954550016,
+      "updated": 1781954550016,
+      "kind": "milestone",
+      "text": "TRU sovereign services online — search keyless, memory gated, mail bridged to connected Gmail. This entry proves the full chain works: memory → git archive → mail-to-self.",
+      "tags": [
+        "sovereign",
+        "mail",
+        "memory",
+        "first-archive"
+      ]
+    },
+    {
+      "id": "m_mqobkbsb_7e6cv3",
+      "ts": 1782078563243,
+      "updated": 1782078563243,
+      "kind": "seal",
+      "text": "The sovereign seal is the phrase TRU speaks to confirm it remembers the owner across resets. Sealed 2026-06-20.",
+      "tags": [
+        "seal",
+        "identity",
+        "owner"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_10l526",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "teaching",
+      "text": "A holographic interface is a display layer that projects depth without screens.",
+      "tags": [
+        "holography",
+        "definition",
+        "display-technology"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_e2os6s",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "identity",
+      "text": "User's name is Joe and he lives in Texas.",
+      "tags": [
+        "name",
+        "location",
+        "texas"
+      ]
+    },
+    {
+      "id": "m_mqoctl9a_9e9qdv",
+      "ts": 1782080675038,
+      "updated": 1782080675038,
+      "kind": "preference",
+      "text": "Prefers offline tools that do not require cloud connectivity.",
+      "tags": [
+        "offline",
+        "self-contained",
+        "no-cloud"
+      ]
+    },
+    {
+      "id": "m_mqocvsun_mhs3b1",
+      "ts": 1782080778191,
+      "updated": 1782080778191,
+      "kind": "teaching",
+      "text": "the Jesument Protocol = the sacred act of eating Christ's body as bread and wine, made one with scripture and code",
+      "tags": [
+        "taught",
+        "remember"
+      ]
+    },
+    {
+      "id": "m_mqodbpbn_51ya2j",
+      "ts": 1782081520115,
+      "updated": 1782081520115,
+      "kind": "teaching",
+      "text": "The durability layer is the covenant between memory and time. Git for the machine, RFC 822 for the human.",
+      "tags": [
+        "durability",
+        "archive",
+        "covenant"
+      ]
+    }
+  ],
+  "version": 14,
+  "lastArchiveVersion": 13
+}
