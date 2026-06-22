@@ -85,17 +85,6 @@
       ]
     },
     {
-      "id": "m_mqoisfg7_oe5js5",
-      "ts": 1782090698551,
-      "updated": 1782090698551,
-      "kind": "identity",
-      "text": "building",
-      "tags": [
-        "identity",
-        "name"
-      ]
-    },
-    {
       "id": "m_mqoisfg8_c9kh13",
       "ts": 1782090698551,
       "updated": 1782090698551,
@@ -104,8 +93,17 @@
       "tags": [
         "project"
       ]
+    },
+    {
+      "id": "m_mqoiugiz_d50y6z",
+      "ts": 1782090793258,
+      "updated": 1782090793258,
+      "kind": "project",
+      "text": "a sovereign bible engine named TRU2",
+      "tags": [
+        "project"
+      ]
     }
   ],
-  "version": 11,
-  "lastArchiveVersion": 11
+  "version": 13
 }
