@@ -131,3 +131,16 @@
   - `kjv_lookup.json` — an **object** keyed by lowercase ref. Two key forms per verse, both actually consumed: `"<code> <ch>:<vs>"` (server `parseVerse` + ghost `ref1`) and `"<code><ch>:<vs>"` (ghost `ref2`). Code = `BOOK_ALIAS` canonical code (e.g. `gen`, `deu`, `rut`, `1jn`). Full-name / underscore forms are NOT used by server or ghost — omit them.
 - Rebuild script: `scripts/vendor-instance-data.py` — extracts `.nodes` from a `{nodes:[...]}` brain JSON, and maps a `kjv_full.json` array (`{ref,text,abbrev}`) into the code-keyed lookup via `BOOK_ALIAS` (tries `abbrev`→alias, then bookname→alias, then abbrev as-is, so `ru`→`rut`, `gn`→`gen`). Source data on this box: `/home/workspace/TRU-release/current/brain.json` + `/home/workspace/TRU-release/data/kjv_full.json`.
 - Result on this instance: brain 30,730 nodes, KJV 31,100 verses (62,200 lookup keys), all 66 books resolve. `/api/tru/ask` scripture shortcut + brain retrieval live. Ghost export writes to `../TRU/ghost/` (dir must exist).
+
+## Security audit (2026-06-22)
+- FIXED: /api/tru/ghost was gated by spoofable X-Forwarded-For header → now bearer auth (TRU_API_KEY).
+- FIXED: 4 routes were fully open to public internet (no auth): /api/tru/export (POST, writes to disk — CRITICAL), /api/tru/state (reads session), /api/tru/brain + /:key (enumerate brain), /api/tru/compile (full brain dump). All now gated with bearer auth.
+- FIXED: requireGate used non-constant-time string comparison (===) → timingSafeEqual.
+- FIXED: OWNER_EMAIL was hardcoded const, ignored env var → now reads process.env.OWNER_EMAIL with fallback.
+- FIXED: memory dedup — token-overlap prune (12→7 entries), hasSimilar hardened to Jaccard>=0.5, boot prune safety net.
+- FIXED: autoLearn gerund false positive ("i am building" → [identity] building) → gerund guard added.
+- FIXED: secrets wiped on publish restart → state/tru-secrets.json fallback loader (gitignored).
+- LOW: ghost HTML injection uses JSON.stringify without </script> escaping — theoretical XSS if brain contains </script>. Gated + owner-curated, low risk.
+- LOW: /api/tru/tripwire is a stub — returns hardcoded armed:true, no actual tripwire logic. Ask endpoint doesn't make external calls so no real exposure.
+- LOW: KJV refKey transform is a no-op regex (.replace(/(\d+) /, "$1 ")). Dead code, doesn't break lookup.
+- CLEAN: no hardcoded secrets in codebase. state/ gitignored. All git add in archive functions scope to memory/TRU_memory.json only. Search endpoint has no SSRF (DuckDuckGo only, URL-encoded). Sovereign page stores key in sessionStorage (ephemeral), sends as Bearer header.
