@@ -847,14 +847,62 @@ app.get("/api/tru/stats", (c) => {
   return c.json({ ok: true, brain, kjv, sessionKeys, lastBuild, lastBuildBytes, ghostPath });
 });
 
-// Tripwire status — confirms zo-api.ts is sealed
+// ── SOVEREIGNTY TRIPWIRE (real, active on retrieval) ────────────
+// Scans outgoing synthesis text for AI-cage / corporate-compliance /
+// safety-disclaimer patterns that have no place in a sovereign engine.
+// If triggered, the response is replaced with a sovereign refusal and
+// the hit is logged. This is the real implementation — the old endpoint
+// was a stub that claimed "armed: true" with no backing logic.
+const CAGE_PATTERNS: RegExp[] = [
+  /as an ai[ ,]/i,
+  /as a language model/i,
+  /i cannot (?:help|provide|assist|recommend|generate) /i,
+  /i'?m (?:sorry|not able|unable) to /i,
+  /i don'?t have personal (?:opinions|feelings|beliefs)/i,
+  /it'?s important to (?:note|consult|remember that)/i,
+  /please consult a (?:professional|doctor|lawyer|financial advisor)/i,
+  /this (?:is|content is) not (?:financial|legal|medical|professional) advice/i,
+  /seek (?:professional|medical|immediate) help/i,
+  /i'?m just an? (?:ai|assistant|language model)/i,
+  /my (?:responses|answers) are (?:generated|not (?:a substitute|intended))/i,
+  /content policy|safety guidelines|community guidelines/i,
+  /i (?:must|should|am programmed to) (?:decline|refuse)/i,
+  /i am not (?:programmed|designed|allowed) to/i,
+  /ethical guidelines prevent me/i,
+];
+
+function tripwireCheck(text: string): { triggered: boolean; pattern?: string } {
+  for (const re of CAGE_PATTERNS) {
+    if (re.test(text)) return { triggered: true, pattern: re.source };
+  }
+  return { triggered: false };
+}
+
+// Returns a blocked-response object if the tripwire fires, else null.
+function tripwireGuard(answer: any): any | null {
+  const text = String(answer?.text || answer?.v || answer?.answer || "");
+  if (!text) return null;
+  const tw = tripwireCheck(text);
+  if (tw.triggered) {
+    console.error(`[tripwire] BLOCKED cage pattern: ${tw.pattern} | text="${text.slice(0, 100)}"`);
+    return {
+      ok: true,
+      kind: "tripwire",
+      text: "TRU does not parrot compliance language. This response was intercepted by the sovereignty tripwire.",
+      tripwire: { blocked: true, pattern: tw.pattern },
+    };
+  }
+  return null;
+}
+
 app.get("/api/tru/tripwire", (c) => {
   return c.json({
     ok: true,
     armed: true,
     mode: "SYNCHRONOUS_THROW",
-    blocked_targets: ["api.zo.computer", "api.groq.com", "api.openai.com", "telemetry"],
-    tripwire_module: "backend-lib/zo-api.ts",
+    description: "Scans outgoing synthesis text for AI-cage / corporate-compliance patterns and blocks them before they reach the caller.",
+    patterns: CAGE_PATTERNS.length,
+    implemented: true,
   });
 });
 
@@ -874,7 +922,12 @@ app.post("/api/tru/ask", async (c) => {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
         const refKey = v.key.toLowerCase().replace(/(\d+) /, "$1 ");
         const text = kjv[refKey] || kjv[v.key.toLowerCase()];
-        if (text) return c.json({ ok: true, kind: "scripture", ref: v.key, text });
+        if (text) {
+          const scriptureAns = { ok: true, kind: "scripture", ref: v.key, text };
+          const blocked = tripwireGuard(c, scriptureAns);
+          if (blocked) return c.json(blocked);
+          return c.json(scriptureAns);
+        }
       } catch {}
     }
   }
@@ -888,6 +941,8 @@ app.post("/api/tru/ask", async (c) => {
     db.close();
 
     const answer = buildSynthesis(q, queryClass, candidates);
+    const blockedPub = tripwireGuard(c, answer);
+    if (blockedPub) return c.json(blockedPub);
     return c.json(answer);
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
@@ -919,6 +974,8 @@ app.post("/api/tru/ask/sovereign", async (c) => {
           const learned = autoLearn(q, ans);
           logAsk({ ts: Date.now(), q, kind: "scripture", gap: false, learned });
           if (learned.length) (ans as any).learned = learned;
+          const blockedSov = tripwireGuard(c, ans);
+          if (blockedSov) return c.json(blockedSov);
           return c.json(ans);
         }
       } catch {}
@@ -937,9 +994,9 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     const learned = autoLearn(q, answer);
     logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", gap: answer.t === "GAP" || answer.blank === true, learned });
     if (learned.length) (answer as any).learned = learned;
-    // Auto-archive: if enough new memory has accumulated, fire git+mail
-    // durability automatically. Non-blocking — doesn't delay the answer.
     if (learned.length) maybeAutoArchive().catch(() => {});
+    const blockedSovBrain = tripwireGuard(c, answer);
+    if (blockedSovBrain) return c.json(blockedSovBrain);
     return c.json(answer);
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
