@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, renameSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
+import { timingSafeEqual } from "node:crypto";
 import Database from "bun:sqlite";
 // canon + truth-layer live in the sibling TRU/ monorepo (present on the
 // canonical account). On instances without that sibling they degrade to
@@ -1132,7 +1133,7 @@ app.get("/api/tru/state", (c) => {
 const MEMORY_DIR = join(process.cwd(), "memory");
 if (!existsSync(MEMORY_DIR)) mkdirSync(MEMORY_DIR, { recursive: true });
 const MEMORY_FILE = join(MEMORY_DIR, "TRU_memory.json");
-const OWNER_EMAIL = "legendofsplashdown@gmail.com";
+const OWNER_EMAIL = process.env.OWNER_EMAIL || "legendofsplashdown@gmail.com";
 const ZO_ASK_URL = "https://api.zo.computer/zo/ask";
 const ZO_MODEL = "vercel:zai/glm-5.2";
 
@@ -1141,7 +1142,12 @@ function requireGate(c: any): boolean {
   if (!secret) return false;
   const auth = c.req.header("authorization") || "";
   if (!auth.startsWith("Bearer ")) return false;
-  return auth.slice(7) === secret;
+  const token = auth.slice(7);
+  // Constant-time comparison to prevent timing attacks.
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
 }
 
 function loadMemory(): { entries: any[]; version: number } {
