@@ -967,7 +967,7 @@ app.post("/api/tru/ask", async (c) => {
         const text = kjv[refKey] || kjv[v.key.toLowerCase()];
         if (text) {
           const scriptureAns = { ok: true, kind: "scripture", ref: v.key, text };
-          const blocked = tripwireGuard(c, scriptureAns);
+          const blocked = tripwireGuard(scriptureAns);
           if (blocked) return c.json(blocked);
           return c.json(scriptureAns);
         }
@@ -984,7 +984,7 @@ app.post("/api/tru/ask", async (c) => {
     db.close();
 
     const answer = buildSynthesis(q, queryClass, candidates);
-    const blockedPub = tripwireGuard(c, answer);
+    const blockedPub = tripwireGuard(answer);
     if (blockedPub) return c.json(blockedPub);
     // Web fallback: when the brain can't ground the query (GAP / blank /
     // low score), defer to DuckDuckGo instead of presenting an irrelevant
@@ -1041,7 +1041,7 @@ app.post("/api/tru/ask/sovereign", async (c) => {
           const learned = autoLearn(q, ans);
           logAsk({ ts: Date.now(), q, kind: "scripture", gap: false, learned });
           if (learned.length) (ans as any).learned = learned;
-          const blockedSov = tripwireGuard(c, ans);
+          const blockedSov = tripwireGuard(ans);
           if (blockedSov) return c.json(blockedSov);
           return c.json(ans);
         }
@@ -1069,12 +1069,12 @@ app.post("/api/tru/ask/sovereign", async (c) => {
       const web = await webSearch(q);
       if (web.ok && web.results && web.results.length > 0) {
         const webAns = formatWebFallback(q, web.results);
-        const blockedSovWeb = tripwireGuard(c, webAns);
+        const blockedSovWeb = tripwireGuard(webAns);
         if (blockedSovWeb) return c.json(blockedSovWeb);
         return c.json(webAns);
       }
     }
-    const blockedSovBrain = tripwireGuard(c, answer);
+    const blockedSovBrain = tripwireGuard(answer);
     if (blockedSovBrain) return c.json(blockedSovBrain);
     return c.json(answer);
   } catch (e) {
