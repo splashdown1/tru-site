@@ -672,6 +672,20 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     text += `\nFormat: remember: ${query} = <the truth you would have it hold>`;
   }
 
+  const grounded = (() => {
+    // Require meaningful token overlap between query and best node.
+    // Short queries (<=2 meaningful tokens) need 100% match so a
+    // single common word ("life", "bake") can't false-positive a
+    // KJV verse. Longer queries need >=50% coverage.
+    const meaningful = qTokens.filter((t) => t.length >= 3);
+    if (!meaningful.length) return true;
+    const hay = new Set(tokenize(`${best.k} ${best.v} ${best.ref ?? ""}`));
+    let hits = 0;
+    for (const t of meaningful) if (hay.has(t)) hits++;
+    const threshold = meaningful.length <= 2 ? 1.0 : 0.5;
+    return hits / meaningful.length >= threshold;
+  })();
+
   return {
     ok: true,
     kind: "brain",
@@ -680,6 +694,7 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     t: bestScore >= 18 ? String(best.t ?? "SYNTHESIS").toUpperCase() : "GAP",
     source: best.source ?? "TRU_CORE",
     score: Math.min(99, Math.round(bestScore)),
+    grounded,
     nodes: scored.slice(0, 5).map((item) => `${item.node.k}:${item.node.t ?? ""}`),
   };
 }
@@ -959,6 +974,30 @@ app.post("/api/tru/ask", async (c) => {
     const answer = buildSynthesis(q, queryClass, candidates);
     const blockedPub = tripwireGuard(c, answer);
     if (blockedPub) return c.json(blockedPub);
+    // Web fallback: when the brain can't ground the query (GAP / blank /
+    // low score), defer to DuckDuckGo instead of presenting an irrelevant
+    // node as a confident answer. Honest about the source.
+    const brainMiss = answer.blank === true || answer.t === "GAP" || !answer.grounded ||
+      (typeof answer.score === "number" && answer.score < 18);
+    if (brainMiss) {
+      const web = await webSearch(q);
+      
+      if (web.ok && web.results.length > 0) {
+        const top = web.results.slice(0, 5);
+        const webText = top.map((r, i) =>
+          `${i + 1}. ${r.title}\n   ${r.url}\n   ${firstSentence(r.snippet, 160)}`
+        ).join("\n\n");
+        return c.json({
+          ok: true,
+          kind: "web",
+          q,
+          source: "WEB_FALLBACK",
+          v: `TRU's brain doesn't hold this. Here's what the web knows:\n\n${webText}`,
+          results: top,
+          brainMiss: true,
+        });
+      }
+    }
     return c.json(answer);
   } catch (e) {
     return c.json({ ok: false, error: String(e) }, 500);
@@ -1011,6 +1050,18 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", gap: answer.t === "GAP" || answer.blank === true, learned });
     if (learned.length) (answer as any).learned = learned;
     if (learned.length) maybeAutoArchive().catch(() => {});
+    // WEB FALLBACK — if brain AND memory both miss (still GAP/blank),
+    // defer to DuckDuckGo so the sovereign owner gets real answers,
+    // not a "teach me" dead-end. Same honest source labeling as /ask.
+    if (answer.blank === true || answer.t === "GAP" || answer.grounded === false) {
+      const web = await webSearch(q);
+      if (web.ok && web.results && web.results.length > 0) {
+        const webAns = formatWebFallback(q, web.results);
+        const blockedSovWeb = tripwireGuard(c, webAns);
+        if (blockedSovWeb) return c.json(blockedSovWeb);
+        return c.json(webAns);
+      }
+    }
     const blockedSovBrain = tripwireGuard(c, answer);
     if (blockedSovBrain) return c.json(blockedSovBrain);
     return c.json(answer);
@@ -1542,41 +1593,79 @@ app.get("/api/tru/metrics", async (c) => {
 });
 
 // ── SEARCH (keyless, public) ─────────────────────────────────────
-app.get("/api/tru/search", async (c) => {
-  const q = (c.req.query("q") || "").trim();
-  if (!q) return c.json({ ok: false, error: "missing q" }, 400);
+// Shared web-search helper — DuckDuckGo HTML scrape, no API key.
+// Used by /api/tru/search AND as the brain fallback when the brain
+// can't ground a query (GAP / blank / low score).
+// Simple in-memory search cache (2 min TTL) — avoids re-hitting
+// DDG/Wikipedia for similar queries under rapid load.
+const _searchCache = new Map<string, { ts: number; data: any }>();
+const SEARCH_CACHE_TTL = 120_000;
+
+async function webSearch(query: string): Promise<{ ok: boolean; results: { title: string; url: string; snippet: string }[]; error?: string }> {
+  // Try DuckDuckGo first (richer snippets). If rate-limited (403),
+  // fall back to Wikipedia's API (no key, no rate limit for reasonable use).
   try {
     const ddg = await fetch(
-      "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(q) + "&kl=us-en",
+      "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query) + "&kl=us-en",
       {
         headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 TRU/1.0" },
         redirect: "follow",
         signal: AbortSignal.timeout(9000),
       },
     );
-    if (!ddg.ok) return c.json({ ok: false, error: "upstream " + ddg.status }, 502);
-    const html = await ddg.text();
-    const links: { href: string; title: string }[] = [];
-    const linkRe = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-    let m: RegExpExecArray | null;
-    while ((m = linkRe.exec(html)) !== null) {
-      let href = m[1];
-      const uddg = /uddg=([^&]+)/.exec(href);
-      if (uddg) {
-        try { href = decodeURIComponent(uddg[1]); } catch { /* keep raw */ }
-      } else if (href.startsWith("//")) {
-        href = "https:" + href;
+    if (ddg.ok) {
+      const html = await ddg.text();
+      const links: { href: string; title: string }[] = [];
+      const linkRe = /class="result__a"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      let m: RegExpExecArray | null;
+      while ((m = linkRe.exec(html)) !== null) {
+        let href = m[1];
+        const uddg = /uddg=([^&]+)/.exec(href);
+        if (uddg) {
+          try { href = decodeURIComponent(uddg[1]); } catch { /* keep raw */ }
+        } else if (href.startsWith("//")) {
+          href = "https:" + href;
+        }
+        links.push({ href, title: decodeEntities(m[2]) });
       }
-      links.push({ href, title: decodeEntities(m[2]) });
+      const snippets: string[] = [];
+      const snipRe = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      while ((m = snipRe.exec(html)) !== null) snippets.push(decodeEntities(m[1]));
+      const results = links.map((l, i) => ({ title: l.title, url: l.href, snippet: snippets[i] || "" }));
+      if (results.length > 0) { const d = { ok: true, results }; _searchCache.set(cacheKey, { ts: Date.now(), data: d }); return d; }
     }
-    const snippets: string[] = [];
-    const snipRe = /class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
-    while ((m = snipRe.exec(html)) !== null) snippets.push(decodeEntities(m[1]));
-    const results = links.map((l, i) => ({ title: l.title, url: l.href, snippet: snippets[i] || "" }));
-    return c.json({ ok: true, q, count: results.length, results });
+    // DDG failed (403 or empty) — fall through to Wikipedia.
+  } catch {}
+  // Wikipedia fallback — free API, no key, generous rate limits.
+  try {
+    const ws = await fetch(
+      "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" +
+      encodeURIComponent(query) + "&format=json&srlimit=5&srprop=snippet",
+      {
+        headers: { "User-Agent": "TRU/1.0 (sovereign knowledge engine; contact: legendofsplashdown@gmail.com)" },
+        signal: AbortSignal.timeout(9000),
+      },
+    );
+    if (!ws.ok) return { ok: false, results: [], error: "wiki upstream " + ws.status };
+    const wd: any = await ws.json();
+    const hits = wd?.query?.search ?? [];
+    const results = hits.map((h: any) => ({
+      title: h.title,
+      url: `https://en.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, "_"))}`,
+      snippet: (h.snippet || "").replace(/<[^>]+>/g, ""),
+    }));
+    return { ok: true, results };
   } catch (e) {
-    return c.json({ ok: false, error: String(e) }, 502);
+    return { ok: false, results: [], error: String(e) };
   }
+}
+
+app.get("/api/tru/search", async (c) => {
+  const q = (c.req.query("q") || "").trim();
+  if (!q) return c.json({ ok: false, error: "missing q" }, 400);
+  const res = await webSearch(q);
+  if (!res.ok) return c.json({ ok: false, error: res.error }, 502);
+  return c.json({ ok: true, q, count: res.results.length, results: res.results });
 });
 
 // ── MEMORY (load / create / update / delete / search) ────────────
