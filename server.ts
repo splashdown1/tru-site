@@ -275,7 +275,9 @@ const BOOK_ALIAS: Record<string, string> = {
 };
 
 function parseVerse(q: string): { key: string; book: string; chapter: number; verse: number } | null {
-  const m = q.toLowerCase().trim().match(/^([1-3]?\s?[a-z]+)\s+(\d+):(\d+)$/);
+  // Accept both colon ("ps 23:1") and space ("ps 23 1") as chapter:verse
+  // separator so natural-language verse queries resolve to scripture.
+  const m = q.toLowerCase().trim().match(/^([1-3]?\s?[a-z]+)\s+(\d+)[\s:](\d+)$/);
   if (!m) return null;
   const book = BOOK_ALIAS[m[1].replace(/\s+/g, "")];
   if (!book) return null;
@@ -599,8 +601,22 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     return hit?.node ?? null;
   };
 
+  // Strict eligible: node must match ALL significant query tokens (>= 3 chars),
+  // not just any. Prevents "holographic memory" from pairing with a
+  // semiconductor-capex node that only incidentally contains "memory".
+  const allTokenMatch = (row: NodeRow): boolean => {
+    if (!qTokens.length) return false;
+    const sig = qTokens.filter((t) => t.length >= 3);
+    if (!sig.length) return isTokenMatch(row);
+    const keyNorm = norm(row.k), valueNorm = norm(row.v), refNorm = norm(row.ref ?? "");
+    return sig.every((t) =>
+      keyNorm.includes(t) || valueNorm.includes(t) || refNorm.includes(t)
+    );
+  };
   const eligible = (it: { node: NodeRow }): boolean =>
-    it.node.k !== best.k && isTopic(it.node) && isTokenMatch(it.node);
+    it.node.k !== best.k && isTopic(it.node) && (allTokenMatch(it.node) || isTokenMatch(it.node));
+  const eligibleStrict = (it: { node: NodeRow }): boolean =>
+    it.node.k !== best.k && isTopic(it.node) && allTokenMatch(it.node);
 
   const whatItWas = firstSentence(best.v, 220);
 
@@ -621,7 +637,7 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
   const embeddedWhy = extractClause("Why it mattered");
 
   const whyItMattered = embeddedWhy || firstSentence(
-    next.find(eligible)?.node.v ?? "",
+    next.find(eligibleStrict)?.node.v ?? "",
     180,
   );
   const hiddenEngine = embeddedHidden || firstSentence(
@@ -1285,11 +1301,15 @@ function foldMemory(answer: any, query: string): any {
   const isPersonal = /\b(i|my|me|mine|myself)\b/i.test(query);
   const recall = strong.length ? strong : hits.slice(0, 2);
   const recallLine = `Remembered: ${recall.map((r) => firstSentence(r.text, 140)).join(" · ")}`;
-  if (isPersonal && strong.length > 0) {
-    out.v = `${strong[0].text}\n\n[remembered · ${strong[0].kind}]`;
+  // Personal-pronoun queries: lead with the top memory hit on ANY hit
+  // (score > 0), not just strong (>= 5). The personal pronoun is the
+  // signal; the curated memory is owner-specific so any hit is relevant.
+  if (isPersonal && hits.length > 0) {
+    const top = strong.length ? strong[0] : hits[0];
+    out.v = `${top.text}\n\n[remembered · ${top.kind}]`;
     out.t = "MEMORY";
     out.source = "TRU_MEMORY";
-    out.score = Math.min(99, strong[0].score * 3);
+    out.score = Math.min(99, Math.max(top.score, 5) * 3);
   } else {
     out.v = `${answer.v}\n${recallLine}`;
   }
