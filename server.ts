@@ -972,14 +972,10 @@ app.post("/api/tru/export", async (c) => {
 });
 
 app.post("/api/tru/ghost", async (c) => {
-  // Localhost only — this endpoint writes a file on disk.
-  // Treat a missing forwarded-for header as "remote" so we never default-open
-  // the gate in a public reverse-proxy deployment.
-  const xff = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "";
-  const ip = xff.split(",")[0]!.trim();
-  const isLocal = ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-  if (!isLocal) {
-    return c.json({ ok: false, error: "ghost export is local-only" }, 403);
+  // Real auth — this endpoint writes a file on disk. The old
+  // localhost-header check was client-spoofable via X-Forwarded-For.
+  if (!requireGate(c)) {
+    return c.json({ ok: false, error: "ghost export requires TRU_API_KEY" }, 401);
   }
   const wantDownload = new URL(c.req.url).searchParams.get("download") === "1";
 
