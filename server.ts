@@ -953,6 +953,7 @@ app.post("/api/tru/reflect", async (c) => {
 });
 
 app.post("/api/tru/export", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   const raw = await c.req.text().catch(() => "");
   if (raw.length > MAX_EXPORT_BYTES) {
     return c.json({ ok: false, error: "payload too large" }, 413);
@@ -1108,6 +1109,7 @@ app.post("/api/tru/ghost", async (c) => {
 });
 
 app.get("/api/tru/state", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   if (!existsSync(STATE_SNAPSHOT)) return c.json({ ok: true, empty: true });
   try {
     return c.json({ ok: true, snapshot: JSON.parse(readFileSync(STATE_SNAPSHOT, "utf8")) });
@@ -1871,6 +1873,7 @@ app.get("/api/tru/mail/status", (c) => {
 // BRAIN QUERY — read from SQLite
 // ═══════════════════════════════════════════════════════════════
 app.get("/api/tru/brain/:key", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   const key = c.req.param("key");
   if (!existsSync(BRAIN_DB)) {
     return c.json({ ok: false, error: "brain.db not found" }, 404);
@@ -1887,6 +1890,7 @@ app.get("/api/tru/brain/:key", (c) => {
 });
 
 app.get("/api/tru/brain", (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   const q = c.req.query("q") || "";
   const limit = Math.min(100, Math.max(1, parseInt(c.req.query("limit") || "50")));
   if (!existsSync(BRAIN_DB)) {
@@ -1912,6 +1916,7 @@ app.get("/api/tru/brain", (c) => {
 // MONOLITH COMPILE — bake brain into a standalone HTML
 // ═══════════════════════════════════════════════════════════════
 app.get("/api/tru/compile", async (c) => {
+  if (!requireGate(c)) return c.text("unauthorized", 401);
   if (!existsSync(BRAIN_DB)) {
     return c.text("brain.db not found", 404);
   }
