@@ -144,3 +144,15 @@
 - LOW: /api/tru/tripwire is a stub — returns hardcoded armed:true, no actual tripwire logic. Ask endpoint doesn't make external calls so no real exposure.
 - LOW: KJV refKey transform is a no-op regex (.replace(/(\d+) /, "$1 ")). Dead code, doesn't break lookup.
 - CLEAN: no hardcoded secrets in codebase. state/ gitignored. All git add in archive functions scope to memory/TRU_memory.json only. Search endpoint has no SSRF (DuckDuckGo only, URL-encoded). Sovereign page stores key in sessionStorage (ephemeral), sends as Bearer header.
+## Restore + export (round-trip durability)
+- GET /api/tru/memory/export — full JSON download (entries, version, exportedAt)
+- GET /api/tru/memory/versions — git history of memory.json (hash, ts, subject)
+- POST /api/tru/memory/restore — three modes:
+  - {source:"git-latest"} → restore from HEAD
+  - {source:"git", hash:"<short>"} → restore from specific commit
+  - {entries:[...]} → restore from JSON payload (e.g. exported file)
+- Wipes current memory first, backs up to .bak-<epoch> before overwrite
+- Verified: wipe → restore git-latest → 12/12 entries match
+- Verified: wipe → restore payload → 12/12 entries match
+- Verified: restore from short hash → 12/12 entries match
+- UI: export button, versions list, restore-from-latest/hash buttons in /sovereign memory section
