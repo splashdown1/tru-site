@@ -1189,7 +1189,7 @@ app.post("/api/tru/ghost", async (c) => {
       brain: Array.isArray(brain) ? brain.length : 0,
       kjv: Object.keys(kjv).length,
       memory: truMemory.entries.length,
-      primariesLock: primariesLock.slice(0, 16) + "…",
+      primariesLock: `"${primariesLock.slice(0, 16)}…"`
     };
 
     // Inject the data slots. Use JSON.stringify which produces
