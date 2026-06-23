@@ -1207,7 +1207,7 @@ app.post("/api/tru/ghost", async (c) => {
       .split("__SESSION__").join(sessionJson)
       .split("__MEMORY__").join(memoryJson)
       .split("__META__").join(metaJson)
-      .split("__PRIMARIES__").join(primariesLock);
+      .split("__PRIMARIES__").join(JSON.stringify(primariesLock));
 
     const html = shell.replace("/* __TRU_GHOST_RUNTIME__ */", runtime);
 
