@@ -8,6 +8,7 @@
 //   __SESSION__ — JSON.stringify of merged user state (text, notes, uploads)
 //   __META__    — JSON.stringify of { baked, brain, kjv, uploads }
 //   __PRIMARIES__ — lock string injected at boot
+//   __MEMORY__  — JSON.stringify of { entries:[...], version:N } self-writing memory
 (function () {
   "use strict";
 
@@ -15,6 +16,101 @@
   const KJV     = __KJV__;
   const SESSION = __SESSION__ || {};
   const META    = __META__ || {};
+  const BAKED_MEMORY = __MEMORY__ || { entries: [], version: 0 };
+
+  // ── GHOST MEMORY — baked memory from server + locally taught entries ──
+  // Baked memory is read-only (inherited at bake time). Locally taught
+  // entries persist in localStorage so the ghost remembers between
+  // sessions on the same machine. Both layers are searched on every ask.
+  const MEM_KEY = "tru_ghost_memory";
+  function loadLocalMemory() {
+    try { return JSON.parse(localStorage.getItem(MEM_KEY) || "[]"); } catch { return []; }
+  }
+  function saveLocalMemory(entries) {
+    try { localStorage.setItem(MEM_KEY, JSON.stringify(entries)); } catch {}
+  }
+  function allMemory() {
+    return (BAKED_MEMORY.entries || []).concat(loadLocalMemory());
+  }
+
+  // ── GHOST MEMORY RECALL — search baked + local memory against a query ──
+  function gatherMemory(query) {
+    var mem = allMemory();
+    if (!mem.length) return [];
+    var qTokens = tokenize(query).filter(function (t) { return t.length >= 3; });
+    if (!qTokens.length) return [];
+    var scored = mem.map(function (e) {
+      var textNorm = norm(String(e.text || ""));
+      var tagsNorm = (e.tags || []).map(function (t) { return norm(String(t)); });
+      var score = 0;
+      qTokens.forEach(function (t) {
+        if (textNorm.indexOf(t) >= 0) score += 3;
+        tagsNorm.forEach(function (tag) {
+          if (tag === t || tag.indexOf(t) === 0) score += 5;
+        });
+      });
+      if (textNorm.indexOf(norm(query)) >= 0 && norm(query).length >= 4) score += 8;
+      return { id: e.id || "", kind: String(e.kind || "note"), text: String(e.text || ""), tags: e.tags || [], score: score };
+    }).filter(function (m) { return m.score > 0; })
+      .sort(function (a, b) { return b.score - a.score; });
+    return scored.slice(0, 5);
+  }
+
+  function foldMemory(answer, query) {
+    var hits = gatherMemory(query);
+    if (!hits.length) return answer;
+    var strong = hits.filter(function (h) { return h.score >= 5; });
+    var isPersonal = /\b(i|my|me|mine|myself)\b/i.test(query);
+    var recall = strong.length ? strong : hits.slice(0, 2);
+    var recallLine = "Remembered: " + recall.map(function (r) { return firstSentence(r.text, 140); }).join(" · ");
+    var out = Object.assign({}, answer, {
+      memory: hits.map(function (h) { return { id: h.id, kind: h.kind, text: h.text, score: h.score }; })
+    });
+    // GAP case: memory IS the answer.
+    if ((answer.blank === true || answer.t === "GAP") && strong.length) {
+      var top = strong[0];
+      out.text = top.text + "\n\n[remembered · " + top.kind + "]";
+      out.t = "MEMORY";
+      out.source = "TRU_MEMORY";
+      out.blank = false;
+      out.score = Math.min(99, top.score * 3);
+      return out;
+    }
+    // Personal query: memory leads, brain demoted to footnote.
+    if (isPersonal && strong.length) {
+      var topP = strong[0];
+      out.text = topP.text + "\n\n[remembered · " + topP.kind + "]\nBrain context: " + firstSentence(answer.text || answer.v || "", 180);
+      out.t = "MEMORY";
+      out.source = "TRU_MEMORY";
+      out.score = Math.min(99, topP.score * 3);
+    } else {
+      out.text = (answer.text || answer.v || "") + "\n" + recallLine;
+    }
+    return out;
+  }
+
+  // ── REMEMBER — teach the ghost, persists to localStorage ──
+  function rememberTeaching(q) {
+    var teachRe = /remember:\s*(.+?)\s*=\s*(.+)/i;
+    var m = q.match(teachRe);
+    if (!m) return null;
+    var entries = loadLocalMemory();
+    var entry = {
+      id: "g_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 6),
+      ts: Date.now(),
+      kind: "teaching",
+      text: m[1].trim() + " = " + m[2].trim(),
+      tags: ["taught", "remember"]
+    };
+    // Dedup
+    var exists = entries.some(function (e) {
+      return String(e.text || "").toLowerCase().indexOf(entry.text.toLowerCase().slice(0, 40)) >= 0;
+    });
+    if (exists) return { duplicate: true };
+    entries.push(entry);
+    saveLocalMemory(entries);
+    return { entry: entry };
+  }
 
   const STOP = new Set([
     "the","a","an","and","or","but","in","on","at","to","for","of","with","by","from",
@@ -346,12 +442,21 @@
 
   function lookup(q) {
     if (!q) return null;
+    // Scripture shortcut
     var v = parseVerse(q);
     if (v) {
-      return { kind: "scripture", text: v.text, ref: v.ref, score: 100 };
+      return foldMemory({ kind: "scripture", text: v.text, ref: v.ref, score: 100 }, q);
+    }
+    // Teach: "remember: X = Y"
+    var taught = rememberTeaching(q);
+    if (taught) {
+      if (taught.duplicate) {
+        return { kind: "brain", text: "Already remembered.", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false };
+      }
+      return { kind: "brain", text: "Remembered: " + taught.entry.text + "\n\n[teaching · stored locally]", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false, learned: true };
     }
     var queryClass = classifyQuery(q);
-    return buildSynthesis(q, queryClass, BRAIN);
+    return foldMemory(buildSynthesis(q, queryClass, BRAIN), q);
   }
 
   function esc(s) {
@@ -366,15 +471,20 @@
   function renderAnswer(r) {
     if (!r) return "";
     if (r.kind === "scripture") {
+      var memHtml = r.memory && r.memory.length ? '<div class="recall"><span class="rec-label">remembered</span>' +
+        r.memory.map(function (m) { return '<div class="rec-item"><span class="rec-kind">[' + esc(m.kind) + ']</span> ' + esc(m.text) + '</div>'; }).join("") + '</div>' : '';
       return '<div class="verdict scripture">SCRIPTURE · ' + r.score + '% · ' + esc(r.ref) + '</div>' +
-             '<div class="answer">' + esc(r.text) + '<span class="src">KJV</span></div>';
+             '<div class="answer">' + esc(r.text) + '<span class="src">KJV</span></div>' + memHtml;
     }
     if (r.kind === "brain") {
+      var memHtml2 = r.memory && r.memory.length ? '<div class="recall"><span class="rec-label">remembered</span>' +
+        r.memory.map(function (m) { return '<div class="rec-item"><span class="rec-kind">[' + esc(m.kind) + ']</span> ' + esc(m.text) + '</div>'; }).join("") + '</div>' : '';
+      var learnBadge = r.learned ? ' · <span style="color:#6b8f71">auto-remembered</span>' : '';
       return '<div class="verdict">' + esc(r.t || "TRUTH") + ' · ' + r.score + '%' +
-             (r.source ? ' · ' + esc(r.source) : '') + '</div>' +
+             (r.source ? ' · ' + esc(r.source) : '') + learnBadge + '</div>' +
              '<div class="answer">' + esc(r.text) +
              (r.ref ? '<span class="src">ref: ' + esc(r.ref) + '</span>' : '') +
-             '</div>';
+             '</div>' + memHtml2;
     }
     return '<div class="verdict unknown">NO GROUNDED NODE</div>' +
            '<div class="answer">' + esc(r.text) + '</div>';

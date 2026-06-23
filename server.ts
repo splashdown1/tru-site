@@ -1143,6 +1143,9 @@ app.post("/api/tru/ghost", async (c) => {
     const memory = existsSync(STATE_SNAPSHOT)
       ? JSON.parse(readFileSync(STATE_SNAPSHOT, "utf-8"))
       : {};
+    // Self-writing memory — the accumulated knowledge TRU learned
+    // from asks. Baked into the ghost so the offline copy remembers.
+    const truMemory = loadMemory();
 
     // Merge user's uploaded state on top of the persisted session memory.
     // userState shape: { text?: string, notes?: string, uploads?: [{name,mime,size,kind,data}] }
@@ -1185,6 +1188,7 @@ app.post("/api/tru/ghost", async (c) => {
       uploads: Array.isArray((mergedMemory as any).uploads) ? (mergedMemory as any).uploads.length : 0,
       brain: Array.isArray(brain) ? brain.length : 0,
       kjv: Object.keys(kjv).length,
+      memory: truMemory.entries.length,
       primariesLock: primariesLock.slice(0, 16) + "…",
     };
 
@@ -1196,10 +1200,12 @@ app.post("/api/tru/ghost", async (c) => {
     const kjvJson = JSON.stringify(kjv);
     const sessionJson = JSON.stringify(mergedMemory);
     const metaJson = JSON.stringify(meta);
+    const memoryJson = JSON.stringify(truMemory);
     runtime = runtime
       .split("__BRAIN__").join(brainJson)
       .split("__KJV__").join(kjvJson)
       .split("__SESSION__").join(sessionJson)
+      .split("__MEMORY__").join(memoryJson)
       .split("__META__").join(metaJson)
       .split("__PRIMARIES__").join(primariesLock);
 
