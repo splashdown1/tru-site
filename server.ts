@@ -342,6 +342,93 @@ const SOURCE_PRIORITY: Record<string, number> = {
   STARTER: 2,
 };
 
+// ── SPIRITUAL DOMAIN BOOST ──────────────────────────────────────
+// When a query contains spiritually-loaded terms, theological nodes
+// get a boost and secular nodes (geography, politics, economics) get
+// a penalty. This prevents "what is the kingdom" from returning
+// "United Kingdom" instead of "Kingdom of God."
+const SPIRITUAL_TERMS = new Set([
+  "god","christ","jesus","lord","holy","spirit","spiritual","divine","sacred",
+  "kingdom","heaven","heavens","salvation","grace","mercy","faith","prayer",
+  "sin","righteousness","redeem","redemption","covenant","gospel","word",
+  "logos","truth","light","glory","worship","altar","temple","church",
+  "bible","scripture","verse","psalm","proverb","parab","parable","prophet",
+  "apostle","disciple","cross","crucifix","resurrection","baptism","communion",
+  "eucharist","soul","eternal","everlasting","immortal","blessed","blessing",
+  "anoint","anointed","messiah","savior","creator","creation","genesis",
+  "revelation","apocalypse","angel","demon","devil","satan","heaven","hell",
+  "paradise","eden","sin","repent","forgive","forgiveness","love","agape",
+  "john","matthew","mark","luke","acts","romans","corinthians","galatians",
+  "ephesians","philippians","colossians","thessalonians","timothy","titus",
+  "philemon","hebrews","james","peter","jude","revelation","exodus","leviticus",
+  "numbers","deuteronomy","joshua","judges","ruth","samuel","kings","chronicles",
+  "ezra","nehemiah","esther","job","psalm","proverbs","ecclesiastes","song",
+  "isaiah","jeremiah","lamentations","ezekiel","daniel","hosea","joel","amos",
+  "obadiah","jonah","micah","nahum","habakkuk","zephaniah","haggai","zechariah",
+  "malachi","testament","canon","law","commandment","ten","moses","abraham",
+  "isaac","jacob","david","solomon","noah","ark","flood","exodus","passover",
+  "tabernacle","ark","covenant","prophecy","vision","dream","miracle","wonder",
+  "sign","witness","testimony","sanctify","sanctification","justification",
+  "atonement","sacrifice","offering","burnt","incense","priest","levite",
+  "pharisee","sadducee","essene","nazirite","gentile","circumcise","circumcision",
+  "sabbath","sunday","easter","pentecost","advent","lent","trinity","father",
+  "son","spirit"," Emmanuel","alpha","omega","beginning","end","amen",
+]);
+
+const SPIRITUAL_TYPES = new Set([
+  "theology","greek_theology","hebrew_theology","christ_attestation",
+  "bible","wisdom","rule","identity","lexicon","garden","survival",
+]);
+
+const SECULAR_MARKERS = new Set([
+  "united","states","america","american","europe","european","country",
+  "countries","nation","nations","government","political","politics",
+  "parliament","congress","senate","president","prime","minister",
+  "democracy","republic","economic","economy","market","stock","trade",
+  "currency","dollar","gdp","inflation","corporation","company","industry",
+  "technology","software","computer","internet","algorithm","semiconductor",
+  "physics","chemistry","biology","geography","continent","island","river",
+  "mountain","ocean","city","capital","population","census","war","military",
+  "army","navy","treaty","alliance","empire","colony","revolution","dynasty",
+  "monarchy","feudal","agricultural","industrial","renaissance","enlightenment",
+]);
+
+function spiritualDomainBoost(query: string, node: NodeRow): number {
+  const qTokens = tokenize(query);
+  const qSpiritualHits = qTokens.filter((t) => SPIRITUAL_TERMS.has(t)).length;
+  if (qSpiritualHits === 0) return 0;
+
+  const keyNorm = norm(node.k ?? "");
+  const valueNorm = norm(node.v ?? "");
+  const typeKind = String(node.t ?? "").toLowerCase();
+  const sourceKind = String(node.source ?? "").toLowerCase();
+
+  let boost = 0;
+
+  // Query is spiritual — boost theological nodes.
+  const nodeIsSpiritualType = SPIRITUAL_TYPES.has(typeKind);
+  const nodeKeySpiritual = keyNorm.split(/[\s_]+/).some((t) => SPIRITUAL_TERMS.has(t));
+  const nodeValueSpiritual = valueNorm.split(/\s+/).some((t) => SPIRITUAL_TERMS.has(t));
+
+  if (nodeIsSpiritualType) boost += 25;
+  if (nodeKeySpiritual) boost += 20;
+  if (nodeValueSpiritual) boost += 10;
+  // TRU_CORE / CERTIFIED theological source gets extra weight.
+  if (sourceKind === "tru_core" || sourceKind === "certified") boost += 8;
+
+  // Penalize secular nodes when the query is spiritual.
+  const keySecular = keyNorm.split(/[\s_]+/).some((t) => SECULAR_MARKERS.has(t));
+  const valueSecular = valueNorm.split(/\s+/).some((t) => SECULAR_MARKERS.has(t));
+  if (keySecular) boost -= 40;
+  if (valueSecular) boost -= 15;
+  // Knowledge/fact types about secular subjects lose ground.
+  if ((typeKind === "knowledge" || typeKind === "fact" || typeKind === "concept") && (keySecular || valueSecular)) {
+    boost -= 25;
+  }
+
+  return boost;
+}
+
 const STOP_WORDS = new Set([
   "a","an","the","is","are","was","were","be","been","being","do","does","did",
   "what","who","whom","whose","which","where","when","why","how",
@@ -496,6 +583,7 @@ function scoreCandidate(node: NodeRow, qNorm: string, qTokens: string[], queryCl
 
   score += typeBonus(node.t, queryClass);
   score += sourceBonus(node.source);
+  score += spiritualDomainBoost(query, node);
   return score;
 }
 
