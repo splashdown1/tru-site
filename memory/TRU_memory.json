@@ -83,8 +83,18 @@
         "archive",
         "covenant"
       ]
+    },
+    {
+      "id": "m_mqqmy8t4_u9eri2",
+      "ts": 1782218620696,
+      "updated": 1782218620696,
+      "kind": "test",
+      "text": "Test ghost memory injection",
+      "tags": [
+        "ghost",
+        "memory"
+      ]
     }
   ],
-  "version": 14,
-  "lastArchiveVersion": 14
+  "version": 15
 }
