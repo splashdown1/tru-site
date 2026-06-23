@@ -393,8 +393,8 @@ const SECULAR_MARKERS = new Set([
   "monarchy","feudal","agricultural","industrial","renaissance","enlightenment",
 ]);
 
-function spiritualDomainBoost(query: string, node: NodeRow): number {
-  const qTokens = tokenize(query);
+function spiritualDomainBoost(qTokens: string[], node: NodeRow): number {
+// qTokens already passed in
   const qSpiritualHits = qTokens.filter((t) => SPIRITUAL_TERMS.has(t)).length;
   if (qSpiritualHits === 0) return 0;
 
@@ -583,13 +583,13 @@ function scoreCandidate(node: NodeRow, qNorm: string, qTokens: string[], queryCl
 
   score += typeBonus(node.t, queryClass);
   score += sourceBonus(node.source);
-  score += spiritualDomainBoost(query, node);
+  score += spiritualDomainBoost(qTokens, node);
   return score;
 }
 
 function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) {
   const qNorm = norm(query);
-  const qTokens = tokenize(query);
+// qTokens already passed in
   const scored = rows
     .map((node) => ({ node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }))
     .filter((item) => item.score > 0)
@@ -806,7 +806,7 @@ function collectCandidates(db: Database, query: string, queryClass: QueryClass):
   };
   const qNorm = norm(query);
   const qRaw = query.trim().toLowerCase();
-  const qTokens = tokenize(query);
+// qTokens already passed in
 
   if (qNorm) {
     try {
