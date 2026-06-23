@@ -558,7 +558,7 @@
     var panel = document.getElementById("lineagePanel");
     var body  = document.getElementById("lineageBody");
     if (!panel || !body) return;
-    var memCount = (MEMORY && Array.isArray(MEMORY.entries)) ? MEMORY.entries.length : 0;
+    var memCount = (BAKED_MEMORY && Array.isArray(BAKED_MEMORY.entries)) ? BAKED_MEMORY.entries.length : 0;
     var lock = (typeof __PRIMARIES__ === "string") ? __PRIMARIES__.slice(0, 16) + "…" : "(not embedded)";
     var lines = [
       "This is TRU — a sovereign, airgapped reasoning engine.",
