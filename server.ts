@@ -1043,6 +1043,23 @@ app.post("/api/tru/ask", async (c) => {
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+
+  // ── Reasoning layer: proxy to zo.space tru-reason endpoint (localhost) ──
+  // The reasoning endpoint does verse parsing + brain retrieval + Zo API synthesis.
+  // Falls back to local brain DB lookup if the reasoning server is unavailable.
+  try {
+    const resp = await fetch("http://localhost:3099/api/tru-reason", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ q }),
+    });
+    if (resp.ok) {
+      const data = await resp.json() as any;
+      if (data.ok) return c.json(data);
+    }
+  } catch {}
+
+  // ── Fallback: local brain DB lookup ──
   ensureBrainDb();
   // Scripture shortcut
   const v = parseVerse(q);

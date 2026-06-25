@@ -51,6 +51,13 @@ export default function TruPublic() {
           score: 100,
           source: j.ref || "KJV",
         });
+      } else if (j.ok && j.kind === "reason") {
+        setOut({
+          kind: "TRUTH",
+          text: j.answer || "",
+          score: 100,
+          source: (j.sources || []).join(", "),
+        });
       } else if (j.ok && j.kind === "brain") {
         setOut({
           kind: j.t || "TRUTH",
