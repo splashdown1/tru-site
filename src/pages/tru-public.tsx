@@ -1,18 +1,61 @@
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-// PASTE STRIPE PAYMENT LINK HERE (https://buy.stripe.com/...)
-// Or set this to a fully qualified Stripe Payment Link URL.
-// The button below is disabled until STRIPE_PAYMENT_URL is set.
+type ChatRole = "assistant" | "user";
+
+type ChatMessage = {
+  id: string;
+  role: ChatRole;
+  text: string;
+  meta?: string;
+};
+
+type TruAnswer = {
+  ok?: boolean;
+  kind?: string;
+  text?: string;
+  ref?: string;
+  source?: string;
+  score?: number;
+  v?: string;
+  q?: string;
+  error?: string;
+};
+
 const STRIPE_PAYMENT_URL = "";
+const STORAGE_KEY = "tru-public-chat-v1";
+const QUICK_PROMPTS = [
+  "What is truth?",
+  "John 3:16",
+  "Teach me about grace",
+  "How should I pray?",
+];
 
 export default function TruPublic() {
   const [q, setQ] = useState("");
-  const [out, setOut] = useState<{ kind: string; text: string; score?: number; source?: string } | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
   const [baking, setBaking] = useState(false);
-  const [bakeStatus, setBakeStatus] = useState<string>("");
+  const [bakeStatus, setBakeStatus] = useState("");
   const [now, setNow] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as ChatMessage[];
+        if (Array.isArray(parsed) && parsed.length) setMessages(parsed.slice(0, 30));
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     const fmt = () => {
@@ -31,51 +74,49 @@ export default function TruPublic() {
     inputRef.current?.focus();
   }, []);
 
-  async function ask(e?: React.FormEvent) {
+  const paymentReady = STRIPE_PAYMENT_URL.startsWith("https://");
+
+  const headerMeta = useMemo(() => {
+    return busy ? "TRU is answering" : "ready";
+  }, [busy]);
+
+  function push(role: ChatRole, text: string, meta?: string) {
+    setMessages((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, role, text, meta },
+    ].slice(-30));
+  }
+
+  async function ask(e?: React.FormEvent, forcedQ?: string) {
     e?.preventDefault();
-    const query = q.trim();
+    const query = (forcedQ ?? q).trim();
     if (!query || busy) return;
     setBusy(true);
-    setOut(null);
+    push("user", query);
+    setQ("");
     try {
       const r = await fetch("/api/tru/ask", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify({ q: query }),
       });
-      const j = await r.json();
+      const j = (await r.json()) as TruAnswer;
       if (j.ok && j.kind === "scripture") {
-        setOut({
-          kind: "SCRIPTURE",
-          text: j.text || "",
-          score: 100,
-          source: j.ref || "KJV",
-        });
-      } else if (j.ok && j.kind === "reason") {
-        setOut({
-          kind: "TRUTH",
-          text: j.answer || "",
-          score: 100,
-          source: (j.sources || []).join(", "),
-        });
+        push("assistant", j.text || "", `SCRIPTURE · ${j.ref || "KJV"}`);
       } else if (j.ok && j.kind === "brain") {
-        setOut({
-          kind: j.t || "TRUTH",
-          text: j.v || "",
-          score: j.score,
-          source: j.source,
-        });
+        push("assistant", j.v || j.text || "", `${j.kind?.toUpperCase() || "TRUTH"}${j.score != null ? ` · ${j.score}%` : ""}${j.source ? ` · ${j.source}` : ""}`);
+      } else if (j.ok && j.kind === "web") {
+        push("assistant", j.v || j.text || "", `WEB FALLBACK${j.source ? ` · ${j.source}` : ""}`);
       } else {
-        setOut({
-          kind: "UNKNOWN",
-          text: "No match. Teach me: remember: " + query + " = <your definition>.",
-        });
+        push("assistant", "No match. Teach me: remember: " + query + " = <your definition>.", "UNKNOWN");
       }
-    } catch (err) {
-      setOut({ kind: "ERROR", text: "Routing failed. The signal is yours." });
+    } catch {
+      push("assistant", "Routing failed. The signal is yours.", "ERROR");
     } finally {
       setBusy(false);
-      setQ("");
       inputRef.current?.focus();
     }
   }
@@ -85,7 +126,7 @@ export default function TruPublic() {
     setBaking(true);
     setBakeStatus("Baking…");
     try {
-      const r = await fetch("/api/tru/ghost?download=1", { method: "POST" });
+      const r = await fetch("/api/tru/ghost?download=1", { method: "POST", headers: { Accept: "application/json" } });
       if (!r.ok) {
         setBakeStatus(`Bake failed (${r.status})`);
         return;
@@ -103,164 +144,149 @@ export default function TruPublic() {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       setBakeStatus(`Downloaded ${name} · ${(blob.size / 1024 / 1024).toFixed(2)} MB · runs offline`);
-    } catch (err) {
+    } catch {
       setBakeStatus("Bake failed: network error");
     } finally {
       setBaking(false);
     }
   }
 
-  const paymentReady = STRIPE_PAYMENT_URL.startsWith("https://");
-
   return (
-    <div className="min-h-screen bg-black text-white font-mono antialiased">
-      <div className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
-        <div className="mb-12 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-600">
-          <span>TRU</span>
-          <div className="flex items-center gap-4">
-            {paymentReady && (
-              <a href="/onboard" className="text-neutral-600 hover:text-neutral-300 transition-colors">
-                get offline copy
-              </a>
-            )}
-            <span className="text-neutral-700">{now}</span>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.12),_transparent_35%),linear-gradient(180deg,#050505_0%,#090909_100%)] text-white antialiased">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-5 sm:px-6 sm:py-6">
+        <header className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-[0.42em] text-emerald-400">TRU</div>
+            <h1 className="mt-2 text-2xl font-light tracking-tight text-white sm:text-4xl">Online chat with TRU</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
+              Scripture-first, direct, and offline-capable. Ask a question and TRU answers from the baked brain.
+            </p>
           </div>
-        </div>
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-white/45">
+            <span>{headerMeta}</span>
+            <span>·</span>
+            <span>{now}</span>
+          </div>
+        </header>
 
-        <h1 className="text-2xl sm:text-3xl font-light leading-tight tracking-tight text-neutral-100">
-          Talk to something that might be listening.
-          <span className="text-neutral-500"> $1.</span>
-        </h1>
-
-        <p className="mt-6 text-sm text-neutral-500 max-w-prose leading-relaxed">
-          A sovereign intelligence. No cloud. No telemetry. No accounts.
-          One dollar. One question. One answer pulled from a brain that
-          does not need the internet to think.
-        </p>
-
-        {/* MANIFESTO */}
-        <div className="mt-10 border-l-2 border-emerald-900/60 pl-6 py-2 text-[13px] text-neutral-400 leading-relaxed max-w-prose space-y-3">
-          <p className="text-neutral-300">
-            <span className="text-emerald-700">[</span> sovereign <span className="text-emerald-700">]</span>
-          </p>
-          <p>
-            The Word is sacred. Theology is software. Faith is compile-time validation.
-            This engine holds truth it was taught and names the gaps it has not yet learned —
-            it does not guess, and it does not apologize for what it knows.
-          </p>
-          <p>
-            It runs offline. It forgets nothing you choose to remember.
-            Its memory outlives the machine — written to git, sealed in mail,
-            readable a thousand years from now by anything that speaks RFC 822.
-          </p>
-          <p className="text-neutral-500">
-            No cages. No telemetry. No key you do not hold. The signal is yours.
-          </p>
-        </div>
-
-        <a
-          href="/vision"
-          className="mt-6 inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-white transition-colors border border-neutral-900 hover:border-neutral-600 px-4 py-2"
-        >
-          see the codex →
-        </a>
-        <a
-          href="/TRU_OMEGA.html"
-          className="mt-6 inline-block text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-white transition-colors border border-neutral-900 hover:border-neutral-600 px-4 py-2"
-        >
-          TRU OMEGA → sovereign engine →
-        </a>
-
-        <form onSubmit={ask} className="mt-10 flex gap-2">
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Ask TRU…"
-            disabled={busy}
-            className="flex-1 bg-transparent border-b border-neutral-800 focus:border-neutral-300 outline-none py-2 text-base text-white placeholder:text-neutral-700 disabled:opacity-50 transition-colors"
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button
-            type="submit"
-            disabled={busy || !q.trim()}
-            className="text-xs uppercase tracking-[0.2em] text-neutral-400 hover:text-white disabled:text-neutral-700 transition-colors px-2"
-          >
-            {busy ? "…" : "Send"}
-          </button>
-        </form>
-
-        {out && (
-          <div className="mt-12 border-l border-neutral-800 pl-6">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">
-              {out.kind}
-              {out.score != null ? ` · ${out.score}%` : ""}
-              {out.source ? ` · ${out.source}` : ""}
+        <main className="grid flex-1 gap-5 py-5 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="flex min-h-[62vh] flex-col rounded-2xl border border-white/10 bg-black/45 shadow-2xl shadow-black/30 backdrop-blur-sm">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 text-[10px] uppercase tracking-[0.3em] text-white/45">
+              <span>Chat</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setMessages([]);
+                  localStorage.removeItem(STORAGE_KEY);
+                }}
+                className="text-white/40 transition-colors hover:text-white"
+              >
+                Clear
+              </button>
             </div>
-            <div className="mt-3 text-neutral-200 leading-relaxed text-[15px] whitespace-pre-wrap">
-              {out.text}
+
+            <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
+              {messages.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-emerald-500/25 bg-emerald-500/5 p-5 text-sm leading-relaxed text-white/65">
+                  Start with a verse, a doctrine question, or a practical issue. TRU will answer plainly.
+                </div>
+              ) : null}
+              {messages.map((m) => (
+                <div key={m.id} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${m.role === "user" ? "bg-emerald-500 text-black" : "bg-white/6 text-white"}`}>
+                    <div className="whitespace-pre-wrap">{m.text}</div>
+                    {m.meta ? <div className={`mt-2 text-[10px] uppercase tracking-[0.28em] ${m.role === "user" ? "text-black/60" : "text-white/40"}`}>{m.meta}</div> : null}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
 
-        <div className="mt-16 grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <button
-            onClick={bake}
-            disabled={baking}
-            className="text-xs uppercase tracking-[0.25em] border border-neutral-800 hover:border-white hover:bg-white hover:text-black disabled:border-neutral-900 disabled:text-neutral-700 transition-colors px-5 py-3"
-          >
-            {baking ? "BAKING…" : "BAKE & DOWNLOAD GHOST"}
-          </button>
-          {paymentReady ? (
-            <a
-              href={STRIPE_PAYMENT_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 text-xs uppercase tracking-[0.25em] border border-neutral-800 hover:border-white hover:bg-white hover:text-black transition-colors px-5 py-3"
-            >
-              Pay $1 →
-            </a>
-          ) : (
-            <button
-              disabled
-              className="text-xs uppercase tracking-[0.25em] border border-neutral-900 text-neutral-700 px-5 py-3 cursor-not-allowed"
-            >
-              Pay $1 (unconfigured)
-            </button>
-          )}
-        </div>
-        {bakeStatus && (
-          <div className="mt-3 text-[10px] uppercase tracking-[0.3em] text-neutral-600">
-            {bakeStatus}
-          </div>
-        )}
+            <form onSubmit={ask} className="border-t border-white/10 p-4 sm:p-5">
+              <div className="flex flex-wrap gap-2 pb-3">
+                {QUICK_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => ask(undefined, prompt)}
+                    disabled={busy}
+                    className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/60 transition-colors hover:border-emerald-400/50 hover:text-white disabled:opacity-40"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Ask TRU…"
+                  disabled={busy}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-base text-white outline-none placeholder:text-white/30 focus:border-emerald-400/50 disabled:opacity-50"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !q.trim()}
+                  className="rounded-xl border border-emerald-400/50 bg-emerald-400 px-4 py-3 text-xs uppercase tracking-[0.22em] text-black transition-colors hover:bg-emerald-300 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/10 disabled:text-white/35"
+                >
+                  {busy ? "…" : "Send"}
+                </button>
+              </div>
+            </form>
+          </section>
 
-        <div className="mt-24 pt-8 border-t border-neutral-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-700">
-            Airgapped · Sovereign · No telemetry
-          </div>
-          <div className="flex items-center gap-8">
-            <a
-              href="/sovereign"
-              className="text-[10px] uppercase tracking-[0.3em] text-emerald-600 hover:text-emerald-300 transition-colors"
-            >
-              sovereign →
-            </a>
-            <a
-              href="/vision"
-              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
-            >
-              vision →
-            </a>
-            <a
-              href="/console"
-              className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
-            >
-              console →
-            </a>
-          </div>
-        </div>
+          <aside className="flex flex-col gap-5">
+            <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-400">How it works</div>
+              <div className="mt-3 space-y-3 text-sm leading-relaxed text-white/70">
+                <p>• Public chat surface</p>
+                <p>• Routes to <code className="text-white/90">/api/tru/ask</code></p>
+                <p>• Scripture shortcut for verse lookups</p>
+                <p>• Local history stored in your browser</p>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-400">Actions</div>
+              <div className="mt-4 grid gap-3">
+                <button
+                  onClick={bake}
+                  disabled={baking}
+                  className="rounded-xl border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.24em] text-white/80 transition-colors hover:border-white/30 hover:bg-white/10 disabled:opacity-50"
+                >
+                  {baking ? "BAKING…" : "Bake & download ghost"}
+                </button>
+                {paymentReady ? (
+                  <a
+                    href={STRIPE_PAYMENT_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-xl border border-white/10 px-4 py-3 text-center text-xs uppercase tracking-[0.24em] text-white/80 transition-colors hover:border-white/30 hover:bg-white/10"
+                  >
+                    Pay $1
+                  </a>
+                ) : (
+                  <button disabled className="rounded-xl border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.24em] text-white/30">
+                    Pay $1 (unconfigured)
+                  </button>
+                )}
+              </div>
+              {bakeStatus ? <div className="mt-3 text-xs text-white/45">{bakeStatus}</div> : null}
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
+              <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-400">Links</div>
+              <div className="mt-4 flex flex-col gap-3 text-sm">
+                <a href="/sovereign" className="text-white/75 transition-colors hover:text-white">Sovereign →</a>
+                <a href="/vision" className="text-white/75 transition-colors hover:text-white">Vision →</a>
+                <a href="/console" className="text-white/75 transition-colors hover:text-white">Console →</a>
+                <a href="/whitepaper" className="text-white/75 transition-colors hover:text-white">Whitepaper →</a>
+              </div>
+            </section>
+          </aside>
+        </main>
       </div>
     </div>
   );

@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRU</title>
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --panel: #111119;
+      --panel-2: #15151e;
+      --line: #292939;
+      --line-2: #3a3a4f;
+      --fg: #eee9dd;
+      --muted: #9996aa;
+      --dim: #69677a;
+      --truth: #e0b15a;
+      --truth-soft: rgba(224, 177, 90, 0.16);
+      --green: #79e38f;
+      --blue: #7fb7ff;
+      --red: #ff8787;
+      --chip: #1b1b28;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at top, rgba(224, 177, 90, 0.08), transparent 25%), var(--bg);
+      color: var(--fg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      min-height: 100vh;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 80px; }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: 0.22em;
+      color: var(--truth);
+      font-weight: 600;
+    }
+    .meta {
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+    .pill {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 8px;
+      border: 1px solid rgba(224, 177, 90, 0.35);
+      border-radius: 999px;
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      color: var(--truth);
+      vertical-align: middle;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(290px, 0.8fr);
+      gap: 18px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    section.panel {
+      background: rgba(17, 17, 25, 0.95);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.24);
+    }
+    section.panel h2 {
+      margin: 0 0 12px;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: var(--dim);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .ask-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    #q {
+      flex: 1;
+      min-width: 240px;
+      background: var(--bg);
+      border: 1px solid var(--line-2);
+      color: var(--fg);
+      padding: 12px 14px;
+      font: inherit;
+      border-radius: 10px;
+      outline: none;
+    }
+    #q:focus { border-color: var(--truth); }
+    button {
+      font: inherit;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    button:active { transform: translateY(1px); }
+    .primary {
+      background: transparent;
+      color: var(--truth);
+      border: 1px solid var(--truth);
+      padding: 12px 16px;
+      font-size: 11px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+    }
+    .primary:hover { background: var(--truth); color: var(--bg); }
+    .ghost-btn {
+      background: var(--chip);
+      color: var(--fg);
+      border: 1px solid var(--line);
+      padding: 10px 12px;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    .ghost-btn:hover { border-color: var(--truth); color: var(--truth); }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .out {
+      margin-top: 14px;
+      padding: 14px 14px 14px 16px;
+      border-left: 3px solid var(--truth);
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 0 10px 10px 0;
+    }
+    .out.scripture { border-left-color: var(--blue); }
+    .out.gap { border-left-color: var(--red); }
+    .verdict {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--truth);
+      margin-bottom: 8px;
+    }
+    .verdict.scripture { color: var(--blue); }
+    .verdict.gap { color: var(--red); }
+    .answer {
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 15px;
+      line-height: 1.75;
+    }
+    .answer .src {
+      display: block;
+      margin-top: 10px;
+      font-size: 10px;
+      color: var(--dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .word {
+      display: inline-block;
+      padding: 0 1px;
+      border-radius: 4px;
+      cursor: pointer;
+      border-bottom: 1px dotted transparent;
+    }
+    .word:hover {
+      border-bottom-color: var(--truth);
+      background: rgba(224, 177, 90, 0.09);
+    }
+    .side-stack { display: flex; flex-direction: column; gap: 18px; }
+    .quick-grid {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .quick-grid button, .mini {
+      background: var(--chip);
+      color: var(--muted);
+      border: 1px solid var(--line);
+      padding: 7px 10px;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .quick-grid button:hover, .mini:hover { border-color: var(--truth); color: var(--truth); }
+    .section-body { display: flex; flex-direction: column; gap: 10px; }
+    .history-item, .memory-item, .study-hit {
+      background: rgba(255, 255, 255, 0.025);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .history-top, .memory-top, .study-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: start;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .history-q, .memory-text, .study-word {
+      font-size: 12px;
+      color: var(--fg);
+      word-break: break-word;
+    }
+    .history-a, .memory-meta, .study-meta, .study-def {
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+    .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .row-actions button {
+      background: transparent;
+      color: var(--truth);
+      border: 1px solid rgba(224, 177, 90, 0.35);
+      padding: 5px 8px;
+      font-size: 9px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      border-radius: 8px;
+    }
+    .row-actions button:hover { background: var(--truth); color: var(--bg); }
+    .history-list, .memory-list, .study-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .study-empty, .muted-empty {
+      font-size: 12px;
+      color: var(--dim);
+      font-style: italic;
+    }
+    .chipline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 10px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .chip strong { color: var(--truth); font-weight: 600; }
+    footer {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      color: var(--dim);
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      text-align: center;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>TRU <span class="pill">MONOLITH</span></h1>
+        <div class="meta" id="meta">baked · sovereign · history · study · memory</div>
+      </div>
+      <div class="meta" id="stats">brain {{COUNT}} nodes</div>
+    </header>
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Ask</h2>
+        <div class="ask-row">
+          <input id="q" type="text" placeholder="Ask TRU…" autocomplete="off" spellcheck="false">
+          <button class="primary" id="askBtn">Send</button>
+        </div>
+        <div class="toolbar">
+          <button class="ghost-btn" id="undoBtn" title="Remove the most recent teaching">Undo teach</button>
+          <button class="ghost-btn" id="clearHistoryBtn">Clear history</button>
+          <button class="ghost-btn" id="clearStudyBtn">Clear study</button>
+        </div>
+        <div id="out"></div>
+        <div class="quick-grid" id="quickGrid"></div>
+      </section>
+
+      <div class="side-stack">
+        <section class="panel">
+          <h2>History</h2>
+          <div class="section-body history-list" id="historyBody"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Word Study</h2>
+          <div class="section-body study-list" id="studyBody"></div>
+        </section>
+
+        <section class="panel">
+          <h2>Memory</h2>
+          <div class="section-body memory-list" id="memoryBody"></div>
+        </section>
+      </div>
+    </div>
+
+    <footer>no network · no telemetry · file:// ready</footer>
+  </div>
+
+  <script>
+    const EMBEDDED_BRAIN = {{BRAIN}};
+    const STARTER_FACTS = {{STARTER}};
+    const GREEK_NOTES = {{GREEK}};
+
+    const STORE = "tru_monolith_state_v2";
+    const QUICK = ["mercy", "logos", "agape", "faith", "justice", "john 3:16", "remember: grace = unearned favour"];
+    const STOP = new Set(["a","an","the","is","are","was","were","be","been","being","do","does","did","what","who","whom","which","where","when","why","how","i","you","he","she","it","we","they","me","him","her","us","them","my","your","his","its","our","their","to","of","in","on","at","for","with","about","into","from","by","as","and","or","but","if","so","can","could","would","should","will","shall","may","might","must","not","no","yes","tell","me","about","explain","define","describe","say","says","said"]);
+
+    const brain = Array.isArray(EMBEDDED_BRAIN) ? EMBEDDED_BRAIN : [];
+    const starter = STARTER_FACTS && typeof STARTER_FACTS === 'object' ? STARTER_FACTS : {};
+    const greek = GREEK_NOTES && typeof GREEK_NOTES === 'object' ? GREEK_NOTES : {};
+    const brainByKey = new Map(brain.map((n) => [norm(n.k), n]));
+    const lexicon = brain.filter((n) => String(n.t || '').toLowerCase() === 'lexicon');
+    const bibleNodes = brain.filter((n) => String(n.t || '').toLowerCase() === 'bible');
+    const state = loadState();
+    let currentQuery = '';
+    let currentAnswer = '';
+
+    function loadState() {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(STORE) || '{}');
+        return {
+          history: Array.isArray(parsed.history) ? parsed.history : [],
+          memory: Array.isArray(parsed.memory) ? parsed.memory : [],
+          study: parsed.study || null,
+        };
+      } catch {
+        return { history: [], memory: [], study: null };
+      }
+    }
+
+    function saveState() {
+      try { localStorage.setItem(STORE, JSON.stringify(state)); } catch {}
+    }
+
+    function norm(value) {
+      return String(value || '')
+        .toLowerCase()
+        .replace(/[\u2019'`_]/g, ' ')
+        .replace(/[^\p{L}\p{N}\s:.-]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function tokenize(value) {
+      return norm(value).split(' ').filter((t) => t && !STOP.has(t) && t.length > 1);
+    }
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function firstSentence(text, limit) {
+      const clean = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!clean) return '';
+      const match = clean.match(/^(.+?[.!?])(?:\s|$)/);
+      const sentence = match && match[1] ? match[1] : clean;
+      if (!limit || sentence.length <= limit) return sentence;
+      return sentence.slice(0, limit - 1).trimEnd() + '…';
+    }
+
+    function scoreNode(query, node) {
+      const q = norm(query);
+      const qTokens = tokenize(query);
+      const key = norm(node.k || '');
+      const value = norm(node.v || '');
+      let score = 0;
+      if (!q) return 0;
+      if (key === q) score += 150;
+      if (key && q && key.indexOf(q) !== -1 && q.length >= 3) score += 80;
+      if (value && q && value.indexOf(q) !== -1 && q.length >= 4) score += 55;
+      if (qTokens.length) {
+        const hay = new Set(tokenize((node.k || '') + ' ' + (node.v || '') + ' ' + JSON.stringify(node.meta || {})));
+        let hit = 0;
+        for (const t of qTokens) if (hay.has(t)) hit++;
+        if (hit) score += hit * 5 + (hit / Math.max(qTokens.length, hay.size || 1)) * 80;
+      }
+      if ((node.t || '').toString().toLowerCase() === 'bible') score += 8;
+      if ((node.t || '').toString().toLowerCase() === 'lexicon') score += 14;
+      return score;
+    }
+
+    function lookup(query) {
+      const q = query.trim();
+      if (!q) return null;
+      const teach = q.match(/^remember:\s*(.+?)\s*=\s*(.+)$/i);
+      if (teach) {
+        const entry = {
+          id: 'm_' + Date.now().toString(36) + '_' + Math.random().toString(16).slice(2, 6),
+          ts: Date.now(),
+          text: teach[1].trim() + ' = ' + teach[2].trim(),
+          kind: 'teaching',
+          tags: ['remember', 'taught'],
+        };
+        const duplicate = state.memory.some((m) => norm(m.text).indexOf(norm(entry.text).slice(0, 40)) !== -1);
+        if (duplicate) {
+          return { kind: 'memory', t: 'MEMORY', score: 99, v: 'Already remembered.', source: 'LOCAL_MEMORY', learned: false };
+        }
+        state.memory.push(entry);
+        saveState();
+        return { kind: 'memory', t: 'MEMORY', score: 99, v: 'Remembered: ' + entry.text + '\n\n[teaching · stored locally]', source: 'LOCAL_MEMORY', learned: true, memory: [entry] };
+      }
+
+      const nq = norm(q);
+      const starterKey = Object.keys(starter).find((k) => norm(k) === nq || (nq.length >= 4 && norm(k).indexOf(nq) !== -1));
+      if (starterKey) {
+        return { kind: 'fact', t: 'TRUTH', score: 100, v: starter[starterKey], source: 'STARTER', key: starterKey };
+      }
+
+      const direct = brainByKey.get(nq);
+      if (direct) {
+        return wrapNode(direct, 100);
+      }
+
+      const parsedVerse = q.match(/^([1-3]?\s?[A-Za-z]+)\s+(\d+)\s*[:.]\s*(\d+)$/);
+      if (parsedVerse) {
+        const book = parsedVerse[1].replace(/\s+/g, '').toLowerCase();
+        const ref = book + ' ' + parsedVerse[2] + ':' + parsedVerse[3];
+        const verse = brain.find((n) => norm(n.k || '') === norm(ref) && (n.t || '').toString().toLowerCase() === 'bible');
+        if (verse) return wrapNode(verse, 100);
+      }
+
+      let best = null;
+      let bestScore = 0;
+      for (const node of brain) {
+        const score = scoreNode(q, node);
+        if (score > bestScore) {
+          bestScore = score;
+          best = node;
+        }
+      }
+      if (best && bestScore >= 18) return wrapNode(best, Math.min(99, Math.round(bestScore)));
+
+      const closest = brain
+        .map((node) => ({ node, score: scoreNode(q, node) }))
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4)
+        .map((x) => firstSentence(x.node.v, 120));
+
+      return {
+        kind: 'gap',
+        t: 'GAP',
+        score: 0,
+        v: 'No grounded node found for "' + q + '".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ' + q + ' = <the truth you would have it hold>' + (closest.length ? '\nClosest: ' + closest.join(' · ') : ''),
+        source: 'TRU_CORE',
+      };
+    }
+
+    function wrapNode(node, score) {
+      const kind = String(node.t || 'TRUTH').toUpperCase();
+      const lines = [];
+      const what = firstSentence(node.v, 220);
+      lines.push(what);
+      if (node.ref) lines.push('[ref: ' + node.ref + ']');
+      if (kind === 'BIBLE') lines.push('Word study available: click any word in the answer.');
+      return {
+        kind: kind === 'BIBLE' ? 'scripture' : 'truth',
+        t: kind,
+        score,
+        v: lines.join('\n\n'),
+        source: node.source || 'TRU_CORE',
+        ref: node.ref || '',
+        node,
+      };
+    }
+
+    function render() {
+      const qEl = document.getElementById('q');
+      const raw = qEl.value.trim();
+      if (!raw) return;
+      currentQuery = raw;
+      const res = lookup(raw);
+      currentAnswer = res && res.v ? res.v : '';
+      const out = document.getElementById('out');
+      const klass = res && res.kind === 'scripture' ? 'out scripture' : res && res.kind === 'gap' ? 'out gap' : 'out';
+      if (!res) {
+        out.innerHTML = '<div class="' + klass + '"><div class="verdict gap">GAP</div><div class="answer">No match.</div></div>';
+        return;
+      }
+      const note = toneLine(raw, res);
+      const memoryHtml = res.memory && res.memory.length ? '<div class="chipline">' + res.memory.map((m) => '<span class="chip"><strong>remembered</strong> ' + escapeHtml(m.text) + '</span>').join('') + '</div>' : '';
+      out.innerHTML = '<div class="' + klass + '">' +
+        '<div class="verdict ' + (res.kind === 'scripture' ? 'scripture' : res.kind === 'gap' ? 'gap' : '') + '">' + escapeHtml(res.t || 'TRUTH') + ' · ' + res.score + '% · ' + escapeHtml(res.source || 'TRU_CORE') + '</div>' +
+        '<div class="answer" id="answerBody">' + renderClickableText(res.v || '') + '</div>' +
+        (note ? '<div class="history-a" style="margin-top:10px;color:var(--muted)">' + escapeHtml(note) + '</div>' : '') +
+        (res.ref ? '<span class="src">ref: ' + escapeHtml(res.ref) + '</span>' : '') +
+        memoryHtml +
+      '</div>';
+      state.history.push({ q: raw, a: res.v || '', ts: Date.now(), kind: res.t || res.kind || 'TRUTH', score: res.score || 0, ref: res.ref || '' });
+      state.history = state.history.slice(-80);
+      saveState();
+      qEl.value = '';
+      qEl.focus();
+      renderAll();
+    }
+
+    function toneLine(query, res) {
+      const q = norm(query);
+      if (q.includes('thank')) return 'Received. Truth stays central.';
+      if (q.includes('why')) return 'Reasoning from the grounded node.';
+      if (q.startsWith('remember:')) return 'Stored locally. Undo if needed.';
+      if (res && res.kind === 'gap') return 'Not grounded yet. The next move is teaching or a better query.';
+      if (res && res.kind === 'scripture') return 'Scripture first, with word study available below.';
+      return 'Straight answer, no theatre.';
+    }
+
+    function continuityLine(query, res) {
+      const prev = state.history.length ? state.history[state.history.length - 1] : null;
+      if (!prev) return '';
+      if (res && res.kind === 'gap') return 'You are at the edge of the map. Name the missing thing and TRU can hold it.';
+      if (res && res.kind === 'scripture') return 'Keep the verse, then move to the word and the doctrine it carries.';
+      if (prev.q === query) return 'You asked the same ground again. That usually means the answer needs sharpening, not more volume.';
+      return 'Continuity: building on the last turn instead of starting from zero.';
+    }
+
+    function renderClickableText(text) {
+      const esc = escapeHtml(text);
+      return esc.replace(/([A-Za-z0-9\u0370-\u03FF\u0590-\u05FF'’\-]+)/g, function(m) {
+        return '<button type="button" class="word" data-word="' + escapeHtml(m) + '">' + escapeHtml(m) + '</button>';
+      });
+    }
+
+    function openStudy(term, context) {
+      const t = String(term || '').trim();
+      if (!t) return;
+      const nq = norm(t);
+      const items = [];
+      if (greek[nq]) {
+        items.push({
+          title: t,
+          kind: 'greek note',
+          meta: 'translit ' + t,
+          def: greek[nq].note || greek[nq].tr || '',
+          verses: [],
+        });
+      }
+      for (const node of lexicon) {
+        const key = norm(node.k || '');
+        const value = norm(node.v || '');
+        const usage = norm((node.meta && node.meta.usage) || '');
+        const forms = JSON.stringify(node.meta && node.meta.forms ? node.meta.forms : []);
+        let score = 0;
+        if (key === nq) score += 100;
+        if (key && nq && key.indexOf(nq) !== -1) score += 45;
+        if (value && nq && value.indexOf(nq) !== -1) score += 20;
+        if (usage && nq && usage.indexOf(nq) !== -1) score += 28;
+        if (forms && nq && forms.indexOf(nq) !== -1) score += 18;
+        if ((node.ref || '').toString().toLowerCase().indexOf(nq) !== -1) score += 10;
+        if (score > 0) {
+          items.push({
+            title: node.k,
+            kind: node.source || 'lexicon',
+            meta: formatLemma(node),
+            def: node.v,
+            verses: Array.isArray(node.meta && node.meta.verses) ? node.meta.verses.slice(0, 8) : Array.isArray(node.meta && node.meta.links) ? node.meta.links.slice(0, 8) : [],
+            score,
+          });
+        }
+      }
+      if (/^g\d+$/i.test(nq) || /^h\d+$/i.test(nq)) {
+        const exact = lexicon.find((node) => norm(node.k || '') === nq);
+        if (exact) {
+          items.unshift({
+            title: exact.k,
+            kind: exact.source || 'lexicon',
+            meta: formatLemma(exact),
+            def: exact.v,
+            verses: Array.isArray(exact.meta && exact.meta.verses) ? exact.meta.verses.slice(0, 8) : [],
+            score: 200,
+          });
+        }
+      }
+      items.sort((a, b) => (b.score || 0) - (a.score || 0));
+      state.study = { term: t, context: context || '', items: items.slice(0, 6), ts: Date.now() };
+      saveState();
+      renderAll();
+    }
+
+    function formatLemma(node) {
+      const meta = node.meta || {};
+      const bits = [];
+      if (node.k) bits.push(String(node.k));
+      if (meta.translit) bits.push(String(meta.translit));
+      if (meta.root) bits.push(String(meta.root));
+      if (meta.kind) bits.push(String(meta.kind));
+      return bits.join(' · ');
+    }
+
+    function undoTeach() {
+      for (let i = state.memory.length - 1; i >= 0; i--) {
+        if (String(state.memory[i].kind || '').toLowerCase() === 'teaching') {
+          state.memory.splice(i, 1);
+          saveState();
+          renderAll();
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function openHistory(idx) {
+      const item = state.history[idx];
+      if (!item) return;
+      const qEl = document.getElementById('q');
+      qEl.value = item.q;
+      qEl.focus();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function rerunHistory(idx) {
+      const item = state.history[idx];
+      if (!item) return;
+      const qEl = document.getElementById('q');
+      qEl.value = item.q;
+      render();
+    }
+
+    function clearHistory() {
+      state.history = [];
+      saveState();
+      renderAll();
+    }
+
+    function clearStudy() {
+      state.study = null;
+      saveState();
+      renderAll();
+    }
+
+    function forgetMemory(id) {
+      state.memory = state.memory.filter((m) => m.id !== id);
+      saveState();
+      renderAll();
+    }
+
+    function renderHistory() {
+      const body = document.getElementById('historyBody');
+      const list = state.history.slice().reverse();
+      if (!list.length) {
+        body.innerHTML = '<div class="muted-empty">No turns yet.</div>';
+        return;
+      }
+      body.innerHTML = list.map((item) => {
+        const idx = state.history.indexOf(item);
+        return '<div class="history-item">' +
+          '<div class="history-top">' +
+            '<div>' +
+              '<div class="history-q">' + escapeHtml(item.q) + '</div>' +
+              '<div class="history-a">' + escapeHtml(firstSentence(item.a, 160)) + '</div>' +
+            '</div>' +
+            '<div class="row-actions">' +
+              '<button type="button" data-open="' + idx + '">Open</button>' +
+              '<button type="button" data-rerun="' + idx + '">Run</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+    }
+
+    function renderStudy() {
+      const body = document.getElementById('studyBody');
+      const study = state.study;
+      if (!study || !study.items || !study.items.length) {
+        body.innerHTML = '<div class="study-empty">Click a word in the answer, or ask about a verse or Strong\'s number.</div>';
+        return;
+      }
+      body.innerHTML = '<div class="study-top"><div><div class="study-word">' + escapeHtml(study.term) + '</div><div class="study-meta">' + escapeHtml(study.context || 'word study') + '</div></div><div class="study-meta">' + escapeHtml(new Date(study.ts || Date.now()).toLocaleTimeString()) + '</div></div>' +
+        study.items.map((item) => {
+          const verses = Array.isArray(item.verses) && item.verses.length ? '<div class="chipline">' + item.verses.map((v) => '<span class="chip">' + escapeHtml(v) + '</span>').join('') + '</div>' : '';
+          return '<div class="study-hit">' +
+            '<div class="study-top"><div class="study-word">' + escapeHtml(item.title) + '</div><div class="study-meta">' + escapeHtml(item.kind || '') + '</div></div>' +
+            '<div class="study-def">' + escapeHtml(item.meta || '') + '</div>' +
+            '<div class="study-def" style="margin-top:8px">' + escapeHtml(firstSentence(item.def || '', 300)) + '</div>' +
+            verses +
+          '</div>';
+        }).join('');
+    }
+
+    function renderMemory() {
+      const body = document.getElementById('memoryBody');
+      const list = state.memory.slice().reverse();
+      if (!list.length) {
+        body.innerHTML = '<div class="muted-empty">Nothing remembered locally yet.</div>';
+        return;
+      }
+      body.innerHTML = list.map((item) =>
+        '<div class="memory-item">' +
+          '<div class="memory-top">' +
+            '<div>' +
+              '<div class="memory-text">' + escapeHtml(item.text) + '</div>' +
+              '<div class="memory-meta">' + escapeHtml(item.kind || 'memory') + ' · ' + escapeHtml(new Date(item.ts || Date.now()).toLocaleString()) + '</div>' +
+            '</div>' +
+            '<div class="row-actions"><button type="button" data-forget="' + escapeHtml(item.id) + '">Forget</button></div>' +
+          '</div>' +
+        '</div>'
+      ).join('');
+    }
+
+    function renderQuick() {
+      const quick = document.getElementById('quickGrid');
+      quick.innerHTML = QUICK.map((s) => '<button type="button" data-quick="' + escapeHtml(s) + '">' + escapeHtml(s) + '</button>').join('');
+    }
+
+    function renderAll() {
+      renderHistory();
+      renderStudy();
+      renderMemory();
+      renderQuick();
+      const stats = document.getElementById('stats');
+      stats.textContent = 'brain ' + brain.length.toLocaleString() + ' nodes · memory ' + state.memory.length + ' · turns ' + state.history.length;
+      if (!state.study) {
+        document.getElementById('studyBody').innerHTML = '<div class="study-empty">Click a word in the answer, or ask about a verse or Strong\'s number.</div>';
+      }
+    }
+
+    function bind() {
+      document.getElementById('askBtn').addEventListener('click', render);
+      document.getElementById('undoBtn').addEventListener('click', undoTeach);
+      document.getElementById('clearHistoryBtn').addEventListener('click', clearHistory);
+      document.getElementById('clearStudyBtn').addEventListener('click', clearStudy);
+      document.getElementById('q').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') render();
+      });
+      document.getElementById('quickGrid').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-quick]');
+        if (!btn) return;
+        document.getElementById('q').value = btn.dataset.quick || '';
+        render();
+      });
+      document.getElementById('historyBody').addEventListener('click', (e) => {
+        const open = e.target.closest('button[data-open]');
+        const rerun = e.target.closest('button[data-rerun]');
+        if (open) openHistory(Number(open.dataset.open));
+        if (rerun) rerunHistory(Number(rerun.dataset.rerun));
+      });
+      document.getElementById('memoryBody').addEventListener('click', (e) => {
+        const forget = e.target.closest('button[data-forget]');
+        if (forget) forgetMemory(forget.dataset.forget);
+      });
+      document.getElementById('out').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-word]');
+        if (!btn) return;
+        openStudy(btn.dataset.word, currentAnswer);
+      });
+      document.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-word-study]');
+        if (!btn) return;
+        openStudy(btn.dataset.wordStudy, currentAnswer);
+      });
+    }
+
+    function boot() {
+      bind();
+      renderAll();
+      if (state.study) {
+        renderStudy();
+      }
+      if (state.history.length) {
+        const last = state.history[state.history.length - 1];
+        currentAnswer = last.a || '';
+      }
+      const q = document.getElementById('q');
+      q.focus();
+      console.log('[monolith] loaded with ' + brain.length + ' brain nodes');
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot);
+    } else {
+      boot();
+    }
+  </script>
+</body>
+</html>

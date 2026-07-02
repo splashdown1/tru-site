@@ -50,7 +50,7 @@ export default function TruSovereign() {
 
   const unlocked = !!gate;
   const push = useCallback((l: string) => setLog((p) => [`[${new Date().toISOString().slice(11, 19)}] ${l}`, ...p].slice(0, 40)), []);
-  const authH = useCallback(() => (gate ? { Authorization: `Bearer ${gate}` } : {}), [gate]);
+  const authH = useCallback(() => (gate ? { Authorization: `Bearer ${gate}` } : {}) as Record<string, string>, [gate]);
 
   // boot gate from sessionStorage
   useEffect(() => {

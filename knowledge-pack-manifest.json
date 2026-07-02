@@ -1,0 +1,440 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "tru-brain-41",
+      "file": "../TRU/TRU_BRAIN_41.json",
+      "shape": "array-nodes",
+      "source": "TRU_BRAIN",
+      "type": "concept",
+      "weight": 0.98,
+      "description": "Curated TRU brain nodes from the sibling TRU monorepo.",
+      "boosts": {
+        "identity": 18,
+        "definition": 10,
+        "topic": 14,
+        "dilemma": 8
+      }
+    },
+    {
+      "id": "brain-data",
+      "file": "../tru-logos-work/data/brain-data.json",
+      "shape": "array-nodes",
+      "source": "TRU_BRAIN",
+      "type": "concept",
+      "weight": 0.9,
+      "description": "Core brain graph from tru-logos-work.",
+      "boosts": {
+        "identity": 12,
+        "definition": 8,
+        "topic": 12,
+        "dilemma": 6
+      }
+    },
+    {
+      "id": "kjv-data",
+      "file": "../tru-logos-work/data/kjv-data.json",
+      "shape": "kjv-verses",
+      "source": "KJV_BIBLE",
+      "type": "bible",
+      "weight": 0.97,
+      "description": "KJV verse text for scripture grounding and verse-aware retrieval.",
+      "boosts": {
+        "identity": 5,
+        "definition": 14,
+        "topic": 10,
+        "dilemma": 8
+      }
+    },
+    {
+      "id": "dict-data",
+      "file": "../tru-logos-work/data/dict-data.json",
+      "shape": "dictionary-map",
+      "source": "TRU_DICT",
+      "type": "knowledge",
+      "weight": 0.88,
+      "description": "Dictionary headwords and definitions.",
+      "boosts": {
+        "identity": 3,
+        "definition": 18,
+        "topic": 6,
+        "dilemma": 2
+      }
+    },
+    {
+      "id": "xref-data",
+      "file": "../tru-logos-work/data/xref-data.json",
+      "shape": "xref-map",
+      "source": "TRU_XREF",
+      "type": "knowledge",
+      "weight": 0.84,
+      "description": "Verse cross-reference graph.",
+      "boosts": {
+        "identity": 2,
+        "definition": 8,
+        "topic": 12,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "strongs-data",
+      "file": "../tru-logos-work/data/strongs-data.json",
+      "shape": "strongs-entries",
+      "source": "TRU_STRONGS",
+      "type": "lexicon",
+      "weight": 0.87,
+      "description": "Strong's Greek and Hebrew lexical entries.",
+      "boosts": {
+        "identity": 2,
+        "definition": 16,
+        "topic": 6,
+        "dilemma": 2
+      }
+    },
+    {
+      "id": "strongs-idx",
+      "file": "../tru-logos-work/data/strongs-idx.json",
+      "shape": "strongs-index",
+      "source": "TRU_STRONGS_IDX",
+      "type": "lexicon",
+      "weight": 0.86,
+      "description": "Strong's concordance index to verse usage.",
+      "boosts": {
+        "identity": 2,
+        "definition": 12,
+        "topic": 6,
+        "dilemma": 2
+      }
+    },
+    {
+      "id": "life-data",
+      "file": "../tru-logos-work/data/life-data.json",
+      "shape": "array-nodes",
+      "source": "TRU_LIFE",
+      "type": "knowledge",
+      "weight": 0.75,
+      "description": "Practical life knowledge nodes.",
+      "boosts": {
+        "identity": 10,
+        "definition": 7,
+        "topic": 8,
+        "dilemma": 6
+      }
+    },
+    {
+      "id": "ancient-greek-philosophy",
+      "file": "../tru-logos-work/data/ancient-greek-philosophy.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Greek philosophy and inheritance.",
+      "boosts": {
+        "identity": 4,
+        "definition": 6,
+        "topic": 12,
+        "dilemma": 10
+      }
+    },
+    {
+      "id": "ancient-eastern-wisdom",
+      "file": "../tru-logos-work/data/ancient-eastern-wisdom.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Eastern wisdom corpus.",
+      "boosts": {
+        "identity": 4,
+        "definition": 6,
+        "topic": 12,
+        "dilemma": 10
+      }
+    },
+    {
+      "id": "ancient-law-codes",
+      "file": "../tru-logos-work/data/ancient-law-codes.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "knowledge",
+      "weight": 0.72,
+      "description": "Ancient legal and covenantal reference material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 7,
+        "topic": 11,
+        "dilemma": 12
+      }
+    },
+    {
+      "id": "ancient-literature-epic",
+      "file": "../tru-logos-work/data/ancient-literature-epic.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Epic and literary wisdom corpus.",
+      "boosts": {
+        "identity": 3,
+        "definition": 6,
+        "topic": 11,
+        "dilemma": 8
+      }
+    },
+    {
+      "id": "ancient-philosophy-glossary",
+      "file": "../tru-logos-work/data/ancient-philosophy-glossary.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Glossary of ancient philosophical terms.",
+      "boosts": {
+        "identity": 3,
+        "definition": 9,
+        "topic": 10,
+        "dilemma": 9
+      }
+    },
+    {
+      "id": "ancient-roman",
+      "file": "../tru-logos-work/data/ancient-roman.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Roman history, civic order, and inheritance.",
+      "boosts": {
+        "identity": 3,
+        "definition": 6,
+        "topic": 11,
+        "dilemma": 8
+      }
+    },
+    {
+      "id": "ancient-science-medicine",
+      "file": "../tru-logos-work/data/ancient-science-medicine.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "knowledge",
+      "weight": 0.72,
+      "description": "Ancient science and medical reference material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 7,
+        "topic": 11,
+        "dilemma": 7
+      }
+    },
+    {
+      "id": "ancient-history",
+      "file": "../tru-logos-work/data/ancient-history.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "knowledge",
+      "weight": 0.72,
+      "description": "Ancient historical reference material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 7,
+        "topic": 11,
+        "dilemma": 8
+      }
+    },
+    {
+      "id": "ancient-proverbs-maxims",
+      "file": "../tru-logos-work/data/ancient-proverbs-maxims.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Ancient proverbs, maxims, and sayings.",
+      "boosts": {
+        "identity": 3,
+        "definition": 8,
+        "topic": 12,
+        "dilemma": 10
+      }
+    },
+    {
+      "id": "ancient-hermetic-neoplatonism",
+      "file": "../tru-logos-work/data/ancient-hermetic-neoplatonism.json",
+      "shape": "array-nodes",
+      "source": "TRU_ANCESTRAL",
+      "type": "wisdom",
+      "weight": 0.72,
+      "description": "Hermetic and Neoplatonic reference material.",
+      "boosts": {
+        "identity": 4,
+        "definition": 8,
+        "topic": 12,
+        "dilemma": 9
+      }
+    },
+    {
+      "id": "encyclopedia-data",
+      "file": "../tru-logos-work/data/encyclopedia-data.json",
+      "shape": "entry-map",
+      "source": "TRU_ENCYCLOPEDIA",
+      "type": "knowledge",
+      "weight": 0.8,
+      "description": "General encyclopaedic articles.",
+      "boosts": {
+        "identity": 4,
+        "definition": 12,
+        "topic": 14,
+        "dilemma": 5
+      }
+    },
+    {
+      "id": "medical-dictionary",
+      "file": "../tru-logos-work/data/medical-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_MEDICAL_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Medical dictionary derived from ancient science and medicine.",
+      "boosts": {
+        "identity": 3,
+        "definition": 18,
+        "topic": 7,
+        "dilemma": 2
+      }
+    },
+    {
+      "id": "law-dictionary",
+      "file": "../tru-logos-work/data/law-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_LAW_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Legal dictionary derived from ancient law codes.",
+      "boosts": {
+        "identity": 3,
+        "definition": 18,
+        "topic": 8,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "history-dictionary",
+      "file": "../tru-logos-work/data/history-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_HISTORY_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "History dictionary derived from ancient history.",
+      "boosts": {
+        "identity": 3,
+        "definition": 17,
+        "topic": 8,
+        "dilemma": 3
+      }
+    },
+    {
+      "id": "proverbs-dictionary",
+      "file": "../tru-logos-work/data/proverbs-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_PROVERBS_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Proverbs and maxims dictionary derived from ancient sayings.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 8,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "philosophy-dictionary",
+      "file": "../tru-logos-work/data/philosophy-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_PHILOSOPHY_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Philosophy dictionary derived from ancient philosophy glossary.",
+      "boosts": {
+        "identity": 3,
+        "definition": 17,
+        "topic": 9,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "greek-philosophy-dictionary",
+      "file": "../tru-logos-work/data/greek-philosophy-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_GREEK_PHILOSOPHY_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Greek philosophy dictionary derived from ancient Greek philosophy.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 9,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "roman-dictionary",
+      "file": "../tru-logos-work/data/roman-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_ROMAN_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Roman dictionary derived from ancient Roman material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 8,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "eastern-wisdom-dictionary",
+      "file": "../tru-logos-work/data/eastern-wisdom-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_EASTERN_WISDOM_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Eastern wisdom dictionary derived from ancient Eastern material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 8,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "literature-dictionary",
+      "file": "../tru-logos-work/data/literature-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_LITERATURE_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Literature dictionary derived from ancient literature and epic material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 8,
+        "dilemma": 4
+      }
+    },
+    {
+      "id": "hermetic-dictionary",
+      "file": "../tru-logos-work/data/hermetic-dictionary.json",
+      "shape": "dictionary-map",
+      "source": "TRU_HERMETIC_DICT",
+      "type": "knowledge",
+      "weight": 0.86,
+      "description": "Hermetic dictionary derived from ancient Hermetic and Neoplatonic material.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 9,
+        "dilemma": 4
+      }
+    }
+  ]
+}

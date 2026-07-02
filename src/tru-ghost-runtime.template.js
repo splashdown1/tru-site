@@ -77,12 +77,12 @@
       return out;
     }
     // Personal query: memory leads, brain demoted to footnote.
-    if (isPersonal && strong.length) {
-      var topP = strong[0];
+    if (isPersonal && hits.length > 0) {
+      var topP = strong.length ? strong[0] : hits[0];
       out.text = topP.text + "\n\n[remembered · " + topP.kind + "]\nBrain context: " + firstSentence(answer.text || answer.v || "", 180);
       out.t = "MEMORY";
       out.source = "TRU_MEMORY";
-      out.score = Math.min(99, topP.score * 3);
+      out.score = Math.min(99, Math.max(topP.score, 5) * 3);
     } else {
       out.text = (answer.text || answer.v || "") + "\n" + recallLine;
     }

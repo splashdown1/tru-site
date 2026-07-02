@@ -8,6 +8,10 @@ import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
 import { timingSafeEqual } from "node:crypto";
 import Database from "bun:sqlite";
+import { ImapFlow } from "imapflow";
+import nodemailer from "nodemailer";
+import { simpleParser } from "mailparser";
+import { loadKnowledgePacks, scorePackMatch, type QueryClass } from "./src/knowledge-packs";
 // canon + truth-layer live in the sibling TRU/ monorepo (present on the
 // canonical account). On instances without that sibling they degrade to
 // "UNAVAILABLE" honestly: the server boots and /api/tru/primaries reports
@@ -168,7 +172,7 @@ async function verifyPrimariesAtBoot(): Promise<{ ok: boolean; details: Record<s
   }
   (details as any).assets = Object.fromEntries(
     Object.entries(lockable.primary).map(([k, v]) => [
-      k, v ? v.hash.slice(0, 16) + "…" : "MISSING",
+      k, v ? (v as { hash: string }).hash.slice(0, 16) + "…" : "MISSING",
     ]),
   );
   const computedLock = computeLock(lockable);
@@ -341,6 +345,26 @@ const SOURCE_PRIORITY: Record<string, number> = {
   TRU_TRUTH: 4,
   STARTER: 2,
 };
+let _packSignature = "";
+let _packBoosts: Record<string, Record<QueryClass, number>> = {};
+
+function packAwareScore(node: NodeRow, qNorm: string, queryClass: QueryClass, base: number): number {
+  const entry = Object.entries(_packBoosts).find(([packId]) => node.source === packId || String(node.source ?? "").includes(packId));
+  const boost = entry ? (entry[1][queryClass] ?? 0) : 0;
+  const keyNorm = norm(node.k ?? "");
+  const aliasMatch = keyNorm && qNorm && (keyNorm === qNorm || keyNorm.includes(qNorm) || qNorm.includes(keyNorm));
+  return base + boost + (aliasMatch ? 6 : 0);
+}
+
+function refreshPackIndex(): void {
+  try {
+    const index = loadKnowledgePacks();
+    if (index.signature !== _packSignature) {
+      _packSignature = index.signature;
+      _packBoosts = Object.fromEntries(index.packs.map((p) => [p.id, p.boosts]));
+    }
+  } catch {}
+}
 
 // ── SPIRITUAL DOMAIN BOOST ──────────────────────────────────────
 // When a query contains spiritually-loaded terms, theological nodes
@@ -584,12 +608,13 @@ function scoreCandidate(node: NodeRow, qNorm: string, qTokens: string[], queryCl
   score += typeBonus(node.t, queryClass);
   score += sourceBonus(node.source);
   score += spiritualDomainBoost(qTokens, node);
+  score += packAwareScore(node, qNorm, queryClass, 0);
   return score;
 }
 
 function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) {
   const qNorm = norm(query);
-// qTokens already passed in
+  const qTokens = tokenize(query).filter((t) => t.length >= 3);
   const scored = rows
     .map((node) => ({ node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }))
     .filter((item) => item.score > 0)
@@ -796,17 +821,19 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     score: Math.min(99, Math.round(bestScore)),
     grounded,
     nodes: scored.slice(0, 5).map((item) => `${item.node.k}:${item.node.t ?? ""}`),
+    packSignature: _packSignature,
   };
 }
 
 function collectCandidates(db: Database, query: string, queryClass: QueryClass): NodeRow[] {
+  refreshPackIndex();
   const rows: NodeRow[] = [];
   const push = (items: NodeRow[] | unknown) => {
     if (Array.isArray(items)) rows.push(...(items as NodeRow[]));
   };
   const qNorm = norm(query);
   const qRaw = query.trim().toLowerCase();
-// qTokens already passed in
+  const qTokens = tokenize(query).filter((t) => t.length >= 3);
 
   if (qNorm) {
     try {
@@ -859,6 +886,16 @@ function collectCandidates(db: Database, query: string, queryClass: QueryClass):
   } catch {}
 
   return uniqueByKey(rows);
+}
+
+function maybeReloadPacks(): void {
+  try {
+    const index = loadKnowledgePacks();
+    if (index.signature && index.signature !== _packSignature) {
+      _packSignature = index.signature;
+      _packBoosts = Object.fromEntries(index.packs.map((p) => [p.id, p.boosts]));
+    }
+  } catch {}
 }
 
 function mergeSnapshot(payload: Record<string, unknown>) {
@@ -1043,23 +1080,7 @@ app.post("/api/tru/ask", async (c) => {
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
-
-  // ── Reasoning layer: proxy to zo.space tru-reason endpoint (localhost) ──
-  // The reasoning endpoint does verse parsing + brain retrieval + Zo API synthesis.
-  // Falls back to local brain DB lookup if the reasoning server is unavailable.
-  try {
-    const resp = await fetch("http://localhost:3099/api/tru-reason", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify({ q }),
-    });
-    if (resp.ok) {
-      const data = await resp.json() as any;
-      if (data.ok) return c.json(data);
-    }
-  } catch {}
-
-  // ── Fallback: local brain DB lookup ──
+  maybeReloadPacks();
   ensureBrainDb();
   // Scripture shortcut
   const v = parseVerse(q);
@@ -1131,6 +1152,7 @@ app.post("/api/tru/ask/sovereign", async (c) => {
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+  maybeReloadPacks();
   ensureBrainDb();
   // Scripture shortcut — same as public /ask.
   const v = parseVerse(q);
@@ -1744,7 +1766,24 @@ app.get("/api/tru/metrics", async (c) => {
 const _searchCache = new Map<string, { ts: number; data: any }>();
 const SEARCH_CACHE_TTL = 120_000;
 
+function formatWebFallback(query: string, results: { title: string; url: string; snippet: string }[]) {
+  const top = results.slice(0, 5);
+  const lines = top.map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}\n   ${firstSentence(r.snippet, 160)}`);
+  return {
+    ok: true,
+    kind: "web",
+    q: query,
+    source: "WEB_FALLBACK",
+    v: `TRU's brain doesn't hold this. Here's what the web knows:\n\n${lines.join("\n\n")}`,
+    results: top,
+    brainMiss: true,
+  };
+}
+
 async function webSearch(query: string): Promise<{ ok: boolean; results: { title: string; url: string; snippet: string }[]; error?: string }> {
+  const cacheKey = norm(query);
+  const cached = _searchCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < SEARCH_CACHE_TTL) return cached.data;
   // Try DuckDuckGo first (richer snippets). If rate-limited (403),
   // fall back to Wikipedia's API (no key, no rate limit for reasonable use).
   try {
@@ -1797,7 +1836,9 @@ async function webSearch(query: string): Promise<{ ok: boolean; results: { title
       url: `https://en.wikipedia.org/wiki/${encodeURIComponent(h.title.replace(/ /g, "_"))}`,
       snippet: (h.snippet || "").replace(/<[^>]+>/g, ""),
     }));
-    return { ok: true, results };
+    const d = { ok: true, results };
+    _searchCache.set(cacheKey, { ts: Date.now(), data: d });
+    return d;
   } catch (e) {
     return { ok: false, results: [], error: String(e) };
   }
@@ -1877,6 +1918,87 @@ app.delete("/api/tru/memory", async (c) => {
 });
 
 // ── MAIL BRIDGE — to Zo's connected Gmail via /zo/ask ────────────
+// ── DIRECT MAIL BRIDGE — IMAP read + SMTP send via Gmail App Password.
+// ~1-3s round trip vs 20-40s for the /zo/ask child-session path. Standard
+// IMAP/SMTP — the 1000-year format, no API middleman. Falls back to the
+// slow bridge if GMAIL_APP_PASSWORD isn't set.
+async function bridgeMailDirect(action: string, payload: any): Promise<{ ok: boolean; detail: any; fast: true }> {
+  const user = OWNER_EMAIL;
+  const pass = process.env.GMAIL_APP_PASSWORD;
+  if (!pass) return { ok: false, detail: "GMAIL_APP_PASSWORD not set", fast: true };
+
+  if (action === "send") {
+    const to = (payload.to || OWNER_EMAIL).toString();
+    const subject = (payload.subject || "TRU memory archive").toString();
+    const bodyText = (payload.body || "").toString();
+    try {
+      const transporter = nodemailer.createTransport({
+        host: "smtp.gmail.com", port: 465, secure: true,
+        auth: { user, pass },
+      });
+      const info = await transporter.sendMail({ from: user, to, subject, text: bodyText });
+      return { ok: true, detail: `SENT ${to} (${info.messageId})`, fast: true };
+    } catch (e) {
+      return { ok: false, detail: "FAIL " + String(e), fast: true };
+    }
+  }
+
+  if (action === "read") {
+    const query = (payload.query || "from:me subject:TRU").toString();
+    const max = Math.min(20, Math.max(1, parseInt(payload.max || "5", 10)));
+    const client = new ImapFlow({
+      host: "imap.gmail.com", port: 993, secure: true,
+      auth: { user, pass }, logger: false,
+    });
+    try {
+      await client.connect();
+      const lock = await client.getMailboxLock("INBOX");
+      try {
+        const uids = await client.search({ x_gm_raw: query }, { uid: true });
+        if (!uids || !uids.length) return { ok: true, detail: [], fast: true };
+        const recent = uids.slice(-max).reverse(); // newest first
+        const out: any[] = [];
+        for (const uid of recent) {
+          const msg = await client.fetchOne(uid, { envelope: true, internalDate: true, uid: true, source: true }, { uid: true });
+          if (!msg || !msg.envelope) continue;
+          const env = msg.envelope;
+          const fromAddr = (env.from && env.from[0]) ? `${env.from[0].name || ""} <${env.from[0].address}>`.trim() : "";
+          let snippet = "";
+          if (msg.source) {
+            try {
+              const parsed = await simpleParser(msg.source);
+              snippet = (parsed.text || "").replace(/\s+/g, " ").trim().slice(0, 200);
+            } catch {}
+          }
+          out.push({
+            id: String(msg.uid ?? uid),
+            date: msg.internalDate ? new Date(msg.internalDate).toISOString() : (env.date ? new Date(env.date).toISOString() : null),
+            subject: env.subject || "(no subject)",
+            from: fromAddr,
+            snippet,
+          });
+        }
+        return { ok: true, detail: out, fast: true };
+      } finally {
+        lock.release();
+      }
+    } catch (e) {
+      return { ok: false, detail: "FAIL " + String(e), fast: true };
+    } finally {
+      try { await client.logout(); } catch {}
+    }
+  }
+
+  return { ok: false, detail: "unknown action: " + action, fast: true };
+}
+
+// Pick the fast direct path when a Gmail App Password is configured,
+// otherwise fall back to the /zo/ask child-session bridge.
+async function sendMailBest(to: string, subject: string, body: string): Promise<{ ok: boolean; detail: any }> {
+  if (process.env.GMAIL_APP_PASSWORD) return bridgeMailDirect("send", { to, subject, body });
+  return bridgeMail("send", { to, subject, body });
+}
+
 async function bridgeMail(action: string, payload: any): Promise<{ ok: boolean; detail: any }> {
   const token = process.env.ZO_API_KEY;
   if (!token) return { ok: false, detail: "ZO_API_KEY not set — add it in Settings > Advanced (Access Tokens)" };
@@ -1965,11 +2087,11 @@ async function maybeAutoArchive(): Promise<{ archived: boolean; version?: number
     try { execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" }); } catch {}
   } catch {}
   const digest = buildDigest(mem);
-  await bridgeMail("send", {
-    to: OWNER_EMAIL,
-    subject: `TRU auto-archive v${mem.version} · ${mem.entries.length} entries`,
-    body: digest,
-  });
+  await sendMailBest(
+    OWNER_EMAIL,
+    `TRU auto-archive v${mem.version} · ${mem.entries.length} entries`,
+    digest,
+  );
   // Record that we archived this version.
   const fresh = loadMemory();
   (fresh as any).lastArchiveVersion = mem.version;
@@ -1995,11 +2117,11 @@ async function dailyArchive(): Promise<{ archived: boolean; version?: number; re
     try { execSync("git push origin HEAD:main --quiet", { cwd, timeout: 30000, stdio: "ignore" }); } catch {}
   } catch {}
   const digest = buildDigest(mem);
-  await bridgeMail("send", {
-    to: OWNER_EMAIL,
-    subject: `TRU daily archive v${mem.version} · ${mem.entries.length} entries`,
-    body: digest,
-  });
+  await sendMailBest(
+    OWNER_EMAIL,
+    `TRU daily archive v${mem.version} · ${mem.entries.length} entries`,
+    digest,
+  );
   const fresh = loadMemory();
   (fresh as any).lastArchiveVersion = mem.version;
   saveMemory(fresh);
@@ -2044,11 +2166,11 @@ app.post("/api/tru/memory/archive", async (c) => {
   }
   // 2) Mail-to-self long-term archive (RFC822 — survives the box).
   //    Human-readable markdown digest, not raw JSON.
-  const mail = await bridgeMail("send", {
-    to: OWNER_EMAIL,
-    subject: `TRU memory archive v${mem.version} · ${mem.entries.length} entries`,
-    body: digest,
-  });
+  const mail = await sendMailBest(
+    OWNER_EMAIL,
+    `TRU memory archive v${mem.version} · ${mem.entries.length} entries`,
+    digest,
+  );
   report.mail = mail;
   // Record archived version.
   const fresh = loadMemory();
@@ -2175,13 +2297,25 @@ app.post("/api/tru/mail", async (c) => {
   } else if (action !== "read") {
     return c.json({ ok: false, error: "unknown action (send|read)" }, 400);
   }
+  // Prefer the fast direct IMAP/SMTP path; fall back to the /zo/ask bridge.
+  if (process.env.GMAIL_APP_PASSWORD) {
+    const result = await bridgeMailDirect(action, body);
+    return c.json(result);
+  }
   const result = await bridgeMail(action, body);
   return c.json(result);
 });
 
 app.get("/api/tru/mail/status", (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
-  return c.json({ ok: true, gate: !!process.env.TRU_API_KEY, bridge: !!process.env.ZO_API_KEY, owner: OWNER_EMAIL });
+  return c.json({
+    ok: true,
+    gate: !!process.env.TRU_API_KEY,
+    bridge: !!process.env.ZO_API_KEY,
+    owner: OWNER_EMAIL,
+    fastPath: !!process.env.GMAIL_APP_PASSWORD,
+    path: process.env.GMAIL_APP_PASSWORD ? "direct-imap-smtp" : "zo-ask-bridge",
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════
