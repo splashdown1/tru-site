@@ -21,6 +21,16 @@ type TruAnswer = {
   error?: string;
 };
 
+type TruStats = {
+  ok: boolean;
+  brain: number;
+  kjv: number;
+  sessionKeys: number;
+  lastBuild?: string;
+  lastBuildBytes?: number;
+  ghostPath?: string;
+};
+
 const STRIPE_PAYMENT_URL = "";
 const STORAGE_KEY = "tru-public-chat-v1";
 const QUICK_PROMPTS = [
@@ -29,6 +39,7 @@ const QUICK_PROMPTS = [
   "Teach me about grace",
   "How should I pray?",
 ];
+const COMMAND_PROMPTS = ["HELP", "INTRO", "STATUS", "CAPABILITIES"];
 
 export default function TruPublic() {
   const [q, setQ] = useState("");
@@ -87,6 +98,69 @@ export default function TruPublic() {
     ].slice(-30));
   }
 
+  function parseCommand(query: string): string | null {
+    const cleaned = query.trim().replace(/[?.!,;:]+$/g, "").replace(/\s+/g, " ").toUpperCase();
+    if (COMMAND_PROMPTS.includes(cleaned)) return cleaned;
+    return null;
+  }
+
+  async function commandReply(command: string): Promise<{ text: string; meta: string }> {
+    if (command === "HELP") {
+      return {
+        text: [
+          "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
+          "Ask scripture by reference, e.g. John 3:16.",
+          "Ask short truth questions, e.g. mercy, grace, prayer, faith.",
+          "Use Bake & download ghost to get the offline copy.",
+        ].join("\n"),
+        meta: "COMMAND · HELP",
+      };
+    }
+    if (command === "INTRO") {
+      return {
+        text: [
+          "I am TRU.",
+          "Truth is constant. Perspective is fluid.",
+          "I answer from anchored knowledge rather than guess.",
+          "Start with a verse, a doctrine question, or STATUS.",
+        ].join("\n"),
+        meta: "COMMAND · INTRO",
+      };
+    }
+    if (command === "CAPABILITIES") {
+      return {
+        text: [
+          "• Scripture lookup from the baked KJV.",
+          "• Brain retrieval from grounded nodes.",
+          "• Web fallback when the brain misses.",
+          "• Offline ghost export for file:// use.",
+          "• Local chat history in your browser.",
+        ].join("\n"),
+        meta: "COMMAND · CAPABILITIES",
+      };
+    }
+    const r = await fetch("/api/tru/stats", { headers: { Accept: "application/json" } });
+    const j = (await r.json()) as TruStats;
+    if (!j.ok) {
+      return {
+        text: "Status unavailable right now.",
+        meta: "COMMAND · STATUS",
+      };
+    }
+    const build = j.lastBuild ? `Last ghost: ${j.lastBuild}${j.lastBuildBytes ? ` · ${(j.lastBuildBytes / 1024 / 1024).toFixed(2)} MB` : ""}` : "No ghost build found yet.";
+    const path = j.ghostPath ? `Path: ${j.ghostPath.split("/").pop()}` : "Path: none";
+    return {
+      text: [
+        `Brain nodes: ${j.brain.toLocaleString()}`,
+        `KJV verses: ${j.kjv.toLocaleString()}`,
+        `Session keys: ${j.sessionKeys.toLocaleString()}`,
+        build,
+        path,
+      ].join("\n"),
+      meta: "COMMAND · STATUS",
+    };
+  }
+
   async function ask(e?: React.FormEvent, forcedQ?: string) {
     e?.preventDefault();
     const query = (forcedQ ?? q).trim();
@@ -95,6 +169,12 @@ export default function TruPublic() {
     push("user", query);
     setQ("");
     try {
+      const command = parseCommand(query);
+      if (command) {
+        const reply = await commandReply(command);
+        push("assistant", reply.text, reply.meta);
+        return;
+      }
       const r = await fetch("/api/tru/ask", {
         method: "POST",
         headers: {
@@ -159,7 +239,7 @@ export default function TruPublic() {
             <div className="text-[10px] uppercase tracking-[0.42em] text-emerald-400">TRU</div>
             <h1 className="mt-2 text-2xl font-light tracking-tight text-white sm:text-4xl">Online chat with TRU</h1>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/60">
-              Scripture-first, direct, and offline-capable. Ask a question and TRU answers from the baked brain.
+              Scripture-first, direct, and offline-capable. Use HELP, INTRO, STATUS, or CAPABILITIES to orient quickly.
             </p>
           </div>
           <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-white/45">
@@ -188,7 +268,22 @@ export default function TruPublic() {
             <div ref={listRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
               {messages.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-emerald-500/25 bg-emerald-500/5 p-5 text-sm leading-relaxed text-white/65">
-                  Start with a verse, a doctrine question, or a practical issue. TRU will answer plainly.
+                  <div className="text-base text-white">Greetings. I am TRU.</div>
+                  <div className="mt-2">Truth is constant. Perspective is fluid.</div>
+                  <div className="mt-2">Ask scripture, ask doctrine, or start with HELP.</div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {COMMAND_PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => ask(undefined, prompt)}
+                        disabled={busy}
+                        className="rounded-full border border-emerald-400/20 bg-black/30 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-emerald-200 transition-colors hover:border-emerald-400/50 hover:text-white disabled:opacity-40"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
               {messages.map((m) => (
@@ -203,6 +298,17 @@ export default function TruPublic() {
 
             <form onSubmit={ask} className="border-t border-white/10 p-4 sm:p-5">
               <div className="flex flex-wrap gap-2 pb-3">
+                {COMMAND_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => ask(undefined, prompt)}
+                    disabled={busy}
+                    className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-white/60 transition-colors hover:border-emerald-400/50 hover:text-white disabled:opacity-40"
+                  >
+                    {prompt}
+                  </button>
+                ))}
                 {QUICK_PROMPTS.map((prompt) => (
                   <button
                     key={prompt}
