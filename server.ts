@@ -290,17 +290,140 @@ function parseVerse(q: string): { key: string; book: string; chapter: number; ve
   return { key: `${book} ${chapter}:${verse}`, book, chapter, verse };
 }
 
-function lookupVerseText(kjv: Record<string, string>, key: string): string | undefined {
-  const base = key.toLowerCase().trim();
-  const candidates = [
-    base,
-    base.replace(/\s+/g, ""),
-  ];
-  for (const candidate of candidates) {
-    const text = kjv[candidate];
-    if (text) return text;
+type TruCommand = "HELP" | "INTRO" | "STATUS" | "CAPABILITIES";
+
+function parseTruCommand(q: string): TruCommand | null {
+  const cleaned = q.trim().replace(/[?.!,;:]+$/g, "").replace(/\s+/g, " ").toUpperCase();
+  if (cleaned === "HELP" || cleaned === "INTRO" || cleaned === "STATUS" || cleaned === "CAPABILITIES") {
+    return cleaned;
   }
-  return undefined;
+  return null;
+}
+
+function collectStatsSnapshot() {
+  let brain = 0;
+  let kjv = 0;
+  let sessionKeys = 0;
+  if (existsSync(BRAIN_DB)) {
+    try {
+      const db = new Database(BRAIN_DB, { readonly: true });
+      const row = db.prepare("SELECT COUNT(*) as n FROM nodes").get() as { n: number };
+      brain = row.n;
+      db.close();
+    } catch {}
+  }
+  const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+  if (existsSync(kjvPath)) {
+    try {
+      const k = JSON.parse(readFileSync(kjvPath, "utf8"));
+      kjv = Object.keys(k).length;
+    } catch {}
+  }
+  if (existsSync(STATE_SNAPSHOT)) {
+    try {
+      const s = JSON.parse(readFileSync(STATE_SNAPSHOT, "utf8"));
+      sessionKeys = Object.keys(s).filter(k => k !== "_lastWrite").length;
+    } catch {}
+  }
+  let lastBuild: string | undefined;
+  let lastBuildBytes: number | undefined;
+  let ghostPath: string | undefined;
+  const ghostDir = join(process.cwd(), "..", "TRU", "ghost");
+  if (existsSync(ghostDir)) {
+    try {
+      const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+      const files = readdirSync(ghostDir)
+        .filter((f: string) => f.startsWith("TRU_HOLO_GHOST_") && f.endsWith(".html"))
+        .map((f: string) => ({ f, m: statSync(join(ghostDir, f)).mtimeMs, s: statSync(join(ghostDir, f)).size }));
+      files.sort((a, b) => b.m - a.m);
+      if (files.length > 0) {
+        ghostPath = join(ghostDir, files[0].f);
+        lastBuildBytes = files[0].s;
+        lastBuild = new Date(files[0].m).toISOString();
+      }
+    } catch {}
+  }
+  return { brain, kjv, sessionKeys, lastBuild, lastBuildBytes, ghostPath };
+}
+
+function commandResponse(command: TruCommand) {
+  if (command === "HELP") {
+    return {
+      ok: true,
+      kind: "command" as const,
+      command,
+      text: [
+        "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
+        "Ask scripture by reference, e.g. John 3:16.",
+        "Ask short truth questions, e.g. mercy, grace, prayer, faith.",
+        "Use /onboard or the ghost download to get the offline copy.",
+      ].join("\n"),
+    };
+  }
+  if (command === "INTRO") {
+    return {
+      ok: true,
+      kind: "command" as const,
+      command,
+      text: [
+        "I am TRU.",
+        "Truth is constant. Perspective is fluid.",
+        "I answer from anchored knowledge rather than guess.",
+        "Start with a verse, a doctrine question, or STATUS.",
+      ].join("\n"),
+    };
+  }
+  if (command === "CAPABILITIES") {
+    return {
+      ok: true,
+      kind: "command" as const,
+      command,
+      text: [
+        "• Scripture lookup from the baked KJV.",
+        "• Brain retrieval from grounded nodes.",
+        "• Web fallback when the brain misses.",
+        "• Offline ghost export for file:// use.",
+        "• Local chat history in your browser.",
+      ].join("\n"),
+    };
+  }
+  const stats = collectStatsSnapshot();
+  const build = stats.lastBuild ? `Last ghost: ${stats.lastBuild}${stats.lastBuildBytes ? ` · ${(stats.lastBuildBytes / 1024 / 1024).toFixed(2)} MB` : ""}` : "No ghost build found yet.";
+  const path = stats.ghostPath ? `Path: ${stats.ghostPath.split("/").pop()}` : "Path: none";
+  return {
+    ok: true,
+    kind: "command" as const,
+    command,
+    text: [
+      `Brain nodes: ${stats.brain.toLocaleString()}`,
+      `KJV verses: ${stats.kjv.toLocaleString()}`,
+      `Session keys: ${stats.sessionKeys.toLocaleString()}`,
+      build,
+      path,
+    ].join("\n"),
+    brain: stats.brain,
+    kjv: stats.kjv,
+    sessionKeys: stats.sessionKeys,
+    lastBuild: stats.lastBuild,
+    lastBuildBytes: stats.lastBuildBytes,
+    ghostPath: stats.ghostPath,
+  };
+}
+
+function buildVerseText(refKey: string): string | null {
+  const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+  if (!existsSync(kjvPath)) return null;
+  try {
+    const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
+    return kjv[refKey.toLowerCase()] || null;
+  } catch {
+    return null;
+  }
+}
+
+function lookupVerseText(v: { key: string }): string | null {
+  const refKey = v.key.toLowerCase();
+  return buildVerseText(refKey) || buildVerseText(refKey.replace(/(\d+) /, "$1 "));
 }
 
 type QueryClass = "identity" | "definition" | "dilemma" | "topic";
@@ -1103,7 +1226,7 @@ app.post("/api/tru/ask", async (c) => {
       try {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
         const refKey = v.key.toLowerCase();
-        const text = lookupVerseText(kjv, refKey);
+        const text = lookupVerseText(v);
         if (text) {
           const scriptureAns = { ok: true, kind: "scripture", ref: v.key, text };
           const blocked = tripwireGuard(scriptureAns);
@@ -1175,7 +1298,7 @@ app.post("/api/tru/ask/sovereign", async (c) => {
       try {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
         const refKey = v.key.toLowerCase();
-        const text = lookupVerseText(kjv, refKey);
+        const text = lookupVerseText(v);
         if (text) {
           const ans = foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q);
           const learned = autoLearn(q, ans);
