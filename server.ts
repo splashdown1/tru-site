@@ -290,6 +290,19 @@ function parseVerse(q: string): { key: string; book: string; chapter: number; ve
   return { key: `${book} ${chapter}:${verse}`, book, chapter, verse };
 }
 
+function lookupVerseText(kjv: Record<string, string>, key: string): string | undefined {
+  const base = key.toLowerCase().trim();
+  const candidates = [
+    base,
+    base.replace(/\s+/g, ""),
+  ];
+  for (const candidate of candidates) {
+    const text = kjv[candidate];
+    if (text) return text;
+  }
+  return undefined;
+}
+
 type QueryClass = "identity" | "definition" | "dilemma" | "topic";
 
 type NodeRow = {
@@ -1089,8 +1102,8 @@ app.post("/api/tru/ask", async (c) => {
     if (existsSync(kjvPath)) {
       try {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
-        const refKey = v.key.toLowerCase().replace(/(\d+) /, "$1 ");
-        const text = kjv[refKey] || kjv[v.key.toLowerCase()];
+        const refKey = v.key.toLowerCase();
+        const text = lookupVerseText(kjv, refKey);
         if (text) {
           const scriptureAns = { ok: true, kind: "scripture", ref: v.key, text };
           const blocked = tripwireGuard(scriptureAns);
@@ -1161,8 +1174,8 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     if (existsSync(kjvPath)) {
       try {
         const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
-        const refKey = v.key.toLowerCase().replace(/(\d+) /, "$1 ");
-        const text = kjv[refKey] || kjv[v.key.toLowerCase()];
+        const refKey = v.key.toLowerCase();
+        const text = lookupVerseText(kjv, refKey);
         if (text) {
           const ans = foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q);
           const learned = autoLearn(q, ans);
