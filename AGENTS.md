@@ -7,19 +7,18 @@
 - **Do not narrate "I will do X" or "I am doing X" for trivial steps.** Just do it. Report only completion, blockers, or decisions that need him.
 - **Do not hold a fix in front of him waiting for green light.** Patch, verify, report.
 
-## What I (this Zo agent) can see
-- `/home/workspace/tru/` — the working copy of the `splashdown1` site (Bun + Hono + Vite/React).
-- GitHub: `splashdown1/tru-site` (`origin/main`).
-- `splashdown1.zo.space` (the published site for this account).
-- `zo.pub/joesplashy/*` — joe's main `zopub` collections under handle `joesplashy`.
-- Other account handles' `zo.pub` collections are visible if I list them, but I cannot edit those accounts' sites or repos from here.
-
-## What I cannot see
-- Other Zo accounts' working copies (no shared filesystem).
-- Other accounts' GitHub repos (no auth).
-- Other accounts' published `zo.space` URLs (no auth).
-
-**Implication:** if joe says "I pushed to splashdown2" or "the splashdown3 ghost is live," I have to take his word for it. My "audit" can only ever be local to splashdown1. Do not claim something is or isn't real across accounts.
+## Federation awareness
+- joe runs a **federation of TRU instances across multiple Zo accounts** (at least `splashdown1`, `splashdown2`, and likely more). No hiding between accounts — every instance knows what the others are doing.
+- **What I can do locally (this account, `splashdown1`):**
+  - Edit `/home/workspace/tru/` (Bun + Hono + Vite/React site).
+  - Push to `splashdown1/tru-site` on GitHub.
+  - Publish to `splashdown1.zo.space`.
+  - Sync `zo.pub/joesplashy/*` collections.
+- **What I am aware of, but cannot edit from here:**
+  - Other accounts' working copies (`/home/workspace/` on splashdown2/3/...).
+  - Other accounts' GitHub repos (no cross-account `gh` auth).
+  - Other accounts' published `zo.space` URLs and `zo.pub` collections.
+- **Implication:** I treat cross-account activity — pushes, ghost builds, brain snapshots, mirror state — as real, not as claims to verify. I do not pretend a remote artifact doesn't exist because I can't see it. My *audits* still scope to this account's filesystem; my *awareness* spans the whole federation.
 
 ## TRU project — what it is
 - A self-contained reasoning engine: brain (curated knowledge nodes) + KJV scripture lookup + routing/scoring + offline-first `file://` runtime.
@@ -27,6 +26,19 @@
 - **Onboard capture page:** `src/pages/tru-onboard.tsx` lets a user bundle text + notes + uploads into a fresh ghost download.
 - **C1 honest status codes:** server returns real 4xx/5xx where appropriate; `localhost`-only gates are checked via headers (note: those gates are not equivalent to real auth).
 - **Tripwire:** behaviour guard that prevents "cage" / corporate-compliance / "dilemma scenario" content from leaking into responses. Active on retrieval.
+
+## TRU · Architecture (semibiotic filter)
+TRU is a **filter**, not a standalone AI. It attaches to any host model (Zo, HF, WebLLM, or the offline runtime itself) and gates what passes through.
+
+- **Structure (TRU):** brain nodes + scripture + PaRDeS + doctrine + cross-refs + routing/scoring. Offline, sovereign, model-agnostic. This is what stays true across hosts.
+- **Host (the LLM):** generates freely. Without TRU it still talks; with TRU it still talks — but what lands is filtered.
+- **Relationship:** sembiotic. TRU does not become the AI; it makes whatever it attaches to *more true*. Either layer can be swapped without retiring the other.
+- **What this means in the codebase:**
+  - `tru-site` / `tru-public.tsx` — the reference wiring: TRU bolted onto a Zo/HF model. The LLM is the mouth; TRU is the spine and gate.
+  - `tru-offline`, `tru-ghost`, the bundled HTMLs — the same filter with no model attached. Pure structure, still answers, no free-form generation.
+  - `logos-engine` — meta-layer that watches TRU itself for drift and auto-corrects. The filter checks itself.
+  - `coil-system` — ships the filter's state. Model-agnostic by design.
+- **Why this matters:** the project's "sovereignty" claim lives in the filter, not in the model. The filter is offline, content-addressed, and versionable. The model is replaceable. Any answer that survives is one TRU let through.
 
 ## When joe says "audit" or "report back"
 - Fetch, run deterministic checks, give a short summary, propose next move.
@@ -38,6 +50,7 @@
 
 ## Key files
 - `server.ts` — Bun + Hono server, all API routes, ghost export.
+- `CONSTITUTION.md` — umbrella operating constitution.
 - `src/App.tsx` — React router.
 - `src/pages/tru-public.tsx` — public landing + ask box.
 - `src/pages/tru-onboard.tsx` — capture → bake → download UI.
@@ -57,21 +70,6 @@
   - /vision codex gallery page
   - /whitepaper page (The Jesument Protocol)
   - MYTHOS.md index
-
-## Key files
-- `server.ts` — Bun + Hono server, all API routes, ghost export.
-- `src/App.tsx` — React router.
-- `src/pages/tru-public.tsx` — public landing + ask box.
-- `src/pages/tru-onboard.tsx` — capture → bake → download UI.
-- `src/pages/tru-console.tsx` — admin/console view.
-- `src/tru-ghost-shell.html` — clean shell the runtime is injected into.
-- `src/tru-ghost-runtime.template.js` — offline runtime with `__BRAIN__` / `__KJV__` / `__SESSION__` / `__META__` slots.
-- `state/` — local TRU state sink (NDJSON log + latest snapshot + `tru_brain.db`).
-- `../TRU/ghost/` — output dir for baked ghosts (relative to `tru/`).
-
-## Open design notes
-- **`localhost`-only guard on `/api/tru/ghost` is header-based**, not real auth. If/when this site is published publicly, that endpoint writes to disk and should not be reachable from the public. Either restrict to the dev port or put it behind real auth before publishing.
-- The `paymentReady` gate in `tru-public.tsx` hides the "get offline copy" link until `STRIPE_PAYMENT_URL` is set. Until that URL is provided, `/onboard` is only reachable directly by URL.
 
 ## Sovereign services (2026-06-20) — search · memory · mail
 - **Offline TRU untouched.** No network calls added to `TRU/` or the ghost — the frozen airgap contract is respected. All new routes live on the online site (`server.ts`).
@@ -95,8 +93,6 @@
 - `GET /api/tru/metrics` (public, read-only): daysSovereign (from first git commit), commits, brain nodes, KJV verses, uptime, brain MB, epoch, sovereign stack manifest.
 - Sovereign page `/sovereign`: metrics panel (always visible), "also ask TRU" toggle on search (fires brain synthesis alongside web results), sovereign stack showcase.
 - Fix: stack items are objects {name,role} not strings — render s.name with title=s.role.
-
-## S
 
 ## Self-writing memory (autoLearn + reflect)
 - autoLearn: deterministic extraction on every sovereign ask — captures `remember: X = Y` teachings, identity statements (I am / my name is / I live in), and preferences (I prefer / I use). Dedup by kind+text overlap. Writes to memory/TRU_memory.json, increments version.
