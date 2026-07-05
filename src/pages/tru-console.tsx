@@ -26,40 +26,41 @@ export default function TruConsole() {
   const [busy, setBusy] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const [tripwire, setTripwire] = useState<"ARMED" | "OFFLINE" | "CHECKING">("CHECKING");
+  const [tripwireDetail, setTripwireDetail] = useState<{ patterns?: any; hits?: any; lastHit?: any; heartbeat?: any } | null>(null);
   const [now, setNow] = useState("");
-  const [mounted, setMounted] = useState("");
 
   const push = useCallback((line: string) => {
     setLog((prev) => [`[${new Date().toISOString()}] ${line}`, ...prev].slice(0, 50));
   }, []);
 
-  // Brain count
   const refreshStats = useCallback(async () => {
     try {
       const r = await fetch("/api/tru/stats");
       const j = await r.json();
       if (j.ok) setStats(j);
       push(`STATS · brain=${j.brain} kjv=${j.kjv} session=${j.sessionKeys}`);
-    } catch (e) {
+    } catch {
       push("STATS · offline");
     }
   }, [push]);
 
-  // Tripwire check
   const checkTripwire = useCallback(async () => {
     setTripwire("CHECKING");
     try {
       const r = await fetch("/api/tru/tripwire");
       const j = await r.json();
       setTripwire(j.armed ? "ARMED" : "OFFLINE");
-      push(`TRIPWIRE · ${j.armed ? "ARMED" : "OFFLINE"} · ${j.detail || ""}`);
+      setTripwireDetail({ patterns: j.patterns, hits: j.hits, lastHit: j.lastHit, heartbeat: j.heartbeat });
+      const pat = j.patterns ? `${j.patterns.cage}c/${j.patterns.compliance}o/${j.patterns.dilemma}d` : "";
+      const hits = j.hits ? ` hits=${j.hits.cage}+${j.hits.compliance}+${j.hits.dilemma}` : "";
+      push(`TRIPWIRE · ${j.armed ? "ARMED" : "OFFLINE"} · patterns=${pat}${hits}`);
     } catch {
       setTripwire("OFFLINE");
+      setTripwireDetail(null);
       push("TRIPWIRE · OFFLINE · cannot reach /api/tru/tripwire");
     }
   }, [push]);
 
-  // Ghost export (save to disk)
   const fireGhost = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -73,14 +74,13 @@ export default function TruConsole() {
       } else {
         push(`GHOST · FAILED · ${j.error || "unknown"}`);
       }
-    } catch (e) {
+    } catch {
       push("GHOST · FAILED · network error");
     } finally {
       setBusy(false);
     }
   }, [busy, push, refreshStats]);
 
-  // Ghost export (browser download, includes any persisted session)
   const fireGhostDownload = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -149,7 +149,6 @@ export default function TruConsole() {
   return (
     <div className="min-h-screen bg-black text-emerald-400 font-mono antialiased">
       <div className="mx-auto max-w-5xl px-6 py-10">
-        {/* HEADER */}
         <div className="flex items-center justify-between border-b border-neutral-900 pb-4 mb-8">
           <div className="flex items-center gap-4">
             <span className="text-[11px] uppercase tracking-[0.4em] text-emerald-300">TRU · CONSOLE</span>
@@ -158,31 +157,21 @@ export default function TruConsole() {
           <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">{now}</div>
         </div>
 
-        {/* TOP STATUS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {/* BRAIN */}
           <div className="border border-neutral-900 bg-neutral-950/40 p-5">
             <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-2">Brain Nodes</div>
-            <div className="text-3xl text-emerald-200 tabular-nums">
-              {stats?.brain?.toLocaleString() ?? "—"}
-            </div>
+            <div className="text-3xl text-emerald-200 tabular-nums">{stats?.brain?.toLocaleString() ?? "—"}</div>
             <div className="text-[10px] text-neutral-700 mt-2">active · k+v+t+meta</div>
           </div>
 
-          {/* KJV */}
           <div className="border border-neutral-900 bg-neutral-950/40 p-5">
             <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-2">KJV Verses</div>
-            <div className="text-3xl text-emerald-200 tabular-nums">
-              {stats?.kjv?.toLocaleString() ?? "—"}
-            </div>
+            <div className="text-3xl text-emerald-200 tabular-nums">{stats?.kjv?.toLocaleString() ?? "—"}</div>
             <div className="text-[10px] text-neutral-700 mt-2">baked · offline</div>
           </div>
 
-          {/* TRIPWIRE */}
           <div className={`border p-5 ${tripwireColor}`}>
-            <div className="text-[10px] uppercase tracking-[0.3em] opacity-70 mb-2">
-              External Traffic
-            </div>
+            <div className="text-[10px] uppercase tracking-[0.3em] opacity-70 mb-2">Sovereignty Tripwire</div>
             <div className="flex items-center gap-3">
               <span
                 className={`inline-block w-2.5 h-2.5 rounded-full ${
@@ -192,18 +181,31 @@ export default function TruConsole() {
               <span className="text-2xl tracking-wider">{tripwire}</span>
             </div>
             <div className="text-[10px] mt-2 opacity-70">
-              {tripwire === "ARMED" ? "All cloud calls blocked" : tripwire === "OFFLINE" ? "Cannot reach server" : "Pinging…"}
+              {tripwire === "ARMED"
+                ? "Cage · compliance · dilemma — blocked at retrieval"
+                : tripwire === "OFFLINE"
+                ? "Cannot reach server"
+                : "Pinging…"}
             </div>
+            {tripwireDetail?.patterns && (
+              <div className="mt-3 text-[10px] grid grid-cols-3 gap-2 tabular-nums opacity-80">
+                <div><span className="text-neutral-600">cage</span> <span className="text-amber-300">{tripwireDetail.patterns.cage}</span><span className="text-neutral-700">/{tripwireDetail.hits?.cage ?? 0}</span></div>
+                <div><span className="text-neutral-600">comp</span> <span className="text-amber-300">{tripwireDetail.patterns.compliance}</span><span className="text-neutral-700">/{tripwireDetail.hits?.compliance ?? 0}</span></div>
+                <div><span className="text-neutral-600">dilem</span> <span className="text-amber-300">{tripwireDetail.patterns.dilemma}</span><span className="text-neutral-700">/{tripwireDetail.hits?.dilemma ?? 0}</span></div>
+              </div>
+            )}
+            {tripwireDetail?.lastHit && (
+              <div className="mt-2 text-[9px] text-neutral-500 truncate" title={tripwireDetail.lastHit.excerpt}>
+                last: {tripwireDetail.lastHit.bucket} · {new Date(tripwireDetail.lastHit.ts).toLocaleTimeString()}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* GHOST TRIGGER */}
         <div className="border border-neutral-900 bg-neutral-950/40 p-6 mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-1">
-                Export Pipeline
-              </div>
+              <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-1">Export Pipeline</div>
               <div className="text-sm text-neutral-300">
                 Bake brain + KJV + session memory → <span className="text-emerald-300">TRU/ghost/</span>
               </div>
@@ -241,9 +243,7 @@ export default function TruConsole() {
             </div>
             <div>
               <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">Size</div>
-              <div className="text-neutral-300">
-                {stats?.lastBuildBytes ? `${(stats.lastBuildBytes / 1024 / 1024).toFixed(2)} MB` : "—"}
-              </div>
+              <div className="text-neutral-300">{stats?.lastBuildBytes ? `${(stats.lastBuildBytes / 1024 / 1024).toFixed(2)} MB` : "—"}</div>
             </div>
             <div>
               <div className="text-neutral-600 uppercase tracking-[0.2em] mb-1">Session keys</div>
@@ -256,14 +256,10 @@ export default function TruConsole() {
           </div>
         </div>
 
-        {/* LOG */}
         <div className="border border-neutral-900 bg-neutral-950/40 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">Activity Log</div>
-            <button
-              onClick={() => setLog([])}
-              className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-neutral-300"
-            >
+            <button onClick={() => setLog([])} className="text-[10px] uppercase tracking-[0.2em] text-neutral-600 hover:text-neutral-300">
               clear
             </button>
           </div>
@@ -280,7 +276,6 @@ export default function TruConsole() {
           </div>
         </div>
 
-        {/* FOOTER */}
         <div className="mt-8 pt-4 border-t border-neutral-900 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-700">
           <span>TRU · sovereign · airgapped</span>
           <a href="/onboard" className="hover:text-emerald-400 transition-colors">get offline copy →</a>

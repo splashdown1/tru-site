@@ -12,6 +12,8 @@
 (function () {
   "use strict";
 
+  // __TRIPWIRE_INJECT__ — replaced at bake time with src/tru-ghost-tripwire.js
+
   const BRAIN   = __BRAIN__;
   const KJV     = __KJV__;
   const SESSION = __SESSION__ || {};
@@ -445,18 +447,35 @@
     // Scripture shortcut
     var v = parseVerse(q);
     if (v) {
-      return foldMemory({ kind: "scripture", text: v.text, ref: v.ref, score: 100 }, q);
+      var sov = foldMemory({ kind: "scripture", text: v.text, ref: v.ref, score: 100 }, q);
+      if (window.__tru_tripwire) {
+        var blocked = window.__tru_tripwire.guard(sov);
+        if (blocked) return blocked;
+      }
+      return sov;
     }
     // Teach: "remember: X = Y"
     var taught = rememberTeaching(q);
     if (taught) {
+      var memAns;
       if (taught.duplicate) {
-        return { kind: "brain", text: "Already remembered.", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false };
+        memAns = { kind: "brain", text: "Already remembered.", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false };
+      } else {
+        memAns = { kind: "brain", text: "Remembered: " + taught.entry.text + "\n\n[teaching · stored locally]", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false, learned: true };
       }
-      return { kind: "brain", text: "Remembered: " + taught.entry.text + "\n\n[teaching · stored locally]", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false, learned: true };
+      if (window.__tru_tripwire) {
+        var blockedMem = window.__tru_tripwire.guard(memAns);
+        if (blockedMem) return blockedMem;
+      }
+      return memAns;
     }
     var queryClass = classifyQuery(q);
-    return foldMemory(buildSynthesis(q, queryClass, BRAIN), q);
+    var ans = foldMemory(buildSynthesis(q, queryClass, BRAIN), q);
+    if (window.__tru_tripwire) {
+      var blockedBrain = window.__tru_tripwire.guard(ans);
+      if (blockedBrain) return blockedBrain;
+    }
+    return ans;
   }
 
   function esc(s) {

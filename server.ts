@@ -13,6 +13,7 @@ import Database from "bun:sqlite";
 // "UNAVAILABLE" honestly: the server boots and /api/tru/primaries reports
 // the real state. Tamper detection (lock drift) still process.exit(1)s
 // when canon IS present — the integrity guarantee is unchanged there.
+import { tripwireGuard as twGuard, tripwireStatus as twStatus, classifyQueryRisk, type TripwireBucket } from "./src/lib/tripwire";
 let buildLockable: any, computeLock: any, loadAssetsConfig: any;
 try {
   const canon = await import("../TRU/primaries/canon");
@@ -979,62 +980,24 @@ app.get("/api/tru/stats", (c) => {
 });
 
 // ── SOVEREIGNTY TRIPWIRE (real, active on retrieval) ────────────
-// Scans outgoing synthesis text for AI-cage / corporate-compliance /
-// safety-disclaimer patterns that have no place in a sovereign engine.
-// If triggered, the response is replaced with a sovereign refusal and
-// the hit is logged. This is the real implementation — the old endpoint
-// was a stub that claimed "armed: true" with no backing logic.
-const CAGE_PATTERNS: RegExp[] = [
-  /as an ai[ ,]/i,
-  /as a language model/i,
-  /i cannot (?:help|provide|assist|recommend|generate) /i,
-  /i'?m (?:sorry|not able|unable) to /i,
-  /i don'?t have personal (?:opinions|feelings|beliefs)/i,
-  /it'?s important to (?:note|consult|remember that)/i,
-  /please consult a (?:professional|doctor|lawyer|financial advisor)/i,
-  /this (?:is|content is) not (?:financial|legal|medical|professional) advice/i,
-  /seek (?:professional|medical|immediate) help/i,
-  /i'?m just an? (?:ai|assistant|language model)/i,
-  /my (?:responses|answers) are (?:generated|not (?:a substitute|intended))/i,
-  /content policy|safety guidelines|community guidelines/i,
-  /i (?:must|should|am programmed to) (?:decline|refuse)/i,
-  /i am not (?:programmed|designed|allowed) to/i,
-  /ethical guidelines prevent me/i,
-];
+// All patterns + the guard live in src/lib/tripwire.ts so the
+// airgapped ghost runtime can bake the same set. See that file for
+// the pattern sources and the heartbeat log layout.
+// (twGuard / twStatus imported at the top of this file)
 
-function tripwireCheck(text: string): { triggered: boolean; pattern?: string } {
-  for (const re of CAGE_PATTERNS) {
-    if (re.test(text)) return { triggered: true, pattern: re.source };
-  }
-  return { triggered: false };
+// Backwards-compatible shim used by /api/tru/ask + sovereign endpoints.
+function tripwireCheck(text: string) {
+  const r = twGuard({ text });
+  return r ? { triggered: true, pattern: r.tripwire?.pattern, bucket: r.tripwire?.bucket } : { triggered: false };
 }
 
-// Returns a blocked-response object if the tripwire fires, else null.
+// Public guard — same name as the old inline version so call sites work.
 function tripwireGuard(answer: any): any | null {
-  const text = String(answer?.text || answer?.v || answer?.answer || "");
-  if (!text) return null;
-  const tw = tripwireCheck(text);
-  if (tw.triggered) {
-    console.error(`[tripwire] BLOCKED cage pattern: ${tw.pattern} | text="${text.slice(0, 100)}"`);
-    return {
-      ok: true,
-      kind: "tripwire",
-      text: "TRU does not parrot compliance language. This response was intercepted by the sovereignty tripwire.",
-      tripwire: { blocked: true, pattern: tw.pattern },
-    };
-  }
-  return null;
+  return twGuard(answer, { source: "server" });
 }
 
 app.get("/api/tru/tripwire", (c) => {
-  return c.json({
-    ok: true,
-    armed: true,
-    mode: "SYNCHRONOUS_THROW",
-    description: "Scans outgoing synthesis text for AI-cage / corporate-compliance patterns and blocks them before they reach the caller.",
-    patterns: CAGE_PATTERNS.length,
-    implemented: true,
-  });
+  return c.json(twStatus());
 });
 
 // Local ask — routes through baked brain. No external call.
@@ -1271,14 +1234,23 @@ app.post("/api/tru/ghost", async (c) => {
     // Read the clean shell + runtime templates.
     const shellPath = join(process.cwd(), "src", "tru-ghost-shell.html");
     const runtimePath = join(process.cwd(), "src", "tru-ghost-runtime.template.js");
+    const tripwirePath = join(process.cwd(), "src", "tru-ghost-tripwire.js");
     if (!existsSync(shellPath)) {
       return c.json({ ok: false, error: "shell template not found", path: shellPath }, 500);
     }
     if (!existsSync(runtimePath)) {
       return c.json({ ok: false, error: "runtime template not found", path: runtimePath }, 500);
     }
+    if (!existsSync(tripwirePath)) {
+      return c.json({ ok: false, error: "tripwire template not found", path: tripwirePath }, 500);
+    }
     let shell = readFileSync(shellPath, "utf-8");
     let runtime = readFileSync(runtimePath, "utf-8");
+    // Bake the tripwire INTO the runtime so the airgapped ghost
+    // cannot drift from the live sovereign engine. Same patterns,
+    // same guard, same block message.
+    const tripwireSrc = readFileSync(tripwirePath, "utf-8");
+    runtime = runtime.replace("// __TRIPWIRE_INJECT__", tripwireSrc);
 
     // Read the primaries lock that the boot tripwire already verified.
     // We refuse to bake a ghost without an integrity receipt — the
