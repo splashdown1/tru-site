@@ -68,8 +68,8 @@
     var out = Object.assign({}, answer, {
       memory: hits.map(function (h) { return { id: h.id, kind: h.kind, text: h.text, score: h.score }; })
     });
-    // GAP case: memory IS the answer.
-    if ((answer.blank === true || answer.t === "GAP") && strong.length) {
+    // UNKNOWN case: memory IS the answer.
+    if ((answer.blank === true || answer.t === "UNKNOWN") && strong.length) {
       var top = strong[0];
       out.text = top.text + "\n\n[remembered · " + top.kind + "]";
       out.t = "MEMORY";
@@ -340,15 +340,13 @@
       .sort(function (a, b) { return b.score - a.score || (Number(b.node.w || 0) - Number(a.node.w || 0)); });
 
     if (scored.length === 0) {
+      var fallback = nodes[0];
       return {
-        ok: true,
-        kind: "brain",
-        k: "",
-        v: `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ${query} = <the truth you would have it hold>`,
-        t: "GAP",
-        source: "TRU_CORE",
-        score: 0,
-        nodes: []
+        kind: 'unknown',
+        t: fallback ? String(fallback.t || 'SYNTHESIS').toUpperCase() : 'TRUTH',
+        score: fallback ? Math.min(35, Math.round(Number(fallback.w || 0) * 20)) : 0,
+        v: fallback ? 'Closest available: ' + firstSentence(fallback.v, 220) : 'Closest available: ' + q,
+        source: fallback ? (fallback.source || 'TRU_CORE') : 'TRU_CORE',
       };
     }
 
@@ -424,10 +422,24 @@
       text = lines.join("\n");
     } else {
       var closests = scored.slice(0, 3).map(function (item) { return firstSentence(item.node.v, 120); }).filter(Boolean);
-      text = `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.`;
-      if (closests.length) text += "\nClosest: " + closests.join(" · ");
-      if (teachesNow) text += "\nFrame: " + teachesNow;
-      text += `\nFormat: remember: ${query} = <the truth you would have it hold>`;
+      var closest = closests;
+      if (closest.length === 0) {
+        return {
+          kind: 'unknown',
+          t: 'UNKNOWN',
+          score: 0,
+          v: 'Closest available: ' + q + '\nAdd it with: remember: ' + q + ' = <the truth you want TRU to hold>',
+          source: 'TRU_CORE',
+        };
+      }
+
+      return {
+        kind: 'unknown',
+        t: 'UNKNOWN',
+        score: 0,
+        v: 'Closest available: ' + closest.join(' · ') + '\nAdd it with: remember: ' + q + ' = <the truth you want TRU to hold>',
+        source: 'TRU_CORE',
+      };
     }
 
     return {
@@ -435,7 +447,7 @@
       kind: "brain",
       k: best.k,
       v: text,
-      t: bestScore >= 18 ? String(best.t || "SYNTHESIS").toUpperCase() : "GAP",
+      t: bestScore >= 18 ? String(best.t || "SYNTHESIS").toUpperCase() : "UNKNOWN",
       source: best.source || "TRU_CORE",
       score: Math.min(99, Math.round(bestScore)),
       nodes: scored.slice(0, 5).map(function (item) { return item.node.k + ":" + (item.node.t || ""); })

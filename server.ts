@@ -778,16 +778,19 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     return qTokens.filter((t) => t.length >= 3).every((t) => k.split(/[\s_]+/).includes(t));
   }) : scored;
   if (scored.length === 0) {
+    const fallback = rows[0];
     return {
       ok: true,
       kind: "brain",
-      k: "",
-      v: `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ${query} = <the truth you would have it hold>`,
-      t: "GAP",
-      source: "TRU_CORE",
-      blank: true,
-      score: 0,
-      nodes: [] as string[],
+      k: fallback?.k ?? "",
+      v: fallback
+        ? `Closest available: ${firstSentence(fallback.v, 220)}`
+        : `Closest available: ${query}`,
+      t: fallback ? String(fallback.t ?? "SYNTHESIS").toUpperCase() : "TRUTH",
+      source: fallback?.source ?? "TRU_CORE",
+      blank: false,
+      score: fallback ? Math.min(35, Math.round(Number(fallback.w ?? 0) * 20)) : 0,
+      nodes: fallback ? [`${fallback.k}:${fallback.t ?? ""}`] : [],
     };
   }
 
@@ -928,10 +931,9 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     text = lines.join("\n");
   } else {
     const closests = scored.slice(0, 3).map((item) => firstSentence(item.node.v, 120)).filter(Boolean);
-    text = `No grounded node found for "${query}".\nThe brain has not yet been taught this. Teach me.`;
-    if (closests.length) text += ` Closest: ${closests.join(" · ")}`;
+    text = closests.length ? `Closest available: ${closests.join(" · ")}` : `Closest available: ${query}`;
     if (teachesNow) text += `\nFrame: ${teachesNow}`;
-    text += `\nFormat: remember: ${query} = <the truth you would have it hold>`;
+    text += `\nAdd it with: remember: ${query} = <the truth you would have it hold>`;
   }
 
   const grounded = (() => {
@@ -953,7 +955,7 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
     kind: "brain",
     k: best.k,
     v: text,
-    t: bestScore >= 18 ? String(best.t ?? "SYNTHESIS").toUpperCase() : "GAP",
+    t: bestScore >= 18 ? String(best.t ?? "SYNTHESIS").toUpperCase() : "UNKNOWN",
     source: best.source ?? "TRU_CORE",
     score: Math.min(99, Math.round(bestScore)),
     grounded,
@@ -1211,10 +1213,10 @@ app.post("/api/tru/ask", async (c) => {
     const answer = buildSynthesis(q, queryClass, candidates);
     const blockedPub = tripwireGuard(answer);
     if (blockedPub) return c.json(blockedPub);
-    // Web fallback: when the brain can't ground the query (GAP / blank /
+    // Web fallback: when the brain can't ground the query (UNKNOWN / blank /
     // low score), defer to DuckDuckGo instead of presenting an irrelevant
     // node as a confident answer. Honest about the source.
-    const brainMiss = answer.blank === true || answer.t === "GAP" || !answer.grounded ||
+    const brainMiss = answer.blank === true || answer.t === "UNKNOWN" || !answer.grounded ||
       (typeof answer.score === "number" && answer.score < 18);
     if (brainMiss) {
       const web = await webSearch(q);
@@ -1244,7 +1246,7 @@ app.post("/api/tru/ask", async (c) => {
 // SOVEREIGN ASK — gated. Same retrieval as /ask, but folds TRU's own
 // remembered memory into the answer. Public /ask stays brain+KJV only;
 // memory is the owner's private knowledge and must not leak to anon
-// queries. In the GAP case, a strong memory match becomes the answer.
+// queries. In the UNKNOWN case, a strong memory match becomes the answer.
 app.post("/api/tru/ask/sovereign", async (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   let body: { q?: string } = {};
@@ -1265,7 +1267,7 @@ app.post("/api/tru/ask/sovereign", async (c) => {
         if (text) {
           const ans = foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q);
           const learned = autoLearn(q, ans);
-          logAsk({ ts: Date.now(), q, kind: "scripture", gap: false, learned });
+          logAsk({ ts: Date.now(), q, kind: "scripture", unresolved: false, learned });
           if (learned.length) (ans as any).learned = learned;
           const blockedSov = tripwireGuard(ans);
           if (blockedSov) return c.json(blockedSov);
@@ -1285,13 +1287,13 @@ app.post("/api/tru/ask/sovereign", async (c) => {
     const answer = foldMemory(buildSynthesis(q, queryClass, candidates), q);
     // Self-writing memory: extract teachings/identity/preferences, log for reflection.
     const learned = autoLearn(q, answer);
-    logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", gap: answer.t === "GAP" || answer.blank === true, learned });
+    logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", unresolved: answer.t === "UNKNOWN" || answer.blank === true, learned });
     if (learned.length) (answer as any).learned = learned;
     if (learned.length) maybeAutoArchive().catch(() => {});
-    // WEB FALLBACK — if brain AND memory both miss (still GAP/blank),
+    // WEB FALLBACK — if brain AND memory both miss (still UNKNOWN/blank),
     // defer to DuckDuckGo so the sovereign owner gets real answers,
-    // not a "teach me" dead-end. Same honest source labeling as /ask.
-    if (answer.blank === true || answer.t === "GAP" || answer.grounded === false) {
+    // not a dead-end. Same honest source labeling as /ask.
+    if (answer.blank === true || answer.t === "UNKNOWN" || answer.grounded === false) {
       const web = await webSearch(q);
       if (web.ok && web.results && web.results.length > 0) {
         const webAns = formatWebFallback(q, web.results);
@@ -1308,7 +1310,7 @@ app.post("/api/tru/ask/sovereign", async (c) => {
   }
 });
 
-// ── REFLECT — LLM distillation of gap asks into durable memory ──
+// ── REFLECT — LLM distillation of unresolved asks into durable memory ──
 app.post("/api/tru/reflect", async (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   const result = await reflectOnAsks();
@@ -1431,18 +1433,18 @@ app.post("/api/tru/ghost", async (c) => {
     // valid JS literals — the runtime reads them as `const` bindings.
     // Use split/join to replace ALL occurrences (String.replace only does
     // the first match, and brain JSON can contain placeholder-like substrings).
-    const brainJson = JSON.stringify(brain);
-    const kjvJson = JSON.stringify(kjv);
-    const sessionJson = JSON.stringify(mergedMemory);
-    const metaJson = JSON.stringify(meta);
-    const memoryJson = JSON.stringify(truMemory);
+    const brainJson = safeJsonForScript(brain);
+    const kjvJson = safeJsonForScript(kjv);
+    const sessionJson = safeJsonForScript(mergedMemory);
+    const metaJson = safeJsonForScript(meta);
+    const memoryJson = safeJsonForScript(truMemory);
     runtime = runtime
       .split("__BRAIN__").join(brainJson)
       .split("__KJV__").join(kjvJson)
       .split("__SESSION__").join(sessionJson)
       .split("__MEMORY__").join(memoryJson)
       .split("__META__").join(metaJson)
-      .split("__PRIMARIES__").join(JSON.stringify(primariesLock));
+      .split("__PRIMARIES__").join(safeJsonForScript(primariesLock));
 
     const html = shell.replace("/* __TRU_GHOST_RUNTIME__ */", runtime);
 
@@ -1595,7 +1597,7 @@ function gatherMemory(query: string, limit = 5): { id: string; kind: string; tex
   return scored.slice(0, limit);
 }
 
-// Fold remembered entries into a synthesis answer. In the GAP case
+// Fold remembered entries into a synthesis answer. In the UNKNOWN case
 // (brain had nothing), a strongly-matching memory entry becomes the
 // answer itself — TRU remembers what it was taught even outside the
 // curated brain.
@@ -1604,8 +1606,8 @@ function foldMemory(answer: any, query: string): any {
   if (!hits.length) return answer;
   const strong = hits.filter((h) => h.score >= 5);
   const out = { ...answer, memory: hits.map((h) => ({ id: h.id, kind: h.kind, text: h.text, score: h.score })) };
-  // GAP case: brain missed, but memory has a strong match → memory IS the answer.
-  if (answer.blank === true || answer.t === "GAP") {
+  // UNKNOWN case: brain missed, but memory has a strong match → memory IS the answer.
+  if (answer.blank === true || answer.t === "UNKNOWN") {
     if (strong.length) {
       const top = strong[0];
       out.v = `${top.text}\n\n[remembered · ${top.kind}]`;
@@ -1616,7 +1618,7 @@ function foldMemory(answer: any, query: string): any {
       return out;
     }
   }
-  // Non-GAP: append a recalled-context line so TRU consults its memory.
+  // Non-unresolved: append a recalled-context line so TRU consults its memory.
   const isPersonal = /\b(i|my|me|mine|myself)\b/i.test(query);
   const recall = strong.length ? strong : hits.slice(0, 2);
   const recallLine = `Remembered: ${recall.map((r) => firstSentence(r.text, 140)).join(" · ")}`;
@@ -1640,7 +1642,7 @@ function foldMemory(answer: any, query: string): any {
 // ── SELF-WRITING MEMORY — deterministic auto-capture from asks ──
 const ASK_LOG = join(MEMORY_DIR, "TRU_asks.log.ndjson");
 
-interface AskRecord { ts: number; q: string; kind: string; gap: boolean; learned: string[] }
+interface AskRecord { ts: number; q: string; kind: string; unresolved: boolean; learned: string[] }
 
 function logAsk(rec: AskRecord): void {
   try { appendFileSync(ASK_LOG, JSON.stringify(rec) + "\n"); } catch {}
@@ -1729,8 +1731,8 @@ function autoLearn(query: string, answer: any): string[] {
     }
   }
 
-  // 3) GAP answers — the question itself is a signal of what TRU doesn't know yet.
-  //    We don't auto-write the gap (too noisy), but we tag it for reflection.
+  // 3) UNKNOWN answers — the question itself is a signal of what TRU doesn't know yet.
+  //    We don't auto-write the unknown (too noisy), but we tag it for reflection.
   if (learned.length > 0) {
     mem.version = (mem.version || 0) + 1;
     saveMemory(mem);
@@ -1738,13 +1740,13 @@ function autoLearn(query: string, answer: any): string[] {
   return learned;
 }
 
-// ── REFLECT — use the Zo bridge to distill durable facts from asks ──
+// ── REFLECT — use the Zo bridge to distill durable facts from unresolved asks ──
 async function reflectOnAsks(): Promise<{ ok: boolean; distilled: any[]; detail: any }> {
   const token = process.env.ZO_API_KEY;
   if (!token) return { ok: false, distilled: [], detail: "ZO_API_KEY not set" };
-  const recent = readAskLog(30).filter((r) => r.gap || r.learned.length > 0);
+  const recent = readAskLog(30).filter((r) => r.unresolved || r.learned.length > 0);
   if (recent.length === 0) {
-    return { ok: true, distilled: [], detail: "no gap/learned asks to reflect on" };
+    return { ok: true, distilled: [], detail: "no unresolved/learned asks to reflect on" };
   }
   const asks = recent.map((r) => r.q).join("\n");
   const prompt =
@@ -1868,7 +1870,7 @@ app.get("/api/tru/metrics", async (c) => {
 // ── SEARCH (keyless, public) ─────────────────────────────────────
 // Shared web-search helper — DuckDuckGo HTML scrape, no API key.
 // Used by /api/tru/search AND as the brain fallback when the brain
-// can't ground a query (GAP / blank / low score).
+// can't ground a query (UNKNOWN / blank / low score).
 // Simple in-memory search cache (2 min TTL) — avoids re-hitting
 // DDG/Wikipedia for similar queries under rapid load.
 const _searchCache = new Map<string, { ts: number; data: any }>();
@@ -2210,7 +2212,7 @@ async function maybeAutoArchive(): Promise<{ archived: boolean; version?: number
 // ── DAILY ARCHIVE (idle-day safety net) ─────────────────────────
 // maybeAutoArchive only fires when version crosses threshold 10.
 // If the box sits idle for a day with a small increment (1-9),
-// nothing would archive. dailyArchive closes that gap: it snapshots
+// nothing would archive. dailyArchive closes that opening: it snapshots
 // to git+mail whenever memory changed since the last archive,
 // regardless of threshold. Called by the production daily timer.
 async function dailyArchive(): Promise<{ archived: boolean; version?: number; reason?: string }> {
@@ -2622,9 +2624,9 @@ app.get("/api/tru/compile", async (c) => {
 </html>`;
 
     // Inject data
-    const brainJson = JSON.stringify(brain);
-    const starterJson = JSON.stringify(starterFacts, null, 2);
-    const greekJson = JSON.stringify(greekNotes, null, 2);
+    const brainJson = safeJsonForScript(brain);
+    const starterJson = safeJsonForScript(starterFacts);
+    const greekJson = safeJsonForScript(greekNotes);
 
     shell = shell
       .replace("{{BRAIN}}", brainJson)
@@ -2887,4 +2889,8 @@ async function configureDevelopment(app: Hono): Promise<ViteDevServer> {
     }
   });
   return vite;
+}
+
+function safeJsonForScript(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, "\\u003c");
 }

@@ -84,7 +84,7 @@ TRU is a **filter**, not a standalone AI. It attaches to any host model (Zo, HF,
 ### Memory-augmented retrieval (2026-06-20)
 - **Gated** `POST /api/tru/ask/sovereign` — same retrieval as `/ask` (brain + KJV) but folds `memory/TRU_memory.json` into the answer. Matching entries appear as a `Remembered:` line and a `memory[]` array on the response.
 - **Public** `POST /api/tru/ask` is unchanged — brain + KJV only. Memory never leaks to anonymous queries.
-- GAP case: if the brain has no node but memory has a matching entry, that remembered entry becomes the answer.
+- Unresolved case: if the brain has no node but memory has a matching entry, that remembered entry becomes the answer.
 - UI: the `/sovereign` page now has an "Ask TRU · brain + memory" box (gated).
 - Commit: `c0cac24`.
 
@@ -103,7 +103,7 @@ TRU is a **filter**, not a standalone AI. It attaches to any host model (Zo, HF,
 ## Memory recall ranking (foldMemory)
 - Personal-pronoun queries (I/my/me/mine/myself) lead with MEMORY when strong hit exists (score>=5). Brain demoted to footnote. source=TRU_MEMORY.
 - Objective queries: brain leads, memory appended as "Remembered:" footnote. source=CERTIFIED/TRU_BRAIN.
-- GAP queries (brain missed): memory becomes the answer if strong hit, else teach-me prompt.
+- Unresolved queries (brain missed): memory becomes the answer if strong hit, else teach-me prompt.
 - Strong threshold lowered from 8 to 5 so single-tag-match personal facts (e.g. preference tag vs "prefer" token) qualify.
 
 ## Durability layer (auto-archive)

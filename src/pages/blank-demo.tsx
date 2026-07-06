@@ -132,9 +132,7 @@ export default function BlankDemo() {
     if (!last) return "";
     return last.r.verdict === "TRUTH"
       ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-      : last.r.verdict === "GAP"
-        ? "bg-amber-500/10 text-amber-600 border-amber-500/30"
-        : "bg-zinc-500/10 text-zinc-500 border-zinc-500/30";
+      : "bg-zinc-500/10 text-zinc-500 border-zinc-500/30";
   }, [last]);
 
   return (
@@ -246,11 +244,7 @@ export default function BlankDemo() {
                   className="rounded-md border border-border bg-muted/20 p-3 text-sm"
                 >
                   <div className="mb-1 text-xs text-muted-foreground">{t.q}</div>
-                  <div className="text-foreground/90">
-                    {t.r.verdict === "GAP"
-                      ? t.r.answer
-                      : t.r.answer.slice(0, 160) + (t.r.answer.length > 160 ? "…" : "")}
-                  </div>
+                  <div className="text-foreground/90">{t.r.answer}</div>
                 </div>
               ))}
           </div>

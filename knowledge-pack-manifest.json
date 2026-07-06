@@ -435,6 +435,36 @@
         "topic": 9,
         "dilemma": 4
       }
+    },
+    {
+      "id": "cook-knowledge",
+      "file": "../tru-logos-work/data/cook-knowledge.json",
+      "shape": "array-nodes",
+      "source": "TRU_COOK",
+      "type": "knowledge",
+      "weight": 0.78,
+      "description": "Cooking techniques and dish methods.",
+      "boosts": {
+        "identity": 3,
+        "definition": 16,
+        "topic": 18,
+        "dilemma": 3
+      }
+    },
+    {
+      "id": "coding-knowledge",
+      "file": "../tru-logos-work/data/coding-knowledge.json",
+      "shape": "array-nodes",
+      "source": "TRU_CODE",
+      "type": "knowledge",
+      "weight": 0.78,
+      "description": "Programming languages and core concepts.",
+      "boosts": {
+        "identity": 4,
+        "definition": 18,
+        "topic": 17,
+        "dilemma": 4
+      }
     }
   ]
 }

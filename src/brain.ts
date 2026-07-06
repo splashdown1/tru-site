@@ -1,6 +1,6 @@
 import { STARTER_FACTS } from "./STARTER_FACTS";
 
-export type Verdict = "TRUTH" | "GAP" | "UNKNOWN";
+export type Verdict = "TRUTH" | "UNKNOWN";
 
 export interface BrainResult {
   answer: string;
@@ -71,7 +71,7 @@ function lookupTokenOverlap(q: string): { key: string; score: number } | null {
 export function askBrain(rawQ: string): BrainResult {
   const q = rawQ.trim();
   if (!q) {
-    return { answer: "Ask a question.", verdict: "GAP", score: 0, nodes: [], key: "" };
+    return { answer: "Try a phrase, name, or scripture reference.", verdict: "UNKNOWN", score: 0, nodes: [], key: "" };
   }
 
   const exact = lookupExact(q);
@@ -98,8 +98,8 @@ export function askBrain(rawQ: string): BrainResult {
   }
 
   return {
-    answer: "I don't have a grounded answer for that in my starter brain. Try a single word or short phrase — mercy, faith, logos, jesus money, the golden rule.",
-    verdict: "GAP",
+    answer: "Closest available: try a scripture reference or named concept.",
+    verdict: "UNKNOWN",
     score: 0,
     nodes: [],
     key: "",

@@ -471,11 +471,22 @@
         .slice(0, 4)
         .map((x) => firstSentence(x.node.v, 120));
 
+      if (closest.length === 0) {
+        var fallback = scored.length ? scored[0].node : null;
+        return {
+          kind: 'unknown',
+          t: fallback ? String(fallback.t || 'TRUTH').toUpperCase() : 'TRUTH',
+          score: fallback ? Math.min(35, Math.round(Number(fallback.w || 0) * 20)) : 0,
+          v: fallback ? 'Closest available: ' + firstSentence(fallback.v, 220) : 'Closest available: ' + q,
+          source: fallback ? (fallback.source || 'TRU_CORE') : 'TRU_CORE',
+        };
+      }
+
       return {
-        kind: 'gap',
-        t: 'GAP',
+        kind: 'unknown',
+        t: 'UNKNOWN',
         score: 0,
-        v: 'No grounded node found for "' + q + '".\nThe brain has not yet been taught this. Teach me.\nFormat: remember: ' + q + ' = <the truth you would have it hold>' + (closest.length ? '\nClosest: ' + closest.join(' · ') : ''),
+        v: 'Closest available: ' + closest.join(' · ') + '\nAdd it with: remember: ' + q + ' = <the truth you want TRU to hold>',
         source: 'TRU_CORE',
       };
     }
@@ -506,15 +517,15 @@
       const res = lookup(raw);
       currentAnswer = res && res.v ? res.v : '';
       const out = document.getElementById('out');
-      const klass = res && res.kind === 'scripture' ? 'out scripture' : res && res.kind === 'gap' ? 'out gap' : 'out';
+      const klass = res && res.kind === 'scripture' ? 'out scripture' : res && res.kind === 'unknown' ? 'out unknown' : 'out';
       if (!res) {
-        out.innerHTML = '<div class="' + klass + '"><div class="verdict gap">GAP</div><div class="answer">No match.</div></div>';
+        out.innerHTML = '<div class="' + klass + '"><div class="verdict unknown">UNKNOWN</div><div class="answer">No match.</div></div>';
         return;
       }
       const note = toneLine(raw, res);
       const memoryHtml = res.memory && res.memory.length ? '<div class="chipline">' + res.memory.map((m) => '<span class="chip"><strong>remembered</strong> ' + escapeHtml(m.text) + '</span>').join('') + '</div>' : '';
       out.innerHTML = '<div class="' + klass + '">' +
-        '<div class="verdict ' + (res.kind === 'scripture' ? 'scripture' : res.kind === 'gap' ? 'gap' : '') + '">' + escapeHtml(res.t || 'TRUTH') + ' · ' + res.score + '% · ' + escapeHtml(res.source || 'TRU_CORE') + '</div>' +
+        '<div class="verdict ' + (res.kind === 'scripture' ? 'scripture' : res.kind === 'unknown' ? 'unknown' : '') + '">' + escapeHtml(res.t || 'TRUTH') + ' · ' + res.score + '% · ' + escapeHtml(res.source || 'TRU_CORE') + '</div>' +
         '<div class="answer" id="answerBody">' + renderClickableText(res.v || '') + '</div>' +
         (note ? '<div class="history-a" style="margin-top:10px;color:var(--muted)">' + escapeHtml(note) + '</div>' : '') +
         (res.ref ? '<span class="src">ref: ' + escapeHtml(res.ref) + '</span>' : '') +
@@ -533,7 +544,7 @@
       if (q.includes('thank')) return 'Received. Truth stays central.';
       if (q.includes('why')) return 'Reasoning from the grounded node.';
       if (q.startsWith('remember:')) return 'Stored locally. Undo if needed.';
-      if (res && res.kind === 'gap') return 'Not grounded yet. The next move is teaching or a better query.';
+      if (res && res.kind === 'unknown') return 'Not grounded yet. The next move is teaching or a better query.';
       if (res && res.kind === 'scripture') return 'Scripture first, with word study available below.';
       return 'Straight answer, no theatre.';
     }
@@ -541,7 +552,7 @@
     function continuityLine(query, res) {
       const prev = state.history.length ? state.history[state.history.length - 1] : null;
       if (!prev) return '';
-      if (res && res.kind === 'gap') return 'You are at the edge of the map. Name the missing thing and TRU can hold it.';
+      if (res && res.kind === 'unknown') return 'You are at the edge of the map. Name the missing thing and TRU can hold it.';
       if (res && res.kind === 'scripture') return 'Keep the verse, then move to the word and the doctrine it carries.';
       if (prev.q === query) return 'You asked the same ground again. That usually means the answer needs sharpening, not more volume.';
       return 'Continuity: building on the last turn instead of starting from zero.';

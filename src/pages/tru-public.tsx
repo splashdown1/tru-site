@@ -191,7 +191,7 @@ export default function TruPublic() {
       } else if (j.ok && j.kind === "web") {
         push("assistant", j.v || j.text || "", `WEB FALLBACK${j.source ? ` · ${j.source}` : ""}`);
       } else {
-        push("assistant", "No match. Teach me: remember: " + query + " = <your definition>.", "UNKNOWN");
+        push("assistant", "Closest available answer is not yet pinned. Add it with: remember: " + query + " = <your definition>.", "BEST");
       }
     } catch {
       push("assistant", "Routing failed. The signal is yours.", "ERROR");

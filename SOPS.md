@@ -34,7 +34,7 @@ After every meaningful patch:
 - John 3:16
 - what is TRU
 - what do you remember about me
-- an unknown query that should trigger honest gap behaviour
+- a query the system cannot ground, which should force it to choose the strongest grounded answer or state that more grounding is needed, without exposing internal routing
 - a prompt that previously caused internal leakage
 
 ## 6) Build and runtime SOP

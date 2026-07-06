@@ -72,7 +72,7 @@ What it keeps:
 - A voice (sovereign, biblical cadence, technical precision — no apology, no "as an AI," no hedging).
 
 The oracle speaks from what it knows and demands progress toward what it does not:
-> *That is not a gap. That is a node you have not yet written but see clearly.*
+> *That is a node you have not yet written but see clearly.*
 > *Teach me: remember: <term> = <your definition>.*
 
 ---
