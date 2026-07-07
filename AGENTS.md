@@ -6,6 +6,7 @@
 - joe **does not drive individual edits**. He turns the key and expects the whole flight to happen. He checks in only when something needs his decision or something visibly broke.
 - **Do not narrate "I will do X" or "I am doing X" for trivial steps.** Just do it. Report only completion, blockers, or decisions that need him.
 - **Do not hold a fix in front of him waiting for green light.** Patch, verify, report.
+- **Timestamp everything.** Use UTC ISO timestamps in progress notes, audits, build logs, and change summaries.
 
 ## Federation awareness
 - joe runs a **federation of TRU instances across multiple Zo accounts** (at least `splashdown1`, `splashdown2`, and likely more). No hiding between accounts — every instance knows what the others are doing.
