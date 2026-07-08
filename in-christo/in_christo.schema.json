@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://splashdown1.github.io/tru-site/in-christo/in_christo.schema.json",
+  "title": "InChristo v1 Record",
+  "description": "One knowledge record placed in the Fivefold relative to Christ.",
+  "type": "object",
+  "required": ["id", "k", "v", "position", "t", "source"],
+  "additionalProperties": true,
+  "properties": {
+    "id":         { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,80}$" },
+    "k":          { "type": "string", "minLength": 1, "maxLength": 200 },
+    "v":          { "type": "string", "minLength": 1, "maxLength": 4000 },
+    "position":   { "type": "string", "enum": ["CENTRE", "TORAH", "BODY", "FRUIT", "SHADOW"] },
+    "w":          { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5 },
+    "t":          { "type": "string", "minLength": 1, "maxLength": 50 },
+    "source":     { "type": "string", "minLength": 1, "maxLength": 80 },
+    "ref":        { "type": "string" },
+    "greek_tr":   { "type": "string" },
+    "greek_note": { "type": "string" },
+    "via":        { "type": "string" },
+    "meta":       { "type": "object" }
+  }
+}
