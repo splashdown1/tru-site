@@ -48,6 +48,10 @@
     .pill.good { color: #b8f5da; border-color: rgba(52,211,153,0.25); }
     .pill.warn { color: #fde68a; border-color: rgba(251,191,36,0.25); }
     .pill.bad { color: #fecdd3; border-color: rgba(251,113,133,0.25); }
+    .stack { display:grid; gap:10px; }
+    .stack .row { display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .tagline { display:flex; flex-wrap:wrap; gap:8px; margin-top: 10px; }
+    .tag { padding: 4px 8px; border-radius: 999px; border:1px solid var(--line); font-size: 10px; letter-spacing:.16em; text-transform:uppercase; color: var(--muted); background: rgba(255,255,255,0.02); }
     pre { margin:0; white-space:pre-wrap; word-break:break-word; background: rgba(255,255,255,0.03); border:1px solid var(--line); border-radius: 16px; padding: 16px; color:#e8f1fb; line-height:1.65; font-size: 13px; }
     .footer { margin: 20px 0 6px; color: var(--muted); font-size: 12px; line-height:1.6; }
     .btnrow { display:flex; flex-wrap:wrap; gap:10px; margin-top: 12px; }
@@ -87,6 +91,13 @@
         <div class="chip">provenance</div>
         <div class="chip">TRU ghost style</div>
       </div>
+      <div class="tagline">
+        <div class="tag">LKP / datum / drift</div>
+        <div class="tag">radio callsign</div>
+        <div class="tag">asset tasking</div>
+        <div class="tag">printable SITREP</div>
+        <div class="tag">copy to clipboard</div>
+      </div>
       <div class="status" id="status"></div>
       <div class="btnrow">
         <button onclick="setMode('brief')">A1 brief</button>
@@ -114,8 +125,16 @@
                 <input id="mission" value="SAR support for downed aircraft" />
               </div>
               <div class="field">
+                <label for="callsign">Radio callsign</label>
+                <input id="callsign" placeholder="who you are on the net" />
+              </div>
+              <div class="field">
                 <label for="lkp">Last known position</label>
                 <input id="lkp" placeholder="lat / lon / fix source" />
+              </div>
+              <div class="field">
+                <label for="drift">Drift / datum</label>
+                <input id="drift" placeholder="drift rate, datum radius, last ping" />
               </div>
               <div class="field">
                 <label for="time">Last known time UTC</label>
@@ -304,7 +323,9 @@
     const promptEl = document.getElementById('prompt');
     const fields = {
       mission: document.getElementById('mission'),
+      callsign: document.getElementById('callsign'),
       lkp: document.getElementById('lkp'),
+      drift: document.getElementById('drift'),
       time: document.getElementById('time'),
       crew: document.getElementById('crew'),
       weather: document.getElementById('weather'),
@@ -319,26 +340,41 @@
       return String(fields[id].value || '').trim();
     }
 
+    function currentText() {
+      return briefEl.textContent || '';
+    }
+
     function buildBrief() {
+      const mission = value('mission') || 'support rescue and recovery of the crew.';
+      const callsign = value('callsign');
+      const lkp = value('lkp');
+      const drift = value('drift');
+      const time = value('time');
+      const crew = value('crew');
+      const weather = value('weather');
+      const comms = value('comms');
+      const assets = value('assets');
+      const authority = value('authority');
+      const notes = value('notes');
       const lines = [
         'A1 one-page field brief',
-        `Mission: ${value('mission') || 'support rescue and recovery of the crew.'}`,
+        `Mission: ${mission}`,
         `Situation: ${[
-          value('lkp') ? `LKP ${value('lkp')}` : 'LKP missing',
-          value('time') ? `time ${value('time')}` : 'time missing',
-          value('weather') ? `weather ${value('weather')}` : 'weather missing',
-          value('crew') ? `crew ${value('crew')}` : 'crew status missing',
-          value('comms') ? `comms ${value('comms')}` : 'comms status missing'
+          lkp ? `LKP ${lkp}` : 'LKP missing',
+          drift ? `datum/drift ${drift}` : 'datum/drift missing',
+          time ? `time ${time}` : 'time missing',
+          crew ? `crew ${crew}` : 'crew status missing',
+          weather ? `weather ${weather}` : 'weather missing',
+          comms ? `comms ${comms}` : 'comms status missing'
         ].join(' · ')}`,
         `Task: build the search picture and identify the next action.`,
-        `Constraints: ${[
-          'time', 'fuel', 'authority', 'jurisdiction', 'risk', 'missing data'
-        ].join(', ')}.`,
-        `Comms: use short structured updates.`,
+        `Constraints: time, fuel, authority, jurisdiction, risk, and missing data.`,
+        `Comms: ${callsign ? `call sign ${callsign}.` : 'use short structured updates.'}`,
         `Decision: expand, narrow, or hold the search area based on grounded facts.`,
-        `Execution: ${value('assets') ? `task assets: ${value('assets')}.` : 'task available assets only after confirmation.'}`,
+        `Execution: ${assets ? `task assets: ${assets}.` : 'task available assets only after confirmation.'}`,
         `Report: return a concise SITREP with gaps called out.`,
-        `Notes: ${value('authority') ? `authority ${value('authority')}.` : 'authority unresolved.'}${value('notes') ? ` ${value('notes')}` : ''}`,
+        `Authority: ${authority || 'authority unresolved.'}`,
+        notes ? `Notes: ${notes}` : 'Notes: none.',
         'Standard: local, factual, concise, and honest.'
       ];
       briefEl.textContent = lines.join('\n');
@@ -373,7 +409,9 @@
 
     window.fillSample = function() {
       fields.mission.value = 'SAR support for downed A-10 in the Indian Ocean';
+      fields.callsign.value = 'TRU-Rescue 1';
       fields.lkp.value = '12.401S 045.210E · radar fix';
+      fields.drift.value = '1.2 nm/hr SE · 6 nm datum radius';
       fields.time.value = '2026-07-29 11:30Z';
       fields.crew.value = '1 pilot + unknown condition';
       fields.weather.value = 'moderate sea state, 18 kt wind, 8 km visibility';
