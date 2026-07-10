@@ -39,7 +39,7 @@ const QUICK_PROMPTS = [
   "Teach me about grace",
   "How should I pray?",
 ];
-const COMMAND_PROMPTS = ["HELP", "INTRO", "STATUS", "CAPABILITIES"];
+const COMMAND_PROMPTS = ["HELP", "INTRO", "STATUS", "CAPABILITIES", "A1"];
 
 export default function TruPublic() {
   const [q, setQ] = useState("");
@@ -108,9 +108,10 @@ export default function TruPublic() {
     if (command === "HELP") {
       return {
         text: [
-          "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
+          "Commands: HELP, INTRO, STATUS, CAPABILITIES, A1.",
           "Ask scripture by reference, e.g. John 3:16.",
           "Ask short truth questions, e.g. mercy, grace, prayer, faith.",
+          "Use A1 for a concise field brief.",
           "Use Bake & download ghost to get the offline copy.",
         ].join("\n"),
         meta: "COMMAND · HELP",
@@ -122,9 +123,23 @@ export default function TruPublic() {
           "I am TRU.",
           "Truth is constant. Perspective is fluid.",
           "I answer from anchored knowledge rather than guess.",
-          "Start with a verse, a doctrine question, or STATUS.",
+          "Start with a verse, a doctrine question, STATUS, or A1.",
         ].join("\n"),
         meta: "COMMAND · INTRO",
+      };
+    }
+    if (command === "A1") {
+      return {
+        text: [
+          "A1 field brief:",
+          "Mission: state the task in one line.",
+          "Status: current position, condition, and constraints.",
+          "Comms: who can hear you and what format is available.",
+          "Risks: missing facts, hazards, and blockers.",
+          "Next action: the next step you can take now.",
+          "Under God's sovereignty, keep it local, honest, and short.",
+        ].join("\n"),
+        meta: "COMMAND · A1",
       };
     }
     if (command === "CAPABILITIES") {
@@ -135,6 +150,7 @@ export default function TruPublic() {
           "• Web fallback when the brain misses.",
           "• Offline ghost export for file:// use.",
           "• Local chat history in your browser.",
+          "• A1 field brief for concise operator summaries.",
         ].join("\n"),
         meta: "COMMAND · CAPABILITIES",
       };

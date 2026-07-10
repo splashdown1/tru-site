@@ -5,6 +5,7 @@ export const STARTER_FACTS: Record<string, string> = {
   'cat':"Felis catus. Small domesticated carnivorous mammal. Obligate carnivore, crepuscular hunter, ~10,000 years self-domesticated. Independent, territorial, 200M+ kept globally.",
   'peace':"Absence of organised violence. Often confused with submission. Real peace requires capacity for violence held in restraint. \u05e9\u05c1\u05b8\u05dc\u05d5\u05b9\u05dd (shalom): wholeness, not just quiet.",
   'war':"Organised violence for political ends. Clausewitz: war is the continuation of politics by other means. Sun Tzu: the supreme art is to subdue without fighting.",
+  'a1':"A1 field brief: mission, status, constraints, comms, risks, next action. Keep it local, concise, and grounded. If a fact is missing, say what is missing and the safest next step.",
   'love':"Greek distinguishes four: \u03b1\u03b3\u03ac\u03c0\u03b7 (agape, sacrificial), \u03c6\u03b9\u03bb\u03af\u03b1 (philia, brotherly), \u03ad\u03c1\u03c9\u03c2 (eros, romantic), \u03c3\u03c4\u03bf\u03c1\u03b3\u03ae (storge, familial). Without all four, none holds.",
   'faith':"Trust beyond proof. Greek \u03c0\u03af\u03c3\u03c4\u03b9\u03c2 (pistis): fidelity, conviction, settled trust. Hebrews 11:1 — the substance of things hoped for, the evidence of things not seen.",
   'justice':"Giving each what is owed. Plato: harmony of soul and city. Aristotle: distributive (fair share) and corrective (fair restoration). The blindfold means equal application, not blindness to truth.",
