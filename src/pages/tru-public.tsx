@@ -111,7 +111,7 @@ export default function TruPublic() {
           "Commands: HELP, INTRO, STATUS, CAPABILITIES, A1.",
           "Ask scripture by reference, e.g. John 3:16.",
           "Ask short truth questions, e.g. mercy, grace, prayer, faith.",
-          "Use A1 for a concise field brief.",
+          "Use A1 for a one-page field brief.",
           "Use Bake & download ghost to get the offline copy.",
         ].join("\n"),
         meta: "COMMAND · HELP",
@@ -131,13 +131,14 @@ export default function TruPublic() {
     if (command === "A1") {
       return {
         text: [
-          "A1 field brief:",
-          "Mission: state the task in one line.",
-          "Status: current position, condition, and constraints.",
-          "Comms: who can hear you and what format is available.",
-          "Risks: missing facts, hazards, and blockers.",
-          "Next action: the next step you can take now.",
-          "Under God's sovereignty, keep it local, honest, and short.",
+          "A1 one-page field brief",
+          "Mission: what is the task.",
+          "Situation: where we are, what changed, what is known.",
+          "Task: what must happen next.",
+          "Constraints: time, access, risk, authority, and missing data.",
+          "Comms: who receives the brief and what channel is available.",
+          "Next action: the first concrete step.",
+          "Standard: local, factual, concise, and grounded.",
         ].join("\n"),
         meta: "COMMAND · A1",
       };
@@ -150,7 +151,7 @@ export default function TruPublic() {
           "• Web fallback when the brain misses.",
           "• Offline ghost export for file:// use.",
           "• Local chat history in your browser.",
-          "• A1 field brief for concise operator summaries.",
+          "• A1 one-page field brief for operator summaries.",
         ].join("\n"),
         meta: "COMMAND · CAPABILITIES",
       };
