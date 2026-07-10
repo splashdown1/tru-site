@@ -67,6 +67,9 @@
     textarea { min-height: 110px; resize: vertical; }
     input:focus, textarea:focus, select:focus { border-color: rgba(125,211,252,0.55); box-shadow: 0 0 0 3px rgba(125,211,252,0.12); }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .searchbar { display:flex; gap:10px; align-items:center; margin: 12px 0 0; }
+    .searchbar input { flex:1; }
+    .searchhit { color: var(--accent); }
     @media (max-width: 900px) { .split { grid-template-columns: 1fr; } body { padding: 14px; } }
   </style>
 </head>
@@ -120,55 +123,27 @@
             <p>Fill in the mission data. Then click <span class="kbd">Build brief</span>. TRU will turn your facts into a structured A1 / SITREP output.</p>
             <div class="hr"></div>
             <div class="fields">
-              <div class="field">
-                <label for="mission">Mission</label>
-                <input id="mission" value="SAR support for downed aircraft" />
-              </div>
-              <div class="field">
-                <label for="callsign">Radio callsign</label>
-                <input id="callsign" placeholder="who you are on the net" />
-              </div>
-              <div class="field">
-                <label for="lkp">Last known position</label>
-                <input id="lkp" placeholder="lat / lon / fix source" />
-              </div>
-              <div class="field">
-                <label for="drift">Drift / datum</label>
-                <input id="drift" placeholder="drift rate, datum radius, last ping" />
-              </div>
-              <div class="field">
-                <label for="time">Last known time UTC</label>
-                <input id="time" placeholder="YYYY-MM-DD HH:MMZ" />
-              </div>
-              <div class="field">
-                <label for="crew">Crew</label>
-                <input id="crew" placeholder="number and condition" />
-              </div>
-              <div class="field">
-                <label for="weather">Weather / sea state</label>
-                <input id="weather" placeholder="visibility, wind, sea state" />
-              </div>
-              <div class="field">
-                <label for="comms">Comms</label>
-                <input id="comms" placeholder="beacon, radio, mayday, satellite" />
-              </div>
-              <div class="field">
-                <label for="assets">Assets available</label>
-                <input id="assets" placeholder="air, surface, medevac, radar, drone" />
-              </div>
-              <div class="field">
-                <label for="authority">Authority / jurisdiction</label>
-                <input id="authority" placeholder="who is in charge" />
-              </div>
+              <div class="field"><label for="mission">Mission</label><input id="mission" value="SAR support for downed aircraft" /></div>
+              <div class="field"><label for="callsign">Radio callsign</label><input id="callsign" placeholder="who you are on the net" /></div>
+              <div class="field"><label for="lkp">Last known position</label><input id="lkp" placeholder="lat / lon / fix source" /></div>
+              <div class="field"><label for="drift">Drift / datum</label><input id="drift" placeholder="drift rate, datum radius, last ping" /></div>
+              <div class="field"><label for="time">Last known time UTC</label><input id="time" placeholder="YYYY-MM-DD HH:MMZ" /></div>
+              <div class="field"><label for="crew">Crew</label><input id="crew" placeholder="number and condition" /></div>
+              <div class="field"><label for="weather">Weather / sea state</label><input id="weather" placeholder="visibility, wind, sea state" /></div>
+              <div class="field"><label for="comms">Comms</label><input id="comms" placeholder="beacon, radio, mayday, satellite" /></div>
+              <div class="field"><label for="assets">Assets available</label><input id="assets" placeholder="air, surface, medevac, radar, drone" /></div>
+              <div class="field"><label for="authority">Authority / jurisdiction</label><input id="authority" placeholder="who is in charge" /></div>
             </div>
-            <div class="field" style="margin-top:10px;">
-              <label for="notes">Extra notes</label>
-              <textarea id="notes" placeholder="Anything else that changes the search picture"></textarea>
+            <div class="field" style="margin-top:10px;"><label for="notes">Extra notes</label><textarea id="notes" placeholder="Anything else that changes the search picture"></textarea></div>
+            <div class="searchbar">
+              <input id="search" placeholder="Search the brief for a term, e.g. datum" />
+              <button onclick="searchBrief()">Find</button>
             </div>
             <div class="btnrow">
               <button onclick="buildBrief()">Build brief</button>
               <button onclick="fillSample()">Load sample</button>
               <button onclick="copyCurrent()">Copy current brief</button>
+              <button onclick="copySITREP()">Copy SITREP only</button>
             </div>
           </div>
           <div class="card">
@@ -183,6 +158,10 @@
             <div class="hr"></div>
             <p class="tiny">
               Keyboard: <span class="kbd">1</span> brief · <span class="kbd">2</span> SITREP · <span class="kbd">3</span> checklist · <span class="kbd">B</span> build · <span class="kbd">C</span> copy.
+            </p>
+            <div class="hr"></div>
+            <p class="tiny">
+              Search terms surface with <span class="searchhit">highlight</span> in the current output. Use it to jump straight to datum, callsign, or asset mentions.
             </p>
           </div>
         </div>
@@ -219,30 +198,12 @@
     </section>
 
     <div class="grid">
-      <section class="card">
-        <h3>Mission</h3>
-        <p>Support location, coordination, and recovery of the crew of a downed Warthog aircraft over the Indian Ocean.</p>
-      </section>
-      <section class="card">
-        <h3>Situation</h3>
-        <p>Aircraft status is unknown until confirmed. The first anchor points are last known position, time, weather, sea state, visibility, and comms status.</p>
-      </section>
-      <section class="card">
-        <h3>Task</h3>
-        <p>Build the cleanest possible search picture from known facts, identify the datum, and call out gaps immediately.</p>
-      </section>
-      <section class="card">
-        <h3>Constraints</h3>
-        <p>Time, fuel, weather, authority, jurisdiction, and communications all limit what can be done now.</p>
-      </section>
-      <section class="card">
-        <h3>Comms</h3>
-        <p>Use short structured updates: what is known, what changed, what is missing, and what happens next.</p>
-      </section>
-      <section class="card">
-        <h3>Decision</h3>
-        <p>Expand, narrow, or hold the search area based on grounded facts only.</p>
-      </section>
+      <section class="card"><h3>Mission</h3><p>Support location, coordination, and recovery of the crew of a downed Warthog aircraft over the Indian Ocean.</p></section>
+      <section class="card"><h3>Situation</h3><p>Aircraft status is unknown until confirmed. The first anchor points are last known position, time, weather, sea state, visibility, and comms status.</p></section>
+      <section class="card"><h3>Task</h3><p>Build the cleanest possible search picture from known facts, identify the datum, and call out gaps immediately.</p></section>
+      <section class="card"><h3>Constraints</h3><p>Time, fuel, weather, authority, jurisdiction, and communications all limit what can be done now.</p></section>
+      <section class="card"><h3>Comms</h3><p>Use short structured updates: what is known, what changed, what is missing, and what happens next.</p></section>
+      <section class="card"><h3>Decision</h3><p>Expand, narrow, or hold the search area based on grounded facts only.</p></section>
       <section class="card wide">
         <h3>First pass checklist</h3>
         <ol>
@@ -254,21 +215,11 @@
           <li>Set datum and track assumptions separately.</li>
         </ol>
       </section>
-      <section class="card wide">
-        <h3>What TRU must not do</h3>
-        <div class="sig">
-          It must not invent coordinates, pretend the crew is recovered, or hide uncertainty. If the facts are missing, the honest answer is to name the gap and stop there.
-        </div>
-      </section>
-      <section class="card wide">
-        <h3>Field prompt</h3>
-        <pre id="prompt"></pre>
-      </section>
+      <section class="card wide"><h3>What TRU must not do</h3><div class="sig">It must not invent coordinates, pretend the crew is recovered, or hide uncertainty. If the facts are missing, the honest answer is to name the gap and stop there.</div></section>
+      <section class="card wide"><h3>Field prompt</h3><pre id="prompt"></pre></section>
     </div>
 
-    <div class="footer">
-      Truth is constant. Perspective is fluid. This page is self-contained and can run from a USB stick, an air-gapped laptop, or any browser that opens local files.
-    </div>
+    <div class="footer">Truth is constant. Perspective is fluid. This page is self-contained and can run from a USB stick, an air-gapped laptop, or any browser that opens local files.</div>
   </div>
 
   <script>
@@ -321,6 +272,7 @@
     const statusEl = document.getElementById('status');
     const briefEl = document.getElementById('brief');
     const promptEl = document.getElementById('prompt');
+    const searchEl = document.getElementById('search');
     const fields = {
       mission: document.getElementById('mission'),
       callsign: document.getElementById('callsign'),
@@ -336,13 +288,9 @@
     };
     let mode = 'brief';
 
-    function value(id) {
-      return String(fields[id].value || '').trim();
-    }
-
-    function currentText() {
-      return briefEl.textContent || '';
-    }
+    function value(id) { return String(fields[id].value || '').trim(); }
+    function currentText() { return briefEl.textContent || ''; }
+    function setOutput(text) { briefEl.textContent = text; promptEl.textContent = text; }
 
     function buildBrief() {
       const mission = value('mission') || 'support rescue and recovery of the crew.';
@@ -367,23 +315,23 @@
           weather ? `weather ${weather}` : 'weather missing',
           comms ? `comms ${comms}` : 'comms status missing'
         ].join(' · ')}`,
-        `Task: build the search picture and identify the next action.`,
-        `Constraints: time, fuel, authority, jurisdiction, risk, and missing data.`,
+        'Task: build the search picture and identify the next action.',
+        'Constraints: time, fuel, authority, jurisdiction, risk, and missing data.',
         `Comms: ${callsign ? `call sign ${callsign}.` : 'use short structured updates.'}`,
-        `Decision: expand, narrow, or hold the search area based on grounded facts.`,
+        'Decision: expand, narrow, or hold the search area based on grounded facts.',
         `Execution: ${assets ? `task assets: ${assets}.` : 'task available assets only after confirmation.'}`,
-        `Report: return a concise SITREP with gaps called out.`,
+        'Report: return a concise SITREP with gaps called out.',
         `Authority: ${authority || 'authority unresolved.'}`,
         notes ? `Notes: ${notes}` : 'Notes: none.',
         'Standard: local, factual, concise, and honest.'
       ];
-      briefEl.textContent = lines.join('\n');
-      promptEl.textContent = lines.join('\n');
+      setOutput(lines.join('\n'));
     }
 
-    function render() {
-      briefEl.textContent = BRIEFS[mode];
-      promptEl.textContent = PROMPT;
+    function renderMode() {
+      if (mode === 'brief') setOutput(BRIEFS.brief);
+      if (mode === 'sitrep') setOutput(BRIEFS.sitrep);
+      if (mode === 'checklist') setOutput(BRIEFS.checklist);
       statusEl.innerHTML = '';
       const pills = [
         ['Offline', 'good'],
@@ -400,11 +348,7 @@
       }
     }
 
-    window.setMode = function(next) {
-      mode = next;
-      render();
-    };
-
+    window.setMode = function(next) { mode = next; renderMode(); };
     window.buildBrief = buildBrief;
 
     window.fillSample = function() {
@@ -423,10 +367,9 @@
     };
 
     window.copyCurrent = async function() {
-      const text = (mode === 'brief' ? BRIEFS.brief : mode === 'sitrep' ? BRIEFS.sitrep : BRIEFS.checklist) + '\n\n' + promptEl.textContent;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch (e) {
+      const text = currentText() + '\n\n' + promptEl.textContent;
+      try { await navigator.clipboard.writeText(text); }
+      catch {
         const ta = document.createElement('textarea');
         ta.value = text;
         ta.style.position = 'fixed';
@@ -438,6 +381,31 @@
       }
     };
 
+    window.copySITREP = async function() {
+      mode = 'sitrep';
+      renderMode();
+      const text = currentText();
+      try { await navigator.clipboard.writeText(text); }
+      catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    };
+
+    window.searchBrief = function() {
+      const term = String(searchEl.value || '').trim().toLowerCase();
+      const text = currentText();
+      if (!term) { buildBrief(); return; }
+      const lines = text.split('\n').map((line) => line.toLowerCase().includes(term) ? `> ${line}` : line);
+      setOutput(lines.join('\n'));
+    };
+
     window.addEventListener('keydown', (e) => {
       if (e.key === '1') setMode('brief');
       if (e.key === '2') setMode('sitrep');
@@ -446,7 +414,7 @@
       if (e.key.toLowerCase() === 'c') copyCurrent();
     });
 
-    render();
+    renderMode();
     buildBrief();
   </script>
 </body>
