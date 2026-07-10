@@ -3,166 +3,274 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TRU Field Brief · SAR Support · Indian Ocean</title>
+  <meta name="color-scheme" content="dark" />
+  <title>TRU Ghost · SAR Support · Indian Ocean</title>
   <style>
     :root {
-      color-scheme: dark;
-      --bg: #06070a;
-      --panel: rgba(15, 18, 24, 0.92);
-      --panel-2: rgba(20, 24, 31, 0.92);
+      --bg: #05070b;
+      --bg2: #090d14;
+      --panel: rgba(15, 19, 27, 0.94);
+      --panel2: rgba(20, 25, 35, 0.92);
       --line: rgba(255, 255, 255, 0.10);
-      --text: #eef2f7;
-      --muted: #a8b3c4;
+      --text: #eef4fb;
+      --muted: #a9b5c7;
       --accent: #7dd3fc;
-      --accent-2: #34d399;
+      --accent2: #34d399;
       --warning: #fbbf24;
+      --danger: #fb7185;
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.35);
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at top, rgba(125, 211, 252, 0.10), transparent 30%), var(--bg); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    body { padding: 24px; }
-    .wrap { max-width: 1120px; margin: 0 auto; }
-    .topbar { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; text-transform: uppercase; letter-spacing: .24em; font-size: 11px; color: var(--muted); }
-    h1 { margin: 18px 0 8px; font-size: clamp(2rem, 4vw, 4rem); line-height: 1.02; letter-spacing: -0.04em; }
-    .lede { max-width: 920px; font-size: 1rem; line-height: 1.7; color: var(--muted); margin: 0 0 24px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 28px; }
-    .chip { border: 1px solid var(--line); background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 999px; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
-    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); margin: 22px 0; }
-    .card { border: 1px solid var(--line); border-radius: 18px; background: linear-gradient(180deg, var(--panel), var(--panel-2)); padding: 18px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
-    .card h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .22em; color: #d9e6f2; }
-    .card p, .card li { color: var(--muted); line-height: 1.65; font-size: 14px; }
-    .card ul, .card ol { margin: 0; padding-left: 18px; }
+    html, body { margin: 0; min-height: 100%; background: radial-gradient(circle at top, rgba(125, 211, 252, 0.10), transparent 28%), linear-gradient(180deg, var(--bg), var(--bg2)); color: var(--text); font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { padding: 22px; }
+    .wrap { max-width: 1160px; margin: 0 auto; }
+    .topbar { display:flex; justify-content:space-between; gap:16px; align-items:baseline; text-transform:uppercase; letter-spacing:.24em; font-size:11px; color:var(--muted); }
+    .hero { margin-top: 18px; padding: 22px; border:1px solid var(--line); border-radius: 24px; background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)); box-shadow: var(--shadow); }
+    h1 { margin: 8px 0 10px; font-size: clamp(2.2rem, 5vw, 4.8rem); line-height: .96; letter-spacing: -.06em; }
+    .lede { max-width: 980px; margin: 0; color: var(--muted); line-height: 1.75; font-size: 1rem; }
+    .chips { display:flex; flex-wrap:wrap; gap:10px; margin-top: 18px; }
+    .chip { border:1px solid var(--line); border-radius:999px; padding: 8px 12px; font-size: 11px; text-transform:uppercase; letter-spacing:.18em; color: var(--muted); background: rgba(255,255,255,0.02); }
+    .panel { margin-top: 18px; border:1px solid var(--line); border-radius: 22px; background: linear-gradient(180deg, var(--panel), var(--panel2)); box-shadow: var(--shadow); }
+    .panel-head { display:flex; justify-content:space-between; gap:16px; align-items:center; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+    .panel-head h2 { margin:0; font-size: 12px; letter-spacing:.24em; text-transform:uppercase; color:#dce8f5; }
+    .panel-head .meta { font-size: 11px; letter-spacing:.18em; text-transform:uppercase; color: var(--muted); }
+    .content { padding: 18px; }
+    .grid { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .card { border:1px solid var(--line); border-radius: 18px; background: rgba(255,255,255,0.025); padding: 16px; }
+    .card h3 { margin:0 0 10px; font-size: 12px; letter-spacing:.22em; text-transform:uppercase; color:#d9e6f2; }
+    .card p, .card li { margin:0; color: var(--muted); line-height:1.65; font-size: 14px; }
+    .card ul, .card ol { margin:0; padding-left: 18px; }
     .wide { grid-column: 1 / -1; }
-    .callout { border-left: 3px solid var(--accent); padding-left: 14px; }
-    pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: rgba(255,255,255,0.03); border: 1px solid var(--line); border-radius: 14px; padding: 16px; color: #e5eef8; line-height: 1.65; font-size: 13px; }
-    .footer { margin-top: 28px; color: var(--muted); font-size: 12px; line-height: 1.6; }
-    .strong { color: var(--text); }
-    .accent { color: var(--accent); }
-    .accent2 { color: var(--accent-2); }
-    .warning { color: var(--warning); }
+    .split { display:grid; gap:16px; grid-template-columns: 1.15fr .85fr; }
+    .sig { border-left:3px solid var(--accent); padding-left: 14px; }
+    .status { display:flex; flex-wrap:wrap; gap:10px; margin-top: 8px; }
+    .pill { padding: 7px 10px; border-radius: 999px; border:1px solid var(--line); background: rgba(255,255,255,0.03); font-size: 11px; letter-spacing:.18em; text-transform:uppercase; color: var(--muted); }
+    .pill.good { color: #b8f5da; border-color: rgba(52,211,153,0.25); }
+    .pill.warn { color: #fde68a; border-color: rgba(251,191,36,0.25); }
+    .pill.bad { color: #fecdd3; border-color: rgba(251,113,133,0.25); }
+    pre { margin:0; white-space:pre-wrap; word-break:break-word; background: rgba(255,255,255,0.03); border:1px solid var(--line); border-radius: 16px; padding: 16px; color:#e8f1fb; line-height:1.65; font-size: 13px; }
+    .footer { margin: 20px 0 6px; color: var(--muted); font-size: 12px; line-height:1.6; }
+    .btnrow { display:flex; flex-wrap:wrap; gap:10px; margin-top: 12px; }
+    button { appearance:none; border:1px solid var(--line); background: rgba(255,255,255,0.03); color: var(--text); border-radius: 12px; padding: 10px 12px; font: inherit; font-size: 12px; letter-spacing:.12em; text-transform:uppercase; cursor:pointer; }
+    button:hover { border-color: rgba(125,211,252,0.45); background: rgba(125,211,252,0.08); }
+    .tiny { font-size: 11px; color: var(--muted); letter-spacing:.08em; }
+    .kbd { display:inline-block; border:1px solid var(--line); padding: 1px 6px; border-radius: 8px; color: #dbeafe; background: rgba(255,255,255,0.03); }
+    .hr { height:1px; background: var(--line); margin: 14px 0; }
+    @media (max-width: 900px) { .split { grid-template-columns: 1fr; } body { padding: 14px; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
-      <div>TRU · Field Brief</div>
-      <div>Offline · Zero dependency · File-ready</div>
+      <div>TRU · Offline Ghost</div>
+      <div>SAR Support · Indian Ocean · file:// ready</div>
     </div>
 
-    <h1>SAR Support<br />Downed Warthog<br />Indian Ocean</h1>
-    <p class="lede">
-      This is a field-ready TRU brief for a search-and-rescue support scenario involving a downed A-10 "Warthog" aircraft in the Indian Ocean. It is written to stay local, factual, and usable when connectivity is poor or absent. No cloud dependency. No guesswork. No hidden authority.
-    </p>
+    <section class="hero">
+      <div class="tiny">Mission brief</div>
+      <h1>SAR Support<br />Downed Warthog<br />Indian Ocean</h1>
+      <p class="lede">
+        This is a single-file TRU ghost for search-and-rescue support. It is built to run from disk with no network access, no external dependencies, and no hidden services. It keeps the answer local, the structure explicit, and the uncertainty visible.
+      </p>
+      <div class="chips">
+        <div class="chip">offline-first</div>
+        <div class="chip">single file</div>
+        <div class="chip">field ready</div>
+        <div class="chip">DDIL</div>
+        <div class="chip">provenance</div>
+        <div class="chip">TRU ghost style</div>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="btnrow">
+        <button onclick="setMode('brief')">A1 brief</button>
+        <button onclick="setMode('sitrep')">SITREP</button>
+        <button onclick="setMode('checklist')">Checklist</button>
+        <button onclick="copyCurrent()">Copy brief</button>
+        <button onclick="window.print()">Print</button>
+      </div>
+    </section>
 
-    <div class="chips">
-      <div class="chip">Mission support</div>
-      <div class="chip">Search and rescue</div>
-      <div class="chip">Maritime domain</div>
-      <div class="chip">DDIL-ready</div>
-      <div class="chip">Provenance-first</div>
-      <div class="chip">Under God's sovereignty</div>
-    </div>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Current output</h2>
+        <div class="meta">Standard: local · factual · concise · grounded</div>
+      </div>
+      <div class="content">
+        <div class="split">
+          <div class="card">
+            <h3>Core answer</h3>
+            <pre id="brief"></pre>
+          </div>
+          <div class="card">
+            <h3>TRU rules</h3>
+            <ul>
+              <li>Say what is known.</li>
+              <li>Say what is missing.</li>
+              <li>Do not invent coordinates or recovery status.</li>
+              <li>Prioritise crew safety and grounded facts.</li>
+              <li>Keep the output short enough to use under pressure.</li>
+            </ul>
+            <div class="hr"></div>
+            <p class="tiny">
+              Keyboard: <span class="kbd">1</span> brief · <span class="kbd">2</span> SITREP · <span class="kbd">3</span> checklist · <span class="kbd">C</span> copy.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <div class="grid">
       <section class="card">
-        <h2>Mission</h2>
-        <p>
-          Support the location, coordination, and recovery effort for the crew of a downed Warthog aircraft over the Indian Ocean. Keep the brief focused on the safety of the crew, the last known position, the rescue authority, and the next concrete action.
-        </p>
+        <h3>Mission</h3>
+        <p>Support location, coordination, and recovery of the crew of a downed Warthog aircraft over the Indian Ocean.</p>
       </section>
-
       <section class="card">
-        <h2>Situation</h2>
-        <ul>
-          <li>Aircraft status is unknown until confirmed.</li>
-          <li>Last known position and time are the first anchor points.</li>
-          <li>Weather, sea state, daylight, and drift matter.</li>
-          <li>Do not assume coordinates, survivability, or comms status.</li>
-        </ul>
+        <h3>Situation</h3>
+        <p>Aircraft status is unknown until confirmed. The first anchor points are last known position, time, weather, sea state, visibility, and comms status.</p>
       </section>
-
       <section class="card">
-        <h2>Task</h2>
-        <ul>
-          <li>Assemble the cleanest possible picture from known facts.</li>
-          <li>Identify the search datum and keep it updated.</li>
-          <li>Report gaps immediately instead of filling them with confidence.</li>
-        </ul>
+        <h3>Task</h3>
+        <p>Build the cleanest possible search picture from known facts, identify the datum, and call out gaps immediately.</p>
       </section>
-
       <section class="card">
-        <h2>Constraints</h2>
-        <ul>
-          <li>Time, fuel, weather, and comms are limiting factors.</li>
-          <li>Authority and jurisdiction must be explicit.</li>
-          <li>Survivor safety outranks narrative clarity.</li>
-          <li>Use only grounded information.</li>
-        </ul>
+        <h3>Constraints</h3>
+        <p>Time, fuel, weather, authority, jurisdiction, and communications all limit what can be done now.</p>
       </section>
-
       <section class="card">
-        <h2>Comms</h2>
-        <ul>
-          <li>Use short, structured updates.</li>
-          <li>State what is known, what is missing, and what changed.</li>
-          <li>Do not bury the lead.</li>
-          <li>Prefer plain language over jargon.</li>
-        </ul>
+        <h3>Comms</h3>
+        <p>Use short structured updates: what is known, what changed, what is missing, and what happens next.</p>
       </section>
-
       <section class="card">
-        <h2>Decision</h2>
-        <p>
-          The key decision is whether the available facts justify expanding the search area, narrowing it, or holding until better information arrives. If the datum is weak, say so plainly.
-        </p>
+        <h3>Decision</h3>
+        <p>Expand, narrow, or hold the search area based on grounded facts only.</p>
       </section>
-
       <section class="card wide">
-        <h2>First pass checklist</h2>
+        <h3>First pass checklist</h3>
         <ol>
-          <li>Confirm last known position, time, and source of that fix.</li>
-          <li>Confirm number of crew and any emergency beacon or mayday reports.</li>
+          <li>Confirm last known position, time, and source of the fix.</li>
+          <li>Confirm number of crew and any emergency beacon / mayday reports.</li>
           <li>Confirm weather, sea state, and visibility at the time of loss.</li>
           <li>Confirm available assets and who is coordinating them.</li>
-          <li>Confirm the reporting channel and cadence.</li>
-          <li>Set the search datum and note every assumption separately.</li>
+          <li>Set the search datum and separate assumptions from facts.</li>
         </ol>
       </section>
-
       <section class="card wide">
-        <h2 class="warning">What TRU should never do here</h2>
-        <p class="callout">
-          It should not invent coordinates, pretend the crew is recovered, or disguise uncertainty. If the system does not know, it should say exactly what is missing and what the safest next step is.
-        </p>
+        <h3>What TRU must not do</h3>
+        <div class="sig">
+          It must not invent coordinates, pretend the crew is recovered, or hide uncertainty. If the facts are missing, the honest answer is to name the gap and stop there.
+        </div>
       </section>
-
       <section class="card wide">
-        <h2>A1 prompt for the field</h2>
-        <pre>A1: SAR support for a downed Warthog aircraft in the Indian Ocean.
-Mission: support rescue and recovery of the crew.
-Situation: state last known position, time, weather, sea state, daylight, and comms status.
-Task: build the search picture and identify the next action.
-Constraints: time, fuel, authority, jurisdiction, risk, and missing data.
-Comms: use short structured updates.
-Decision: expand, narrow, or hold the search area.
-Execution: act only on grounded facts.
-Report: return a concise SITREP with gaps called out.
-Standard: local, factual, concise, and honest.</pre>
-      </section>
-
-      <section class="card wide">
-        <h2>TRU answer format</h2>
-        <p>
-          <span class="strong">Mission</span> → <span class="strong">Situation</span> → <span class="strong">Task</span> → <span class="strong">Constraints</span> → <span class="strong">Comms</span> → <span class="strong">Decision</span> → <span class="strong">Execution</span> → <span class="strong">Report</span>.
-        </p>
-        <p>
-          If facts are missing, TRU should name the gap and stop there. That is the honest answer.
-        </p>
+        <h3>Field prompt</h3>
+        <pre id="prompt"></pre>
       </section>
     </div>
 
     <div class="footer">
-      Truth is constant. Perspective is fluid. This brief is designed for offline use in the field and can be opened from disk with no network access.
+      Truth is constant. Perspective is fluid. This page is self-contained and can run from a USB stick, an air-gapped laptop, or any browser that opens local files.
     </div>
   </div>
+
+  <script>
+    const BRIEFS = {
+      brief: [
+        "A1 one-page field brief",
+        "Mission: support rescue and recovery of the crew.",
+        "Situation: state last known position, time, weather, sea state, daylight, and comms status.",
+        "Task: build the search picture and identify the next action.",
+        "Constraints: time, fuel, authority, jurisdiction, risk, and missing data.",
+        "Comms: use short structured updates.",
+        "Decision: expand, narrow, or hold the search area.",
+        "Execution: act only on grounded facts.",
+        "Report: return a concise SITREP with gaps called out.",
+        "Standard: local, factual, concise, and honest."
+      ].join("\n"),
+      sitrep: [
+        "SITREP",
+        "Status: aircraft down / unconfirmed until verified.",
+        "Location: last known position required.",
+        "Crew: number of crew required.",
+        "Environment: weather, sea state, daylight, visibility required.",
+        "Comms: beacon / mayday / radio status required.",
+        "Action: build datum, task assets, report gaps.",
+        "Risk: do not overstate certainty."
+      ].join("\n"),
+      checklist: [
+        "Checklist",
+        "1. Confirm last known position and time.",
+        "2. Confirm crew count and emergency signal status.",
+        "3. Confirm weather, sea state, and visibility.",
+        "4. Confirm authority, jurisdiction, and asset availability.",
+        "5. Confirm reporting channel and update cadence.",
+        "6. Set datum and track assumptions separately."
+      ].join("\n")
+    };
+    const PROMPT = [
+      "A1: SAR support for a downed Warthog aircraft in the Indian Ocean.",
+      "Mission: support rescue and recovery of the crew.",
+      "Situation: state last known position, time, weather, sea state, daylight, and comms status.",
+      "Task: build the search picture and identify the next action.",
+      "Constraints: time, fuel, authority, jurisdiction, risk, and missing data.",
+      "Comms: use short structured updates.",
+      "Decision: expand, narrow, or hold the search area.",
+      "Execution: act only on grounded facts.",
+      "Report: return a concise SITREP with gaps called out.",
+      "Standard: local, factual, concise, and honest."
+    ].join("\n");
+
+    const statusEl = document.getElementById('status');
+    const briefEl = document.getElementById('brief');
+    const promptEl = document.getElementById('prompt');
+    let mode = 'brief';
+
+    function render() {
+      briefEl.textContent = BRIEFS[mode];
+      promptEl.textContent = PROMPT;
+      statusEl.innerHTML = '';
+      const pills = [
+        ['Offline', 'good'],
+        ['Single file', 'good'],
+        ['No external calls', 'good'],
+        ['Crew safety first', 'warn'],
+        ['No invented facts', 'bad']
+      ];
+      for (const [label, cls] of pills) {
+        const div = document.createElement('div');
+        div.className = 'pill ' + cls;
+        div.textContent = label;
+        statusEl.appendChild(div);
+      }
+    }
+
+    window.setMode = function(next) {
+      mode = next;
+      render();
+    };
+
+    window.copyCurrent = async function() {
+      const text = BRIEFS[mode] + '\n\n' + PROMPT;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === '1') setMode('brief');
+      if (e.key === '2') setMode('sitrep');
+      if (e.key === '3') setMode('checklist');
+      if (e.key.toLowerCase() === 'c') copyCurrent();
+    });
+
+    render();
+  </script>
 </body>
 </html>
