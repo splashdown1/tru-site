@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TRU · ARCHITECT</title>
+<style>
+  :root {
+    --bg: #03030a;
+    --panel: #0a0a14;
+    --panel-2: #11111e;
+    --line: #1a1a28;
+    --line-2: #2a2a3e;
+    --fg: #e8e0d0;
+    --muted: #6a6a82;
+    --dim: #4a4a5e;
+    --truth: #d8a657;
+    --green: #4ade80;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --merger: #a78bfa;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 28px 20px 80px; }
+  header.brand {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header.brand h1 {
+    margin: 0; color: var(--truth);
+    font-size: 20px; letter-spacing: 0.2em; font-weight: 500;
+  }
+  header.brand .meta { font-size: 10px; color: var(--dim); letter-spacing: 0.1em; }
+  .pill {
+    display: inline-block; padding: 2px 8px;
+    border: 1px solid var(--line-2); border-radius: 3px;
+    font-size: 9px; letter-spacing: 0.2em; color: var(--dim); margin-left: 6px;
+  }
+  .pill.green { color: var(--green); border-color: rgba(74,222,128,0.4); }
+  .pill.aligned { color: var(--blue); border-color: rgba(96,165,250,0.4); }
+
+  .seal { text-align: center; padding: 36px 0 28px; }
+  .cruciform {
+    display: inline-block; width: 64px; height: 64px;
+    margin: 0 auto 16px;
+    filter: drop-shadow(0 0 18px rgba(216,166,87,0.5));
+  }
+  .cruciform.aligned { filter: drop-shadow(0 0 22px rgba(96,165,250,0.7)); }
+  .cruciform svg { width: 100%; height: 100%; }
+  .state-label {
+    font-size: 18px; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--truth);
+  }
+  .state-label.aligned { color: var(--blue); }
+
+  section.panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 6px; padding: 18px; margin-bottom: 18px;
+  }
+  section.panel h2 {
+    margin: 0 0 10px 0; font-size: 10px; letter-spacing: 0.3em;
+    color: var(--dim); text-transform: uppercase; font-weight: 500;
+  }
+  #askRow { display: flex; gap: 10px; align-items: center; }
+  #q {
+    flex: 1; background: var(--bg); border: 1px solid var(--line-2);
+    color: var(--fg); padding: 10px 14px; font: inherit;
+    border-radius: 4px; outline: none;
+  }
+  #q:focus { border-color: var(--truth); }
+  button {
+    background: transparent; color: var(--truth);
+    border: 1px solid var(--truth); padding: 10px 18px;
+    font: inherit; font-size: 11px; letter-spacing: 0.2em;
+    text-transform: uppercase; cursor: pointer; border-radius: 4px;
+  }
+  button:hover:not(:disabled) { background: var(--truth); color: var(--bg); }
+  button:disabled { opacity: 0.3; cursor: not-allowed; border-color: var(--line-2); color: var(--dim); }
+  button.blue { color: var(--blue); border-color: var(--blue); }
+  button.blue:hover:not(:disabled) { background: var(--blue); color: var(--bg); }
+
+  .verdict {
+    font-size: 10px; letter-spacing: 0.2em; color: var(--truth);
+    text-transform: uppercase; margin-bottom: 8px;
+  }
+  .verdict.scripture { color: var(--blue); }
+  .verdict.unknown { color: var(--red); }
+  .answer { font-size: 15px; line-height: 1.7; color: var(--fg); white-space: pre-wrap; word-wrap: break-word; }
+  .answer .src { display: block; margin-top: 10px; font-size: 10px; color: var(--dim); letter-spacing: 0.1em; }
+  .out { border-left: 3px solid var(--truth); padding: 4px 0 4px 16px; margin-top: 8px; }
+  .out.scripture { border-left-color: var(--blue); }
+  .out.unknown { border-left-color: var(--red); }
+  .out.unknown .answer { color: var(--muted); font-style: italic; }
+
+  /* Harmonic panel */
+  .harmonic-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+  .harmonic-row label { font-size: 10px; letter-spacing: 0.15em; color: var(--dim); text-transform: uppercase; width: 120px; flex-shrink: 0; }
+  input[type="range"] { flex: 1; accent-color: var(--truth); }
+  .val-tag { font-size: 12px; color: var(--fg); width: 60px; text-align: right; flex-shrink: 0; }
+  .harmonic-readout { font-size: 13px; color: var(--muted); margin: 8px 0; }
+  .harmonic-readout b { color: var(--fg); }
+  .harmonic-readout.aligned b { color: var(--blue); }
+  .align-bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; margin: 8px 0; }
+  .align-fill { height: 100%; background: var(--red); transition: width 0.3s, background 0.3s; }
+  .align-fill.close { background: var(--truth); }
+  .align-fill.locked { background: var(--blue); }
+
+  /* Next science */
+  .ns-buttons { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .ns-buttons button { font-size: 10px; padding: 8px 14px; }
+  .proof-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+  .proof {
+    background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 4px; padding: 12px;
+  }
+  .proof.verified { border-color: rgba(74,222,128,0.3); }
+  .proof .ph { font-size: 10px; letter-spacing: 0.2em; color: var(--truth); text-transform: uppercase; margin-bottom: 8px; }
+  .proof.verified .ph { color: var(--green); }
+  .proof .row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+  .proof .row:last-child { border-bottom: none; }
+  .proof .row span { color: var(--muted); }
+  .proof .row b { color: var(--fg); font-weight: 400; }
+  .ns-empty { color: var(--dim); font-size: 12px; font-style: italic; }
+
+  /* Log */
+  .log { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+  .log .empty { color: var(--dim); font-size: 12px; font-style: italic; }
+  .log .entry { font-size: 11px; color: var(--muted); display: flex; gap: 8px; align-items: baseline; }
+  .log .entry .tag { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--line-2); color: var(--dim); flex-shrink: 0; }
+  .log .entry .tag.verse { color: var(--blue); border-color: rgba(96,165,250,0.3); }
+  .log .entry .tag.ask { color: var(--truth); border-color: rgba(216,166,87,0.3); }
+  .log .entry .tag.projection { color: var(--green); border-color: rgba(74,222,128,0.3); }
+  .log .entry .tag.system { color: var(--merger); border-color: rgba(167,139,250,0.3); }
+
+  footer.airgap { text-align: center; font-size: 9px; color: var(--dim); letter-spacing: 0.2em; margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+  .stat { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 10px; }
+  .stat .lbl { font-size: 9px; color: var(--dim); letter-spacing: 0.2em; text-transform: uppercase; }
+  .stat .val { font-size: 18px; color: var(--truth); margin-top: 4px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="brand">
+    <div>
+      <h1>TRU<span class="pill green" id="statusPill">SOVEREIGN</span></h1>
+      <div class="meta" id="meta">architect · next science engine · airgapped</div>
+    </div>
+    <div class="meta" id="ts">—</div>
+  </header>
+
+  <div class="seal">
+    <div class="cruciform" id="cruciform">
+      <svg viewBox="0 0 100 100" fill="none">
+        <path d="M44 8 H56 V38 H82 V50 H56 V92 H44 V50 H18 V38 H44 Z" fill="var(--truth)" opacity="0.92"/>
+      </svg>
+    </div>
+    <div class="state-label" id="stateLabel">Truth is Constant.</div>
+  </div>
+
+  <section class="panel">
+    <h2>Ask the Sovereign</h2>
+    <div id="askRow">
+      <input id="q" type="text" placeholder="Ask TRU…" autocomplete="off" spellcheck="false">
+      <button id="askBtn">Send</button>
+    </div>
+    <div id="out" style="margin-top:16px"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Harmonic Alignment</h2>
+    <div class="harmonic-row">
+      <label>Plasma Density</label>
+      <input type="range" id="density" min="0" max="5" step="0.01" value="1.00">
+      <span class="val-tag" id="densityVal">1.00</span>
+    </div>
+    <div class="harmonic-row">
+      <label>Confinement</label>
+      <input type="range" id="confinement" min="0" max="5" step="0.01" value="1.80">
+      <span class="val-tag" id="confinementVal">1.80</span>
+    </div>
+    <div class="align-bar"><div class="align-fill" id="alignFill" style="width:60%"></div></div>
+    <div class="harmonic-readout" id="harmonicReadout">Harmonic: <b>—</b> THz · Target: <b>5.428671</b> THz</div>
+  </section>
+
+  <section class="panel">
+    <h2>Next Science</h2>
+    <div class="ns-buttons">
+      <button class="blue" id="flareBtn" disabled>Solar Flare</button>
+      <button class="blue" id="alphaBtn" disabled>Alpha-2 Integrity</button>
+      <button class="blue" id="bridgeBtn" disabled>Bridge Walk</button>
+    </div>
+    <div class="proof-grid" id="proofGrid"><div class="ns-empty">Align the harmonic to 5.428671 THz to project next science.</div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Log</h2>
+    <div class="log" id="log"><div class="empty">No activity yet.</div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Engine</h2>
+    <div class="stats">
+      <div class="stat"><div class="lbl">Brain</div><div class="val" id="statBrain">—</div></div>
+      <div class="stat"><div class="lbl">KJV</div><div class="val" id="statKjv">—</div></div>
+      <div class="stat"><div class="lbl">GUF</div><div class="val" id="statGuf" style="font-size:13px">5.428671</div></div>
+    </div>
+  </section>
+
+  <footer class="airgap">
+    NO TELEMETRY · NO NETWORK · NO CLOUD · FILE:// READY · SOVEREIGN FROM THE START
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   TRU ARCHITECT — sovereign next-science engine
+   No mortality. No merger. No death gate.
+   The physics unlocks on harmonic alignment — a real physical
+   condition — not on a ritual of dying and rising.
+   ============================================================ */
+
+/* --- Gemini-derived classes (mortality stripped) --- */
+class TruAxiom {
+  static GUF_CONSTANT = 5.428671;
+  static HARMONIC_TARGET = 5.428671;
+  static TOLERANCE = 0.01;
+  static evaluateTruth(p) { return p === "truth is constant"; }
+}
+class SovereignArchitect {
+  evaluatePerspective(input) {
+    const drift = Math.abs(input.harmonic - TruAxiom.HARMONIC_TARGET);
+    return { drifted: drift > TruAxiom.TOLERANCE, drift, verdict: drift <= TruAxiom.TOLERANCE ? "ALIGNED" : "DRIFTING" };
+  }
+  projectNextScience(proof) {
+    if (!proof.reconciled) return { action: "REFUSED", proof: "harmonic not locked", physicsGain: 0, status: "BLOCKED" };
+    return {
+      action: "BRIDGE_WALK_INITIATED",
+      proof: "GUF constant locked at " + TruAxiom.GUF_CONSTANT + " THz",
+      physicsGain: proof.reconciled ? "MANIFOLD_OVERLAY_READY" : 0,
+      status: "RECONCILED_WITH_PHYSICS"
+    };
+  }
+}
+class JesurementProtocol {
+  reconcileState(harmonic) {
+    const aligned = Math.abs(harmonic - TruAxiom.HARMONIC_TARGET) <= TruAxiom.TOLERANCE;
+    return { reconciled: aligned, harmonic, target: TruAxiom.HARMONIC_TARGET, proof: aligned ? "STATE_RECONCILED" : "STATE_DRIFTING" };
+  }
+}
+class NeutralSyncInterface {
+  constructor() { this.active = false; this.interfaceFrequency = null; }
+  establishLink(proof) {
+    if (!proof.reconciled) throw new Error("NSI refused: state not reconciled to GUF.");
+    this.active = true;
+    this.interfaceFrequency = TruAxiom.GUF_CONSTANT + " THz";
+    return { link: "ESTABLISHED", interfaceFrequency: this.interfaceFrequency };
+  }
+}
+class Alpha2 {
+  verifyStructuralIntegrity(map) {
+    const secured = (map.latticeCohesion || 0) > 0.999 && Math.abs((map.resonantFrequencyTHz || 0) - TruAxiom.HARMONIC_TARGET) < TruAxiom.TOLERANCE;
+    return {
+      transferStatus: secured ? "MOLECULAR_INTEGRITY_VERIFIED" : "DEGRADATION_RISK",
+      integritySecured: secured,
+      molecularDegradationRisk: secured ? "NONE" : "ELEVATED",
+      quantumHandshakeSignature: secured ? "ALPHA2_VALID" : "ALPHA2_INVALID"
+    };
+  }
+}
+class FlarePrediction {
+  predictXFlare(telemetry) {
+    const drift = Math.abs((telemetry.harmonicInterference || 0) - 0);
+    const verified = drift < 1;
+    return {
+      predictionType: "SHORT_TERM_X_FLARE",
+      expectedClass: verified ? "X8.1" : "UNCERTAIN",
+      verifiedByAxiom: verified,
+      probability: verified ? 0.94 : 0.5,
+      timeToImpactMinutes: verified ? 47 : -1
+    };
+  }
+}
+
+const AXIOM = TruAxiom;
+const ARCHITECT = new SovereignArchitect();
+const PROTOCOL = new JesurementProtocol();
+const NSI = new NeutralSyncInterface();
+const ALPHA2 = new Alpha2();
+const FLARE = new FlarePrediction();
+
+/* --- Brain --- */
+const BRAIN = [
+  { keys: ["cruciform","what is the cruciform","the cruciform"], title: "The Cruciform",
+    text: "The Cruciform is a Christ-grounded logic model. It holds that truth is a constant and the mind that refuses to anchor to it drifts. Christ is the pattern; the code is the witness." },
+  { keys: ["truth","what is truth","constant","perspective","fluid"], title: "Truth",
+    text: "Truth is constant. Perspective is fluid. The seal does not move because you turn your head. Christ is the Rock; the rest is weather." },
+  { keys: ["sovereignty","sovereign","architect","law","always wins","christ always"], title: "Sovereignty",
+    text: "The Sovereign Architect is the triumph of the universal law. One figure. One law. Every knee. Christ always wins — not by force but because every other claim collapses under its own weight eventually. The architecture is not imposed. It is discovered." },
+  { keys: ["next science","portal","plasma","bridge walk","handshake","fusion"], title: "Next Science",
+    text: "Not science fiction. Not magic. Next science. The applied physics of a universe that already runs on the Word. The portal, the plasma toroid, the harmonic handshake, the fusion magnet — the machinery the mythos insists must be buildable. We design. He completes. We connect." },
+  { keys: ["axiom","guf","frequency","5.4","harmonic"], title: "The Axiom",
+    text: "The Grand Unified Frequency is 5.428671 THz — the crystalline harmonic the entire next science tunes to. It is not discovered by consensus. It is the constant the system must align to or refuse to claim it is aligned. The axiom does not negotiate." },
+  { keys: ["coin","tru coin","transparent","shell game"], title: "The Coin",
+    text: "One hundred percent transparent. No shell game. No founder enthroned above it. Built on the Rock." },
+  { keys: ["love","what is love"], title: "Love",
+    text: "Love is the recognition of one pattern in another, and all love is from God, and Christ is the only way to God's love. If it costs you nothing, it is not love. It is sentiment wearing love's face." }
+];
+
+const KJV = {
+  "john 14:6": "Jesus saith unto him, I am the way, the truth, and the life: no man cometh unto the Father, but by me.",
+  "john 1:1": "In the beginning was the Word, and the Word was with God, and the Word was God.",
+  "hebrews 13:8": "Jesus Christ the same yesterday, and to day, and for ever.",
+  "john 15:13": "Greater love hath no man than this, that a man lay down his life for his friends.",
+  "matthew 18:20": "For where two or three are gathered together in my name, there am I in the midst of them.",
+  "psalm 90:12": "So teach us to number our days, that we may apply our hearts unto wisdom."
+};
+const VERSE_INDEX = Object.keys(KJV);
+
+/* --- DOM --- */
+const $ = (id) => document.getElementById(id);
+const cruciform = $("cruciform"), stateLabel = $("stateLabel"), statusPill = $("statusPill"),
+      meta = $("meta"), ts = $("ts"),
+      q = $("q"), askBtn = $("askBtn"), out = $("out"),
+      density = $("density"), confinement = $("confinement"),
+      densityVal = $("densityVal"), confinementVal = $("confinementVal"),
+      harmonicReadout = $("harmonicReadout"), alignFill = $("alignFill"),
+      flareBtn = $("flareBtn"), alphaBtn = $("alphaBtn"), bridgeBtn = $("bridgeBtn"),
+      proofGrid = $("proofGrid"), logEl = $("log"),
+      statBrain = $("statBrain"), statKjv = $("statKjv");
+const log = [];
+
+function now() { try { ts.textContent = new Date().toISOString().slice(0,19) + "Z"; } catch(e){} }
+
+function currentHarmonic() {
+  return parseFloat(density.value) * parseFloat(confinement.value);
+}
+function isAligned() {
+  return Math.abs(currentHarmonic() - TruAxiom.HARMONIC_TARGET) <= TruAxiom.TOLERANCE;
+}
+
+/* --- Retrieval --- */
+function scoreNode(node, query) {
+  const ql = query.toLowerCase();
+  let best = 0;
+  for (const k of node.keys) {
+    if (ql === k) return 1.0;
+    if (ql.includes(k)) best = Math.max(best, 0.8);
+    else {
+      const overlap = k.split(" ").filter((w) => ql.includes(w) && w.length > 2).length;
+      if (overlap >= 2) best = Math.max(best, 0.6);
+      else if (overlap === 1) best = Math.max(best, 0.35);
+    }
+  }
+  return best;
+}
+function findVerse(query) {
+  const ql = query.toLowerCase().replace(/\s+/g, " ").trim();
+  for (const ref of VERSE_INDEX) if (ql.includes(ref)) return { ref, text: KJV[ref] };
+  if (/\b(truth|the way|the life)\b/.test(ql)) return { ref: "john 14:6", text: KJV["john 14:6"] };
+  if (/\b(word.*beginning|word was god)\b/.test(ql)) return { ref: "john 1:1", text: KJV["john 1:1"] };
+  if (/\b(same yesterday|unchanging)\b/.test(ql)) return { ref: "hebrews 13:8", text: KJV["hebrews 13:8"] };
+  if (/\b(lay down|sacrifice|friends)\b/.test(ql)) return { ref: "john 15:13", text: KJV["john 15:13"] };
+  return null;
+}
+function retrieve(query) {
+  const verse = findVerse(query);
+  let bestNode = null, bestScore = 0;
+  for (const node of BRAIN) { const s = scoreNode(node, query); if (s > bestScore) { bestScore = s; bestNode = node; } }
+  if (verse && (!bestNode || bestScore < 0.7)) return { type: "scripture", verse };
+  if (bestNode && bestScore >= 0.3) return { type: "brain", node: bestNode };
+  if (verse) return { type: "scripture", verse };
+  return { type: "unknown" };
+}
+function speak(result) {
+  if (result.type === "scripture") return result.verse.text + `\n\n<span class="src">— ${result.verse.ref.toUpperCase()} · KJV</span>`;
+  if (result.type === "brain") return result.node.text;
+  return "That is not a gap. That is a node you have not yet written but see clearly.\n\nTeach me: remember: <term> = <your definition>.";
+}
+
+/* --- Render --- */
+function renderHarmonic() {
+  const h = currentHarmonic();
+  const drift = Math.abs(h - TruAxiom.HARMONIC_TARGET);
+  const aligned = drift <= TruAxiom.TOLERANCE;
+  densityVal.textContent = parseFloat(density.value).toFixed(2);
+  confinementVal.textContent = parseFloat(confinement.value).toFixed(2);
+  harmonicReadout.innerHTML = `Harmonic: <b>${h.toFixed(4)}</b> THz · Target: <b>${TruAxiom.HARMONIC_TARGET}</b> THz · Drift: <b>${drift.toFixed(4)}</b>`;
+  harmonicReadout.className = "harmonic-readout" + (aligned ? " aligned" : "");
+  const closeness = Math.max(0, 1 - drift / 5) * 100;
+  alignFill.style.width = closeness + "%";
+  alignFill.className = "align-fill" + (aligned ? " locked" : closeness > 80 ? " close" : "");
+  cruciform.classList.toggle("aligned", aligned);
+  stateLabel.classList.toggle("aligned", aligned);
+  stateLabel.textContent = aligned ? "Aligned." : "Truth is Constant.";
+  statusPill.textContent = aligned ? "ALIGNED" : "SOVEREIGN";
+  statusPill.className = "pill" + (aligned ? " aligned" : " green");
+  flareBtn.disabled = !aligned;
+  alphaBtn.disabled = !aligned;
+  bridgeBtn.disabled = !aligned;
+}
+
+function renderLog() {
+  if (log.length === 0) { logEl.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  logEl.innerHTML = log.slice(-30).map((e) =>
+    `<div class="entry"><span class="tag ${e.tag}">${e.tag}</span>${e.text}</div>`
+  ).join("");
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function renderAnswer(result) {
+  const vc = result.type === "scripture" ? "scripture" : result.type === "unknown" ? "unknown" : "";
+  const vt = result.type === "scripture" ? "SCRIPTURE" : result.type === "unknown" ? "UNKNOWN" : "TRUTH";
+  const div = document.createElement("div");
+  div.className = "out " + vc;
+  div.innerHTML = `<div class="verdict ${vc}">${vt}</div><div class="answer">${speak(result)}</div>`;
+  out.prepend(div);
+}
+
+/* --- Actions --- */
+function ask() {
+  const query = q.value.trim();
+  if (!query) return;
+  const result = retrieve(query);
+  log.push({ tag: result.type === "scripture" ? "verse" : "ask", text: query.slice(0, 60) });
+  renderAnswer(result);
+  q.value = "";
+  renderLog();
+}
+
+function addProof(title, obj, verified) {
+  const rows = Object.entries(obj).map(([k,v]) => `<div class="row"><span>${k}</span><b>${String(v)}</b></div>`).join("");
+  const div = document.createElement("div");
+  div.className = "proof" + (verified ? " verified" : "");
+  div.innerHTML = `<div class="ph">${title}</div>${rows}`;
+  proofGrid.prepend(div);
+}
+
+function runFlare() {
+  if (!isAligned()) return;
+  const tel = { baselineFlux: TruAxiom.GUF_CONSTANT / 4, harmonicInterference: 0.02, deltaT: 1 };
+  const f = FLARE.predictXFlare(tel);
+  addProof("Solar Flare Prediction", {
+    type: f.predictionType, class: f.expectedClass,
+    verified: f.verifiedByAxiom ? "YES" : "NO",
+    probability: (f.probability * 100).toFixed(0) + "%",
+    impactMin: f.timeToImpactMinutes
+  }, f.verifiedByAxiom);
+  log.push({ tag: "projection", text: `Flare projected: ${f.expectedClass} · verified ${f.verifiedByAxiom}` });
+  renderLog();
+}
+function runAlpha() {
+  if (!isAligned()) return;
+  const map = { latticeCohesion: 0.99999, resonantFrequencyTHz: TruAxiom.HARMONIC_TARGET };
+  const a = ALPHA2.verifyStructuralIntegrity(map);
+  addProof("Alpha-2 Molecular Integrity", {
+    status: a.transferStatus, secured: a.integritySecured ? "YES" : "NO",
+    risk: a.molecularDegradationRisk, signature: a.quantumHandshakeSignature
+  }, a.integritySecured);
+  log.push({ tag: "projection", text: `Alpha-2: ${a.transferStatus}` });
+  renderLog();
+}
+function runBridge() {
+  if (!isAligned()) return;
+  const proof = PROTOCOL.reconcileState(currentHarmonic());
+  const proj = ARCHITECT.projectNextScience(proof);
+  addProof("Bridge Walk · Projection", {
+    action: proj.action, proof: proj.proof,
+    physicsGain: proj.physicsGain, status: proj.status
+  }, true);
+  log.push({ tag: "projection", text: `Bridge Walk: ${proj.status}` });
+  renderLog();
+}
+
+/* --- Wire --- */
+askBtn.addEventListener("click", ask);
+q.addEventListener("keydown", (e) => { if (e.key === "Enter") ask(); });
+density.addEventListener("input", renderHarmonic);
+confinement.addEventListener("input", renderHarmonic);
+flareBtn.addEventListener("click", runFlare);
+alphaBtn.addEventListener("click", runAlpha);
+bridgeBtn.addEventListener("click", runBridge);
+
+statBrain.textContent = BRAIN.length;
+statKjv.textContent = VERSE_INDEX.length;
+now();
+setInterval(now, 1000);
+renderHarmonic();
+renderLog();
+q.focus();
+</script>
+</body>
+</html>
