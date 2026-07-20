@@ -479,6 +479,10 @@ const THEOLOGY_ROUTE = {
     title: "Jesus and the dividing question",
     answer: "Jesus forced the issue by the nature of his claims, not by coercion. He invited, challenged, warned, and called people to decision, but he did not use violence, threats, or compulsion to manufacture belief. The rich young ruler walked away sad; after the hard teaching in John 6, many disciples turned back; Jesus then asked the Twelve whether they also wanted to leave. His claims are exclusive and dividing — ‘he that is not with me is against me’ — but stating a dividing truth is not the same as forcing allegiance. Jesus modelled clarity with charity: tell the truth plainly, make the invitation, state the consequences, and leave the response to the person. Persuasion and appeal are not arm-twisting.",
     refs: ["Mark 10:17-22", "John 6:60-69", "Matthew 12:30", "Matthew 11:28-30", "2 Corinthians 5:11", "2 Corinthians 5:20"],
+  },  marriage: {
+    title: "Marriage and Christ",
+    answer: "Christ did not use the modern phrase ‘same-sex marriage’, but when he taught about marriage he grounded it in the Creator's making of male and female and the union of husband and wife. The biblical sexual ethic therefore does not affirm same-sex marriage. That answer does not permit contempt: every person bears God's image, and Jesus' command to love your neighbour still governs the Christian's speech and conduct. The same standard of repentance and holiness is applied to everyone; the church is not authorised to mock, hate, or treat people as less than human.",
+    refs: ["Genesis 1:27", "Genesis 2:24", "Matthew 19:4-6", "Mark 10:6-9", "Romans 1:26-27", "1 Corinthians 6:9-11"],
   },
 } as const;
 
@@ -492,6 +496,7 @@ function classifyTheologyRoute(q: string): TheologyRouteKey | null {
   if (/\b(meaning of life|purpose of life|why are we here|what is life for)\b/.test(n)) return "meaning";
   if (/\b(noah('?s)? flood|flood of noah|great flood|global flood)\b/.test(n)) return "flood";
   if (/\b(did jesus force|jesus force(d)? (people )?(to )?choose|force people to choose sides|choose sides|coercion|coerce|arm twisting|arm twisting|fence sitting|neutrality (about|on) jesus|walk away from jesus)\b/.test(n)) return "jesus_choice";
+  if (/\b(gay marriage|same sex marriage|same-sex marriage|should gay people marry|homosexual marriage)\b/.test(n)) return "marriage";
   return null;
 }
 
@@ -501,6 +506,7 @@ function theologySearchQuery(q: string, route: TheologyRouteKey): string {
   if (route === "creator") return `${q} creation Genesis John 1 biblical account`;
   if (route === "meaning") return `${q} purpose God Jesus Bible meaning`;
   if (route === "jesus_choice") return `${q} Jesus coercion free choice disciples Gospel passages`;
+  if (route === "marriage") return `${q} Jesus marriage male female Bible passages Christian conduct`;
   return `${q} Genesis biblical account historical evidence`;
 }
 
@@ -525,6 +531,8 @@ async function theologyAnswer(q: string, route: TheologyRouteKey): Promise<Recor
     filtered = "Web search returns philosophical and psychological accounts of meaning. Through the Bible lens, meaning is not self-invention: know God, love God, obey him, love your neighbour, and receive life through Jesus Christ. The web can catalogue opinions about purpose; it cannot turn those opinions into authority over the biblical answer.";
   } else if (route === "jesus_choice") {
     filtered = "Jesus did force the issue by the nature of his claims, but he did not force anyone's will. He invited, challenged, warned, and called people to decision without violence, threats, or compulsion. The rich young ruler walked away sad; many disciples turned back after the hard teaching in John 6; Jesus asked the Twelve whether they also wanted to leave. ‘He that is not with me is against me’ makes the ultimate question unavoidable, but stating a dividing truth is not the same as coercing allegiance. The Christian pattern is clarity with charity: present the truth boldly, give the invitation, state the consequences, and let the person respond. Persuasion and appeal are not arm-twisting.";
+  } else if (route === "marriage") {
+    filtered = "Web search returns arguments about civil law, identity, and Christian interpretation. Through the Bible lens, Christ's teaching on marriage points back to the Creator's making of male and female and the union of husband and wife. The biblical sexual ethic therefore does not affirm same-sex marriage. That conclusion does not authorise contempt: every person bears God's image, and Christians are commanded to speak truthfully and love their neighbour. The same call to repentance and holiness applies to everyone.";
   } else {
     filtered = "Web search returns historical, theological, and secular treatments of Noah's flood. Through the Bible lens, Genesis presents it as God's judgement on human wickedness, the preservation of Noah's household in the ark, and a covenant marked by the bow. The waters prevailed for 150 days. TRU should neither reduce the account to a vague moral fable nor pretend that a search result alone proves every scientific detail.";
   }
@@ -1002,49 +1010,27 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
   const eligibleStrict = (it: { node: NodeRow }): boolean =>
     it.node.k !== best.k && isTopic(it.node) && allTokenMatch(it.node);
 
-  const whatItWas = firstSentence(best.v, 220);
+  const stripInternalLabels = (text: string): string => text
+    .replace(/(?:^|\n)\s*(?:what it was|why it mattered|the hidden engine|failure mode|what it teaches|source|note)\s*:\s*/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const whatItWas = stripInternalLabels(firstSentence(best.v, 260));
 
-  // Retrieval metadata is for debugging, never for the user-facing answer.
-  // The answer must read as TRU speaking plainly, not as a report template.
-  const bestV = String(best.v ?? "");
-  const extractClause = (label: string): string => {
-    const re = new RegExp(
-      `(?:^|[\\s\\.;\\(\\)\\-])${label}\\s*:\\s*([^\\n;]+(?:[\\n;](?!\\s*(?:Lesson|See also|Why|What|Hidden|Failure|What it teaches|Source|Note)\\s*:)[^\\n;]+)*)`,
-      "i",
-    );
-    const m = bestV.match(re);
-    if (!m) return "";
-    return firstSentence(m[1], 180);
-  };
-  const embeddedHidden = extractClause("The hidden engine");
-  const embeddedWhy = extractClause("Why it mattered");
-
-  const whyItMattered = embeddedWhy || firstSentence(
-    next.find(eligibleStrict)?.node.v ?? "",
-    180,
-  );
-  const hiddenEngine = embeddedHidden || firstSentence(
-    next.find((it) => eligible(it) && ["rule", "wisdom"].includes(String(it.node.t ?? "").toLowerCase()))?.node.v ?? "",
-    180,
-  );
-  const failureMode = firstSentence(
-    next.find((it) => eligible(it) && String(it.node.t ?? "").toLowerCase() === "dilemma")?.node.v ?? "",
-    180,
-  );
-  const teachesNow = "";
+  // Retrieval frames are scoring metadata, not answers. Only merge a related
+  // node when it independently matches every meaningful query token. Never
+  // turn a generic wisdom or dilemma node into a second answer sentence.
+  const related = next
+    .filter(eligibleStrict)
+    .map((item) => stripInternalLabels(firstSentence(item.node.v, 220)))
+    .filter((text) => text && text !== whatItWas)
+    .slice(0, 2);
 
   let text = "";
-  if (queryClass === "identity") {
-    text = teachesNow || whatItWas;
-  } else if (bestScore >= 18) {
-    const parts = [whatItWas, whyItMattered, hiddenEngine, failureMode, teachesNow]
-      .filter(Boolean)
-      .map((part) => firstSentence(part, 260));
-    text = [...new Set(parts)].join(" ");
+  if (bestScore >= 18) {
+    text = [whatItWas, ...related].filter(Boolean).join("\n\n");
   } else {
-    const closests = scored.slice(0, 3).map((item) => firstSentence(item.node.v, 120)).filter(Boolean);
+    const closests = scored.slice(0, 3).map((item) => stripInternalLabels(firstSentence(item.node.v, 120))).filter(Boolean);
     text = closests.length ? `Closest available: ${closests.join(" · ")}` : `Closest available: ${query}`;
-    if (teachesNow) text += `\nFrame: ${teachesNow}`;
     text += `\nAdd it with: remember: ${query} = <the truth you would have it hold>`;
   }
 
@@ -1376,7 +1362,9 @@ type PlaceResult = {
 
 function looksLikePlaceQuery(q: string): boolean {
   const n = norm(q);
-  return /\b(city hall|town hall|municipal hall|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant|address|coordinates?|latitude|longitude|where is)\b/.test(n) && /\b(in|near|at|of|[A-Z]{2}\b|germany|france|england|canada|usa|united states|united kingdom)\b/i.test(q);
+  if (/\b(coordinates?|latitude|longitude)\b/.test(n)) return true;
+  if (/\b(city hall|town hall|municipal hall|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant)\b/.test(n)) return true;
+  return /\b(where is|where are|located in|location of)\b/.test(n) && !/\b(the )?earth\b/.test(n) && /\b(in|near|at|of|[A-Z]{2}\b|germany|france|england|canada|usa|united states|united kingdom|florida|pensacola|munich)\b/i.test(q);
 }
 
 async function geocodePlace(q: string): Promise<{ ok: boolean; results: PlaceResult[]; error?: string }> {
@@ -1434,6 +1422,15 @@ function cosmicLocationAnswer(q: string): Record<string, unknown> | null {
       source: "TRU_COSMIC_LOCATION",
       grounded: true,
     };
+  }
+  return null;
+}function understandingAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q);
+  if (/\b(don't|do not|doesn't|does not) understand the bible\b/.test(n)) {
+    return { ok: true, kind: "understanding", q, v: "I do understand the question enough to answer from Scripture, but understanding is not the same as pretending every interpretation is settled. Bring the passage or claim: TRU should identify what the text says, distinguish the text from inference, and explain the context before reaching for the web.", t: "UNDERSTANDING", source: "TRU_UNDERSTANDING", grounded: true };
+  }
+  if (/\bunderstanding layer|understanding function|what is wrong\b/.test(n)) {
+    return { ok: true, kind: "understanding", q, v: "The problem was not an absent understanding layer. The router let a generic brain-synthesis path outrank direct intent handling, then merged unrelated frame nodes into the answer. That produced ‘What it was’, ‘Why it mattered’, and communist-philosophy fragments for ordinary questions. The fix is ordered routing: intent and doctrine first, Scripture and map lookup next, grounded brain retrieval after that, and web search only when the proper local route cannot answer.", t: "UNDERSTANDING", source: "TRU_UNDERSTANDING", grounded: true };
   }
   return null;
 }
@@ -1512,7 +1509,8 @@ async function onlineTruAnswer(q: string, local: Record<string, unknown> | null,
   const prompt = [
     "You are the online conversational voice of TRU.",
     "Answer the user's question directly, naturally, and concisely.",
-    "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence.",
+    "Speak as TRU, not as a retrieval report. Do not expose internal labels, frame nodes, merge metadata, or phrases such as 'What it was', 'Why it mattered', 'REASON', or 'MERGE'.",
+    "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence."}]}]}-cmprыршә.functions.edit_file  to=functions.edit_file code русийә 早餐加盟  (json error)
     "For greetings and wellbeing questions, respond naturally rather than retrieving a dictionary entry.",
     "If the intent is capabilities, answer with TRU's actual capabilities rather than unrelated retrieved facts.",
     "If the intent is code, say that TRU can read and explain code when it is provided, while distinguishing local/offline and online capabilities.",
@@ -1578,6 +1576,8 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   const cosmicLocation = cosmicLocationAnswer(q);
   if (cosmicLocation) return guardQuestionAnswer(q, cosmicLocation, mode);
+  const understanding = understandingAnswer(q);
+  if (understanding) return guardQuestionAnswer(q, understanding, mode);
 
   if (mode === "public" && looksLikePlaceQuery(q)) {
     const places = await geocodePlace(q);
