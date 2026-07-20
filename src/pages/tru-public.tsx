@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiUrl, siteUrl } from "../lib/api";
 
-type Verdict = "REASON" | "TRUTH" | "SCRIPTURE" | "WEB" | "COMMAND" | "GAP" | "ERROR";
+type Verdict = "REASON" | "TRUTH" | "SCRIPTURE" | "WEB" | "MAP" | "COMMAND" | "GAP" | "ERROR";
 type Role = "user" | "tru";
 
 type ChatMessage = {
@@ -41,6 +41,7 @@ const SUGGESTIONS = [
 const COMMANDS = ["HELP", "INTRO", "STATUS", "CAPABILITIES"];
 
 function verdictFor(answer: TruAnswer): Verdict {
+  if (answer.kind === "map") return "MAP";
   if (answer.kind === "scripture") return "SCRIPTURE";
   if (answer.kind === "brain") return answer.score != null && answer.score >= 70 ? "TRUTH" : "REASON";
   if (answer.kind === "web") return "WEB";

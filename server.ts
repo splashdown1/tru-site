@@ -1371,6 +1371,63 @@ app.get("/api/tru/tripwire", (c) => {
   return c.json(twStatus());
 });
 
+type PlaceResult = {
+  name: string;
+  address: string;
+  lat: number;
+  lon: number;
+  score: number;
+  type: string;
+  mapUrl: string;
+};
+
+function looksLikePlaceQuery(q: string): boolean {
+  const n = norm(q);
+  return /\b(city hall|town hall|municipal hall|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant|address|coordinates?|latitude|longitude|where is)\b/.test(n) && /\b(in|near|at|of|[A-Z]{2}\b|germany|france|england|canada|usa|united states|united kingdom)\b/i.test(q);
+}
+
+async function geocodePlace(q: string): Promise<{ ok: boolean; results: PlaceResult[]; error?: string }> {
+  const queries = [q];
+  const n = norm(q);
+  if (/city hall/.test(n) && /pensacola/.test(n)) queries.push("Pensacola City Hall");
+  if (/city hall|town hall/.test(n) && /munich|munchen/.test(n)) queries.push("New Town Hall Munich");
+  const seen = new Set<string>();
+  for (const query of queries) {
+    try {
+      const url = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&maxLocations=5&outFields=*&singleLine=" + encodeURIComponent(query);
+      const response = await fetch(url, { headers: { "User-Agent": "TRU/1.0" }, signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) continue;
+      const data = await response.json() as any;
+      const results: PlaceResult[] = (data?.candidates || [])
+        .filter((item: any) => item?.location && Number(item.score) >= 85)
+        .map((item: any) => {
+          const a = item.attributes || {};
+          const lat = Number(item.location.y);
+          const lon = Number(item.location.x);
+          return {
+            name: String(a.PlaceName || a.Match_addr || item.address || query),
+            address: String(a.LongLabel || a.Place_addr || item.address || query),
+            lat, lon, score: Number(item.score) || 0,
+            type: String(a.Type || a.Addr_type || "place"),
+            mapUrl: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`,
+          };
+        });
+      for (const item of results) {
+        const key = `${item.name}|${item.lat.toFixed(5)}|${item.lon.toFixed(5)}`;
+        if (!seen.has(key)) seen.add(key);
+      }
+      const unique = results.filter((item, index, list) => list.findIndex((x) => x.name === item.name && Math.abs(x.lat - item.lat) < 0.001 && Math.abs(x.lon - item.lon) < 0.001) === index);
+      if (unique.length) return { ok: true, results: unique.slice(0, 5) };
+    } catch {}
+  }
+  return { ok: false, results: [], error: "place not found" };
+}
+
+function formatPlaceAnswer(q: string, places: PlaceResult[]): Record<string, unknown> {
+  const lines = places.map((p, index) => `${index + 1}. ${p.name}\n   ${p.address}\n   Coordinates: ${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}\n   Map: ${p.mapUrl}`);
+  return { ok: true, kind: "map", q, source: "MAP_GEOCODED", route: "Location", v: `TRU located this place from the map index:\n\n${lines.join("\n\n")}`, places, mapSearched: true, grounded: true };
+}
+
 function conversationAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening|greetings)( there)?$/.test(n)) {
@@ -1477,6 +1534,11 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
   const theologyRoute = classifyTheologyRoute(q);
   if (theologyRoute) {
     return guardQuestionAnswer(q, await theologyAnswer(q, theologyRoute), mode);
+  }
+
+  if (mode === "public" && looksLikePlaceQuery(q)) {
+    const places = await geocodePlace(q);
+    if (places.ok && places.results.length) return guardQuestionAnswer(q, formatPlaceAnswer(q, places.results), mode);
   }
 
   maybeReloadPacks();

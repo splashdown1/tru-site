@@ -314,3 +314,4 @@ body {
   .tru-mission-section-head { gap: 18px; }
   .tru-mission-footer { flex-direction: column; line-height: 1.7; }
 }
+.verdict-map { color: #4dd0e1; border-color: #4dd0e1; }
