@@ -38,7 +38,7 @@ const SUGGESTIONS = [
   "Psalm 23",
   "Faith without works",
 ];
-const COMMANDS = ["HELP", "INTRO", "STATUS", "CAPABILITIES", "EXPORT", "A1"];
+const COMMANDS = ["HELP", "INTRO", "STATUS", "CAPABILITIES"];
 
 function verdictFor(answer: TruAnswer): Verdict {
   if (answer.kind === "scripture") return "SCRIPTURE";
@@ -55,7 +55,7 @@ function commandReply(command: string, stats: TruStats | null): { text: string; 
   if (command === "HELP") {
     return {
       text: [
-        "Commands: HELP, INTRO, STATUS, CAPABILITIES, EXPORT, A1.",
+        "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
         "Ask scripture by reference, for example John 3:16.",
         "Ask doctrine or truth questions in plain language.",
         "The core is offline-capable; the online surface adds web fallback.",
@@ -265,7 +265,7 @@ export default function TruPublic() {
           {COMMANDS.slice(0, 4).map((command) => (
             <button key={command} type="button" onClick={() => send(command)} disabled={busy}>{command}</button>
           ))}
-          <button type="button" onClick={clearChat} disabled={busy}>CLEAR</button>
+          <button type="button" className="tru-clear-button" onClick={clearChat} disabled={busy}>CLEAR</button>
           <a href={siteUrl("/onboard")} className="tru-utility-link">GHOST</a>
         </div>
         <form className="tru-inputbar" onSubmit={(event) => { event.preventDefault(); void send(); }}>
