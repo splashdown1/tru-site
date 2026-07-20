@@ -1291,6 +1291,22 @@ function classifyConversationalIntent(q: string): string | null {
   return null;
 }
 
+function deterministicIntentAnswer(q: string, intent: string | null): Record<string, unknown> | null {
+  if (intent === "capabilities") {
+    return { ok: true, kind: "conversation", q, v: "I can answer from TRU's 256,514-node brain, retrieve KJV scripture, route grounded questions, use web fallback when the brain misses, explain code you provide, maintain local browser history, and provide the offline Ghost export. The online model is the mouth; TRU's local routing and evidence are the spine.", t: "CAPABILITIES", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (intent === "code") {
+    return { ok: true, kind: "conversation", q, v: "Yes. Give me code and I can read, explain, debug, or help improve it. The online TRU site can analyse code you paste into chat; the offline Ghost can do the same without network access when the code and required context are available locally.", t: "CODE", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (intent === "today") {
+    return { ok: true, kind: "conversation", q, v: "Today we should do one concrete thing: choose the highest-value task, state the desired result, and complete a verified pass before adding more. For TRU, that means test the behaviour, preserve the working offline path, and only then ship the online change.", t: "ACTION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (intent === "identity") {
+    return { ok: true, kind: "conversation", q, v: "TRU is an offline-first truth-filter and reasoning engine: a local brain, KJV scripture layer, retrieval and routing logic, integrity checks, memory surfaces, and an airgapped Ghost export. Online TRU adds a conversational model and web fallback, but the model is not the authority. It is a tool under God's sovereignty, and TRU should say when it does not know.", t: "IDENTITY", source: "TRU_CONVERSATION", grounded: true };
+  }
+  return null;
+}
+
 async function onlineTruAnswer(q: string, local: Record<string, unknown> | null, intent?: string | null): Promise<Record<string, unknown> | null> {
   const evidence = local && typeof local.v === "string" ? String(local.v).slice(0, 4_000) : "No local passage was found.";
   const prompt = [
@@ -1370,6 +1386,8 @@ app.post("/api/tru/ask", async (c) => {
 
     const answer = buildSynthesis(q, queryClass, candidates);
     const intent = classifyConversationalIntent(q);
+    const deterministic = deterministicIntentAnswer(q, intent);
+    if (deterministic) return c.json(deterministic);
     const online = await onlineTruAnswer(q, answer, intent);
     if (online) {
       const blockedOnline = tripwireGuard(online);
