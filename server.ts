@@ -475,6 +475,11 @@ const THEOLOGY_ROUTE = {
     answer: "Genesis presents Noah's flood as God's judgement on widespread human wickedness, a real worldwide event within the biblical narrative, and a rescue of Noah's household in the ark. The waters prevailed for 150 days; afterward God established his covenant and set the bow in the cloud as its sign. TRU should not flatten that account into either a vague moral fable or an unqualified scientific proof claim.",
     refs: ["Genesis 6:5-8", "Genesis 7:11-24", "Genesis 9:11-17"],
   },
+  jesus_choice: {
+    title: "Jesus and the dividing question",
+    answer: "Jesus forced the issue by the nature of his claims, not by coercion. He invited, challenged, warned, and called people to decision, but he did not use violence, threats, or compulsion to manufacture belief. The rich young ruler walked away sad; after the hard teaching in John 6, many disciples turned back; Jesus then asked the Twelve whether they also wanted to leave. His claims are exclusive and dividing — ‘he that is not with me is against me’ — but stating a dividing truth is not the same as forcing allegiance. Jesus modelled clarity with charity: tell the truth plainly, make the invitation, state the consequences, and leave the response to the person. Persuasion and appeal are not arm-twisting.",
+    refs: ["Mark 10:17-22", "John 6:60-69", "Matthew 12:30", "Matthew 11:28-30", "2 Corinthians 5:11", "2 Corinthians 5:20"],
+  },
 } as const;
 
 type TheologyRouteKey = keyof typeof THEOLOGY_ROUTE;
@@ -486,6 +491,7 @@ function classifyTheologyRoute(q: string): TheologyRouteKey | null {
   if (/\b(who created|creator of|created the world|origin of (the )?world)\b/.test(n)) return "creator";
   if (/\b(meaning of life|purpose of life|why are we here|what is life for)\b/.test(n)) return "meaning";
   if (/\b(noah('?s)? flood|flood of noah|great flood|global flood)\b/.test(n)) return "flood";
+  if (/\b(did jesus force|jesus force(d)? (people )?(to )?choose|force people to choose sides|choose sides|coercion|coerce|arm twisting|arm twisting|fence sitting|neutrality (about|on) jesus|walk away from jesus)\b/.test(n)) return "jesus_choice";
   return null;
 }
 
@@ -494,6 +500,7 @@ function theologySearchQuery(q: string, route: TheologyRouteKey): string {
   if (route === "evolution") return `${q} biology origin of life biblical creation`;
   if (route === "creator") return `${q} creation Genesis John 1 biblical account`;
   if (route === "meaning") return `${q} purpose God Jesus Bible meaning`;
+  if (route === "jesus_choice") return `${q} Jesus coercion free choice disciples Gospel passages`;
   return `${q} Genesis biblical account historical evidence`;
 }
 
@@ -516,6 +523,8 @@ async function theologyAnswer(q: string, route: TheologyRouteKey): Promise<Recor
     filtered = "Web search returns competing creation accounts and explanations. Filtering those results through Scripture gives a clear answer: God created the world. Genesis 1:1 states it directly, while John identifies the Word as God and says all things were made by him. The web may discuss mechanisms; it does not replace the primary claim that creation is dependent on God and, in the New Testament, on Christ.";
   } else if (route === "meaning") {
     filtered = "Web search returns philosophical and psychological accounts of meaning. Through the Bible lens, meaning is not self-invention: know God, love God, obey him, love your neighbour, and receive life through Jesus Christ. The web can catalogue opinions about purpose; it cannot turn those opinions into authority over the biblical answer.";
+  } else if (route === "jesus_choice") {
+    filtered = "Jesus did force the issue by the nature of his claims, but he did not force anyone's will. He invited, challenged, warned, and called people to decision without violence, threats, or compulsion. The rich young ruler walked away sad; many disciples turned back after the hard teaching in John 6; Jesus asked the Twelve whether they also wanted to leave. ‘He that is not with me is against me’ makes the ultimate question unavoidable, but stating a dividing truth is not the same as coercing allegiance. The Christian pattern is clarity with charity: present the truth boldly, give the invitation, state the consequences, and let the person respond. Persuasion and appeal are not arm-twisting.";
   } else {
     filtered = "Web search returns historical, theological, and secular treatments of Noah's flood. Through the Bible lens, Genesis presents it as God's judgement on human wickedness, the preservation of Noah's household in the ark, and a covenant marked by the bow. The waters prevailed for 150 days. TRU should neither reduce the account to a vague moral fable nor pretend that a search result alone proves every scientific detail.";
   }
