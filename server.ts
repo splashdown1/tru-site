@@ -50,7 +50,12 @@ type Mode = "development" | "production";
 const app = new Hono();
 
 app.use("/api/*", cors({
-  origin: ["https://splashdown1.github.io"],
+  origin: (origin) => {
+    if (!origin) return "*";
+    if (origin === "https://splashdown1.github.io" || origin === "http://localhost:5173" || origin === "http://localhost:4173") return origin;
+    if (/^https:\/\/splashdown1\.github\.io$/.test(origin)) return origin;
+    return "https://splashdown1.github.io";
+  },
   allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
   allowHeaders: ["Content-Type", "Accept", "Authorization"],
   exposeHeaders: ["Content-Disposition", "Retry-After", "X-LLM-Gateway", "X-LLM-Gateway-Attempts"],
