@@ -308,7 +308,7 @@ function parseVerse(q: string): { key: string; book: string; chapter: number; ve
 type TruCommand = "HELP" | "INTRO" | "STATUS" | "CAPABILITIES" | "EXPORT";
 
 function parseTruCommand(q: string): TruCommand | null {
-  const cleaned = q.trim().replace(/[?.!,;:]+$/g, "").replace(/\s+/g, " ").toUpperCase();
+  const cleaned = q.trim().replace(/^\//, "").replace(/[?.!,;:]+$/g, "").replace(/\s+/g, " ").toUpperCase();
   if (cleaned === "HELP" || cleaned === "INTRO" || cleaned === "STATUS" || cleaned === "CAPABILITIES" || cleaned === "EXPORT") {
     return cleaned;
   }
