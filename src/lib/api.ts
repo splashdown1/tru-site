@@ -1,4 +1,4 @@
-const apiBase = (import.meta.env.VITE_TRU_API_BASE || "").replace(/\/+$/, "");
+const apiBase = (import.meta.env.VITE_TRU_API_BASE || "https://tru-joesplashy.zocomputer.io").replace(/\/+$/, "");
 
 export function apiUrl(path: string): string {
   const normalised = path.startsWith("/") ? path : `/${path}`;
