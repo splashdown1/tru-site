@@ -1260,6 +1260,52 @@ app.get("/api/tru/tripwire", (c) => {
   return c.json(twStatus());
 });
 
+function conversationAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening|greetings)( there)?$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "Hello. I am here and ready. What would you like to explore?", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(are you ok|are you alright|how are you|how is it going|you ok)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "I am operating normally and ready to help. What do you need?", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(thanks|thank you|thankyou|cheers)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "You are welcome. Continue when ready.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  return null;
+}
+
+async function onlineTruAnswer(q: string, local: Record<string, unknown> | null): Promise<Record<string, unknown> | null> {
+  const evidence = local && typeof local.v === "string" ? String(local.v).slice(0, 4_000) : "No local passage was found.";
+  const prompt = [
+    "You are the online conversational voice of TRU.",
+    "Answer the user's question directly, naturally, and concisely.",
+    "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence.",
+    "For greetings and wellbeing questions, respond naturally rather than retrieving a dictionary entry.",
+    "Do not invent scripture quotations or claim certainty without evidence.",
+    "Keep God's sovereignty above the system; TRU is a tool, not an authority over God or the user.",
+    `User: ${q}`,
+    `Local TRU evidence: ${evidence}`,
+  ].join("\n\n");
+  try {
+    const gateway = gatewayStatus();
+    if (gateway.keys > 0) {
+      const result = await chatCompletion({ model: gateway.model, messages: [{ role: "user", content: prompt }], temperature: 0.35, max_tokens: 700 });
+      const text = result.data?.choices?.[0]?.message?.content;
+      if (typeof text === "string" && text.trim()) return { ok: true, kind: "model", q, v: text.trim(), t: "ONLINE_MODEL", source: "LLM_GATEWAY", model: gateway.model, grounded: Boolean(local?.grounded) };
+    }
+    const token = process.env.ZO_API_KEY;
+    if (token) {
+      const response = await fetch(ZO_ASK_URL, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json", accept: "application/json" }, body: JSON.stringify({ input: prompt, model_name: ZO_MODEL }), signal: AbortSignal.timeout(60_000) });
+      const data = await response.json() as any;
+      const text = typeof data?.output === "string" ? data.output.trim() : "";
+      if (response.ok && text) return { ok: true, kind: "model", q, v: text, t: "ONLINE_MODEL", source: "ZO_MODEL", model: ZO_MODEL, grounded: Boolean(local?.grounded) };
+    }
+  } catch (error) {
+    console.error("[online-tru] model unavailable:", String(error).slice(0, 240));
+  }
+  return null;
+}
+
 // Local ask — routes through baked brain. No external call.
 app.post("/api/tru/ask", async (c) => {
   let body: { q?: string } = {};
@@ -1268,6 +1314,9 @@ app.post("/api/tru/ask", async (c) => {
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
   maybeReloadPacks();
   ensureBrainDb();
+  const conversation = conversationAnswer(q);
+  if (conversation) return c.json(conversation);
+
   // Scripture shortcut
   const v = parseVerse(q);
   if (v) {
@@ -1296,11 +1345,15 @@ app.post("/api/tru/ask", async (c) => {
     db.close();
 
     const answer = buildSynthesis(q, queryClass, candidates);
+    const online = await onlineTruAnswer(q, answer);
+    if (online) {
+      const blockedOnline = tripwireGuard(online);
+      if (blockedOnline) return c.json(blockedOnline);
+      return c.json(online);
+    }
     const blockedPub = tripwireGuard(answer);
     if (blockedPub) return c.json(blockedPub);
-    // Web fallback: when the brain can't ground the query (UNKNOWN / blank /
-    // low score), defer to DuckDuckGo instead of presenting an irrelevant
-    // node as a confident answer. Honest about the source.
+    // Web fallback: when the brain and online model cannot answer, defer to DuckDuckGo.
     const brainMiss = answer.blank === true || answer.t === "UNKNOWN" || !answer.grounded ||
       (typeof answer.score === "number" && answer.score < 18);
     if (brainMiss) {
