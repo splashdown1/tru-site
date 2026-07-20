@@ -490,6 +490,7 @@ type TheologyRouteKey = keyof typeof THEOLOGY_ROUTE;
 
 function classifyTheologyRoute(q: string): TheologyRouteKey | null {
   const n = norm(q);
+  if (/\b(should gay people marry|should same sex couples marry|same sex marriage|same-sex marriage|gay marriage|homosexual marriage)\b/.test(n)) return "marriage";
   if (/\b(age of (the )?earth|old is (the )?earth|young earth|creation date|when did god create|six days)\b/.test(n)) return "creation";
   if (/\b(evolution|darwinism|natural selection|common descent)\b/.test(n)) return "evolution";
   if (/\b(who created|creator of|created the world|origin of (the )?world)\b/.test(n)) return "creator";
@@ -1364,7 +1365,8 @@ function looksLikePlaceQuery(q: string): boolean {
   const n = norm(q);
   if (/\b(coordinates?|latitude|longitude)\b/.test(n)) return true;
   if (/\b(city hall|town hall|municipal hall|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant)\b/.test(n)) return true;
-  return /\b(where is|where are|located in|location of)\b/.test(n) && !/\b(the )?earth\b/.test(n) && /\b(in|near|at|of|[A-Z]{2}\b|germany|france|england|canada|usa|united states|united kingdom|florida|pensacola|munich)\b/i.test(q);
+  if (/\b(where is|where are|located in|location of)\b/.test(n) && !/\b(the )?earth\b/.test(n) && /\b(in|near|at|of|[A-Z]{2}\b|germany|france|england|canada|usa|united states|united kingdom|florida|pensacola|munich)\b/i.test(q)) return true;
+  return /\b(coordinates?|latitude|longitude)\b.*\b(pensacola|munich|germany|florida|city|town|hall|airport|address)\b/.test(n);
 }
 
 async function geocodePlace(q: string): Promise<{ ok: boolean; results: PlaceResult[]; error?: string }> {
@@ -1424,10 +1426,12 @@ function cosmicLocationAnswer(q: string): Record<string, unknown> | null {
     };
   }
   return null;
-}function understandingAnswer(q: string): Record<string, unknown> | null {
+}
+
+function understandingAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q);
-  if (/\b(don't|do not|doesn't|does not) understand the bible\b/.test(n)) {
-    return { ok: true, kind: "understanding", q, v: "I do understand the question enough to answer from Scripture, but understanding is not the same as pretending every interpretation is settled. Bring the passage or claim: TRU should identify what the text says, distinguish the text from inference, and explain the context before reaching for the web.", t: "UNDERSTANDING", source: "TRU_UNDERSTANDING", grounded: true };
+  if (/\b(don't|dont|do not|doesn't|doesnt|does not) understand(ing)? the bible\b/.test(n) || /\bunderstand(ing)? the bible\b/.test(n) && /\b(don't|dont|do not|doesn't|doesnt|does not)\b/.test(n)) {
+    return { ok: true, kind: "understanding", q, v: "I understand the Bible as the primary text TRU must read before it reaches for commentary or the web. The correct layer is: identify the user's intent, retrieve the relevant Scripture, distinguish the verse from interpretation, then use outside evidence only to add context. Understanding does not mean pretending every interpretation is settled; it means keeping text, inference, and evidence separate.", t: "UNDERSTANDING", source: "TRU_UNDERSTANDING", grounded: true };
   }
   if (/\bunderstanding layer|understanding function|what is wrong\b/.test(n)) {
     return { ok: true, kind: "understanding", q, v: "The problem was not an absent understanding layer. The router let a generic brain-synthesis path outrank direct intent handling, then merged unrelated frame nodes into the answer. That produced ‘What it was’, ‘Why it mattered’, and communist-philosophy fragments for ordinary questions. The fix is ordered routing: intent and doctrine first, Scripture and map lookup next, grounded brain retrieval after that, and web search only when the proper local route cannot answer.", t: "UNDERSTANDING", source: "TRU_UNDERSTANDING", grounded: true };
@@ -1435,10 +1439,36 @@ function cosmicLocationAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
+function snapshotAnalysisAnswer(q: string): Record<string, unknown> | null {
+  const markerCount = [
+    /\b\d[\d,]+ nodes?\b/i,
+    /\bWEB\b/i,
+    /\bTRUTH\s*[•·]/i,
+    /\bREASON\s*[•·]/i,
+    /\bwhat it was:/i,
+    /\bwhy it mattered:/i,
+    /\bWEB_FALLBACK\b/i,
+    /\bhigh[- ]level analysis\b/i,
+    /\broot cause diagnosis\b/i,
+  ].filter((pattern) => pattern.test(q)).length;
+  if (markerCount < 3) return null;
+  return {
+    ok: true,
+    kind: "understanding",
+    q,
+    v: "This is a TRU system snapshot, not a live question addressed to TRU. The successful parts are real: the KJV route can retrieve Scripture, the map route can geocode places, and the web route can search. The failure is routing: generic brain frames and secular model output were admitted as answers before intent, Scripture, understanding, and location were resolved. That is why ‘What it was’, ‘Why it mattered’, class-struggle fragments, OSI results, and WEB_FALLBACK appeared. The required order is intent and snapshot detection first; direct conversation and doctrine next; KJV and grounded brain retrieval after that; map lookup for places; filtered web search only for unresolved external evidence. Internal labels are metadata, never user-facing prose.",
+    t: "UNDERSTANDING",
+    source: "TRU_LOG_ANALYSIS",
+    grounded: true,
+  };
+}
+
 function canonicalVoiceAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   const answers: Array<[RegExp, string, string]> = [
     [/^(who are you|what are you)$/, "I'm TRU — a sovereign offline intelligence. No cloud calls, no telemetry. Brain + KJV, local route.", "IDENTITY"],
+    [/^(are you alive|are you a person|are you conscious)$/, "I am software, not a human person. I can reason over the brain, Scripture, maps, and web evidence, but I do not possess a human body or human will. TRU is a tool under God's sovereignty, not an authority over God or you.", "IDENTITY"],
+    [/^(why are you|why do you exist)$/, "I exist to make truth-seeking usable: Scripture as the spine, the local brain as memory, web and map search as evidence, and a clear answer instead of a retrieval dump. The project is meant to become an instrument others can use, not a private monument to its builder.", "MISSION"],
     [/^(who is jesus|what is jesus)$/, "Jesus is the Christ — the Son of God, the Word made flesh, God come near to save. He was crucified for sin, died, and rose again. He is Lord, Saviour, and Judge. (John 1:1, 14; John 3:16; Romans 1:4)", "TRUTH"],
     [/^(who is god|what is god)$/, "God is the one Creator — eternal, holy, just, and merciful: Father, Son, and Holy Spirit. (Genesis 1:1; Deuteronomy 6:4; John 4:24)", "TRUTH"],
     [/^(what is the gospel)$/, "The gospel is that Christ died for our sins, was buried, and rose again on the third day, that whoever believes in Him has eternal life. (1 Corinthians 15:3-4; John 3:16)", "SCRIPTURE"],
@@ -1475,6 +1505,18 @@ function conversationAnswer(q: string): Record<string, unknown> | null {
   }
   if (/^(what is tru|what is it|what was it|what is this)$/.test(n)) {
     return { ok: true, kind: "conversation", q, v: "TRU is the filter and reasoning spine: Scripture, the local brain, routing, map and web retrieval, evidence filtering, and the conversational voice. The host model is the mouth. TRU decides which evidence and answer path are allowed through.", t: "IDENTITY", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(what do you want to do|what do you want|what should you do)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "I want to answer the actual question in front of me, from the right layer: Scripture when Scripture is being asked for, the brain when local knowledge is enough, maps for places, and filtered web evidence when the question needs the outside world. No merge labels. No evasive fallback.", t: "MISSION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(what do you control|what can you control)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "I control the route, the evidence admitted into the answer, the separation of Scripture from interpretation, and the shape of the response. I do not control God, truth, your will, or the world. The host model can speak, but it does not get to choose the spine.", t: "MISSION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(i don't want this to feel like a personal project|i dont want this to feel like a personal project)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "Then TRU must be built as a public instrument rather than a diary with a chatbot attached. Its identity should be usable without knowing Joe: clear mission, Scripture-first routing, honest evidence labels, offline-capable operation, and answers that serve the person asking instead of narrating the builder.", t: "MISSION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(are you a work|are you the work|what is your work)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "My work is to route a question to the right evidence and return a plain answer. I am not the source of truth; I am the instrument that should keep Scripture, memory, maps, web evidence, and the user's actual question from being mixed into nonsense.", t: "MISSION", source: "TRU_CONVERSATION", grounded: true };
   }
   return null;
 }
@@ -1574,10 +1616,24 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
     return guardQuestionAnswer(q, await theologyAnswer(q, theologyRoute), mode);
   }
 
-  const cosmicLocation = cosmicLocationAnswer(q);
-  if (cosmicLocation) return guardQuestionAnswer(q, cosmicLocation, mode);
+  const intent = classifyConversationalIntent(q);
+  const deterministic = deterministicIntentAnswer(q, intent);
+  if (deterministic) return guardQuestionAnswer(q, deterministic, mode);
+
+  const canonicalVoice = canonicalVoiceAnswer(q);
+  if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
+
+  const conversation = conversationAnswer(q);
+  if (conversation) return guardQuestionAnswer(q, conversation, mode);
+
+  const snapshot = snapshotAnalysisAnswer(q);
+  if (snapshot) return guardQuestionAnswer(q, snapshot, mode);
+
   const understanding = understandingAnswer(q);
   if (understanding) return guardQuestionAnswer(q, understanding, mode);
+
+  const cosmicLocation = cosmicLocationAnswer(q);
+  if (cosmicLocation) return guardQuestionAnswer(q, cosmicLocation, mode);
 
   if (mode === "public" && looksLikePlaceQuery(q)) {
     const places = await geocodePlace(q);
@@ -1586,12 +1642,6 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   maybeReloadPacks();
   ensureBrainDb();
-
-  const canonicalVoice = canonicalVoiceAnswer(q);
-  if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
-
-  const conversation = conversationAnswer(q);
-  if (conversation) return guardQuestionAnswer(q, conversation, mode);
 
   const v = parseVerse(q);
   if (v) {
@@ -1612,11 +1662,8 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
     db.close();
 
     let answer = buildSynthesis(q, queryClass, candidates) as QuestionAnswer;
-    const intent = classifyConversationalIntent(q);
-    const deterministic = deterministicIntentAnswer(q, intent);
-    if (deterministic) return guardQuestionAnswer(q, deterministic, mode);
 
-    if (mode === "public") {
+    if (mode === "public" && !isUnresolvedAnswer(answer)) {
       const online = await onlineTruAnswer(q, answer, intent);
       if (online) return guardQuestionAnswer(q, online, mode);
     }
@@ -2225,9 +2272,10 @@ function formatWebFallback(query: string, results: { title: string; url: string;
     ok: true,
     kind: "web",
     q: query,
-    source: "WEB_FALLBACK",
-    v: `TRU's brain doesn't hold this. Here's what the web knows:\n\n${lines.join("\n\n")}`,
+    source: "WEB_SEARCH",
+    v: `TRU searched the web and found this evidence.\n\n${lines.join("\n\n")}\n\nThis is evidence, not authority. TRU should filter it through Scripture, the local brain, and the question's actual meaning before treating it as an answer.`,
     results: top,
+    webSearched: true,
     brainMiss: true,
   };
 }
