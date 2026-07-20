@@ -305,11 +305,11 @@ function parseVerse(q: string): { key: string; book: string; chapter: number; ve
   return { key: `${book} ${chapter}:${verse}`, book, chapter, verse };
 }
 
-type TruCommand = "HELP" | "INTRO" | "STATUS" | "CAPABILITIES";
+type TruCommand = "HELP" | "INTRO" | "STATUS" | "CAPABILITIES" | "EXPORT";
 
 function parseTruCommand(q: string): TruCommand | null {
   const cleaned = q.trim().replace(/[?.!,;:]+$/g, "").replace(/\s+/g, " ").toUpperCase();
-  if (cleaned === "HELP" || cleaned === "INTRO" || cleaned === "STATUS" || cleaned === "CAPABILITIES") {
+  if (cleaned === "HELP" || cleaned === "INTRO" || cleaned === "STATUS" || cleaned === "CAPABILITIES" || cleaned === "EXPORT") {
     return cleaned;
   }
   return null;
@@ -362,6 +362,14 @@ function collectStatsSnapshot() {
 }
 
 function commandResponse(command: TruCommand) {
+  if (command === "EXPORT") {
+    return {
+      ok: true,
+      kind: "command" as const,
+      command,
+      text: "The offline Ghost export is available from the TRU surface. Use /onboard to inspect the offline route, or download the Ghost from the export control.",
+    };
+  }
   if (command === "HELP") {
     return {
       ok: true,
@@ -679,7 +687,7 @@ function levenshtein(a: string, b: string): number {
 
 function classifyQuery(q: string): QueryClass {
   const n = norm(q);
-  if (/\b(who are you|what are you|what is tru|who is tru|your mission|your style|how do you answer|how do you think|tell me about yourself)\b/.test(n)) {
+  if (/\b(who are you|what are you|what is tru|who is tru|your mission|your style|how do you answer|how do you think|tell me about yourself|what can you do|what do you do|your capabilities|can you read code|can you help|what are your capabilities)\b/.test(n)) {
     return "identity";
   }
   if (/^\s*(define|what is|what are|explain|describe|tell me about|how does|how do|why is|why are)\b/.test(n)) {
@@ -1312,6 +1320,8 @@ app.post("/api/tru/ask", async (c) => {
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+  const command = parseTruCommand(q);
+  if (command) return c.json(commandResponse(command));
   maybeReloadPacks();
   ensureBrainDb();
   const conversation = conversationAnswer(q);
