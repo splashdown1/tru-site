@@ -376,7 +376,7 @@ function commandResponse(command: TruCommand) {
       kind: "command" as const,
       command,
       text: [
-        "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
+        "Commands: HELP, INTRO, STATUS, CAPABILITIES, EXPORT.",
         "Ask scripture by reference, e.g. John 3:16.",
         "Ask short truth questions, e.g. mercy, grace, prayer, faith.",
         "Use /onboard or the ghost download to get the offline copy.",
@@ -1282,13 +1282,27 @@ function conversationAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
-async function onlineTruAnswer(q: string, local: Record<string, unknown> | null): Promise<Record<string, unknown> | null> {
+function classifyConversationalIntent(q: string): string | null {
+  const n = norm(q);
+  if (/^(what can you do|what are you capable of|what do you do|your capabilities)$/.test(n)) return "capabilities";
+  if (/^(can you read code|can you understand code|do you read code)$/.test(n)) return "code";
+  if (/^(what should we do today|what do we do today|what should i do today)$/.test(n)) return "today";
+  if (/^(what is tru|who are you|what are you|tell me about tru)$/.test(n)) return "identity";
+  return null;
+}
+
+async function onlineTruAnswer(q: string, local: Record<string, unknown> | null, intent?: string | null): Promise<Record<string, unknown> | null> {
   const evidence = local && typeof local.v === "string" ? String(local.v).slice(0, 4_000) : "No local passage was found.";
   const prompt = [
     "You are the online conversational voice of TRU.",
     "Answer the user's question directly, naturally, and concisely.",
     "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence.",
     "For greetings and wellbeing questions, respond naturally rather than retrieving a dictionary entry.",
+    "If the intent is capabilities, answer with TRU's actual capabilities rather than unrelated retrieved facts.",
+    "If the intent is code, say that TRU can read and explain code when it is provided, while distinguishing local/offline and online capabilities.",
+    "If the intent is today, give a practical grounded next step rather than defining a word.",
+    "If the intent is identity, explain what TRU is from its mission and architecture.",
+    `Detected intent: ${intent || "general"}`,
     "Do not invent scripture quotations or claim certainty without evidence.",
     "Keep God's sovereignty above the system; TRU is a tool, not an authority over God or the user.",
     `User: ${q}`,
@@ -1355,7 +1369,8 @@ app.post("/api/tru/ask", async (c) => {
     db.close();
 
     const answer = buildSynthesis(q, queryClass, candidates);
-    const online = await onlineTruAnswer(q, answer);
+    const intent = classifyConversationalIntent(q);
+    const online = await onlineTruAnswer(q, answer, intent);
     if (online) {
       const blockedOnline = tripwireGuard(online);
       if (blockedOnline) return c.json(blockedOnline);
