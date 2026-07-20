@@ -2143,6 +2143,73 @@ app.get("/api/tru/search", async (c) => {
   return c.json({ ok: true, q, count: res.results.length, results: res.results });
 });
 
+function validWebUrl(value: unknown): string | null {
+  try {
+    const url = new URL(String(value || ""));
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function admitWebEvidence(input: { query: string; title: string; url: string; snippet: string; answer?: string }): { entry: any; created: boolean } {
+  const mem = loadMemory();
+  const sourceUrl = validWebUrl(input.url);
+  if (!sourceUrl) throw new Error("only http and https source URLs may be admitted");
+  const query = input.query.trim().slice(0, 500);
+  const title = input.title.trim().slice(0, 300) || sourceUrl;
+  const snippet = input.snippet.trim().slice(0, 1600);
+  const answer = (input.answer || snippet).trim().slice(0, 2400);
+  if (!query || !answer) throw new Error("query and evidence are required");
+
+  const duplicate = mem.entries.find((entry: any) =>
+    String(entry.kind || "") === "web-evidence" &&
+    String(entry.source_url || "") === sourceUrl &&
+    String(entry.query || "") === query,
+  );
+  if (duplicate) return { entry: duplicate, created: false };
+
+  const now = Date.now();
+  const domain = new URL(sourceUrl).hostname.replace(/^www\./, "");
+  const entry = {
+    id: genId(),
+    ts: now,
+    updated: now,
+    kind: "web-evidence",
+    text: `${answer}\n\nSource: ${title}\nURL: ${sourceUrl}\nRetrieved: ${new Date(now).toISOString()}\nSearch question: ${query}`,
+    tags: ["web-evidence", "source", domain],
+    query,
+    title,
+    source_url: sourceUrl,
+    snippet,
+    retrieved_at: new Date(now).toISOString(),
+    admission: "explicit-owner-admission",
+  };
+  mem.entries.push(entry);
+  mem.version = (mem.version || 0) + 1;
+  saveMemory(mem);
+  return { entry, created: true };
+}
+
+app.post("/api/tru/web/admit", async (c) => {
+  if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
+  let body: any;
+  try { body = await c.req.json(); } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  try {
+    const result = admitWebEvidence({
+      query: String(body?.query || ""),
+      title: String(body?.title || ""),
+      url: String(body?.url || ""),
+      snippet: String(body?.snippet || ""),
+      answer: typeof body?.answer === "string" ? body.answer : undefined,
+    });
+    return c.json({ ok: true, admitted: result.created, duplicate: !result.created, entry: result.entry, version: loadMemory().version });
+  } catch (error) {
+    return c.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, 400);
+  }
+});
+
 // ── MEMORY (load / create / update / delete / search) ────────────
 app.get("/api/tru/memory", (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);

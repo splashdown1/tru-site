@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { apiUrl, siteUrl } from "../lib/api";
 
 type SearchResult = { title: string; url: string; snippet: string };
+type AdmissionState = Record<number, "idle" | "busy" | "done" | "error">;
 type MemEntry = { id: string; ts: number; updated: number; kind: string; text: string; tags: string[] };
 type Status = { ok: boolean; gate?: boolean; bridge?: boolean; owner?: string };
 
@@ -16,6 +17,7 @@ export default function TruSovereign() {
   const [sq, setSq] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [admission, setAdmission] = useState<AdmissionState>({});
 
   // sovereign metrics
   const [metrics, setMetrics] = useState<any>(null);
@@ -148,6 +150,27 @@ export default function TruSovereign() {
       } catch {
         push("TRU · read · fail");
       }
+    }
+  };
+
+  const admitResult = async (result: SearchResult, index: number) => {
+    if (!unlocked || admission[index] === "busy" || admission[index] === "done") return;
+    setAdmission((current) => ({ ...current, [index]: "busy" }));
+    push(`ADMIT · ${result.title}`);
+    try {
+      const r = await fetch(apiUrl("/api/tru/web/admit"), {
+        method: "POST",
+        headers: { ...authH(), "Content-Type": "application/json" },
+        body: JSON.stringify({ query: sq.trim(), title: result.title, url: result.url, snippet: result.snippet }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      setAdmission((current) => ({ ...current, [index]: "done" }));
+      push(`ADMIT · ${j.admitted ? "saved" : "already held"} · ${result.title}`);
+      await loadMem();
+    } catch (error) {
+      setAdmission((current) => ({ ...current, [index]: "error" }));
+      push(`ADMIT · failed · ${String(error)}`);
     }
   };
 
@@ -529,11 +552,22 @@ export default function TruSovereign() {
           </div>
           <div className="space-y-3">
             {results.map((r, i) => (
-              <a key={i} href={r.url} target="_blank" rel="noreferrer" className="block group">
-                <div className="text-sm text-emerald-300 group-hover:underline">{r.title}</div>
-                <div className="text-[10px] text-neutral-600 truncate">{r.url}</div>
-                <div className="text-[11px] text-neutral-400 mt-1">{r.snippet}</div>
-              </a>
+              <div key={i} className="border-b border-neutral-900 pb-3 last:border-0">
+                <a href={r.url} target="_blank" rel="noreferrer" className="block group">
+                  <div className="text-sm text-emerald-300 group-hover:underline">{r.title}</div>
+                  <div className="text-[10px] text-neutral-600 truncate">{r.url}</div>
+                  <div className="text-[11px] text-neutral-400 mt-1">{r.snippet}</div>
+                </a>
+                {unlocked ? (
+                  <button
+                    onClick={() => admitResult(r, i)}
+                    disabled={admission[i] === "busy" || admission[i] === "done"}
+                    className="mt-2 px-3 py-1 text-[10px] uppercase tracking-[0.2em] border border-cyan-700 text-cyan-300 hover:bg-cyan-700/30 disabled:border-neutral-800 disabled:text-neutral-600"
+                  >
+                    {admission[i] === "busy" ? "admitting…" : admission[i] === "done" ? "admitted" : admission[i] === "error" ? "retry admit" : "admit to memory"}
+                  </button>
+                ) : null}
+              </div>
             ))}
             {results.length === 0 && sq && !searching && <div className="text-[11px] text-neutral-700">no results</div>}
           </div>
