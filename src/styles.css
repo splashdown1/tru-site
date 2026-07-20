@@ -129,3 +129,126 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* TRU APEX public surface */
+:root {
+  --tru-cyan: #00e5ff;
+  --tru-bg: #000308;
+  --tru-fg: #e6f7ff;
+}
+
+html, body, #root {
+  min-height: 100%;
+}
+
+body {
+  background: var(--tru-bg);
+  color: var(--tru-fg);
+}
+
+.tru-apex {
+  min-height: 100dvh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--tru-bg);
+  color: var(--tru-fg);
+  font-family: -apple-system, ui-monospace, "Courier New", monospace;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+.tru-apex-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid rgba(0, 229, 255, .2);
+  background: rgba(0, 4, 10, .92);
+}
+
+.tru-holo {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.tru-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tru-cyan) 0%, rgba(0, 229, 255, .2) 70%, transparent 100%);
+  box-shadow: 0 0 16px var(--tru-cyan);
+  animation: tru-breathe 4s ease-in-out infinite;
+}
+
+.tru-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 229, 255, .4);
+  animation: tru-spin linear infinite;
+}
+
+.tru-ring-outer { width: 44px; height: 44px; border-color: rgba(0, 229, 255, .15); animation-duration: 20s; }
+.tru-ring-dashed { width: 36px; height: 36px; border-style: dashed; animation-duration: 12s; animation-direction: reverse; }
+.tru-ring-inner { width: 26px; height: 26px; animation-duration: 8s; }
+.is-thinking .tru-core { box-shadow: 0 0 28px var(--tru-cyan); animation-duration: 1s; }
+.is-thinking .tru-ring { animation-duration: 2s; }
+.is-speaking .tru-core { background: radial-gradient(circle, #ff5252 0%, rgba(255, 82, 82, .2) 70%, transparent 100%); box-shadow: 0 0 30px #ff5252; }
+
+@keyframes tru-spin { to { transform: rotate(360deg); } }
+@keyframes tru-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+.tru-title-block { flex: 1; min-width: 0; }
+.tru-title { color: var(--tru-cyan); font-family: Georgia, serif; font-size: 15px; letter-spacing: 4px; text-shadow: 0 0 12px rgba(0, 229, 255, .5); }
+.tru-subtitle { margin-top: 2px; color: rgba(0, 229, 255, .46); font-size: 10px; letter-spacing: 1px; }
+.tru-badge { flex-shrink: 0; padding: 4px 10px; border: 1px solid var(--tru-cyan); border-radius: 999px; color: var(--tru-cyan); font-size: 10px; letter-spacing: 1.5px; text-shadow: 0 0 8px currentColor; }
+.verdict-truth { color: #69f0ae; border-color: #69f0ae; }
+.verdict-scripture { color: #ffd166; border-color: #ffd166; }
+.verdict-web { color: #a78bfa; border-color: #a78bfa; }
+.verdict-command { color: #80cbc4; border-color: #80cbc4; }
+.verdict-error, .verdict-gap { color: #ff8a80; border-color: #ff8a80; }
+
+.tru-chat { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 14px 8px; display: flex; flex-direction: column; gap: 10px; }
+.tru-chat::-webkit-scrollbar { width: 0; }
+.tru-message { max-width: 88%; padding: 12px 14px; border-radius: 14px; font-size: 15px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.tru-message-user { align-self: flex-end; background: rgba(0, 150, 200, .16); border: 1px solid rgba(100, 180, 220, .25); border-bottom-right-radius: 4px; }
+.tru-message-tru { align-self: flex-start; background: rgba(0, 229, 255, .07); border: 1px solid rgba(0, 229, 255, .2); border-bottom-left-radius: 4px; }
+.tru-verdict { margin-bottom: 5px; color: var(--tru-cyan); font-size: 9px; letter-spacing: 1.5px; opacity: .8; }
+.tru-message-text { color: rgba(255, 255, 255, .9); }
+.tru-thinking-dots { padding: 10px 4px; color: var(--tru-cyan); font-size: 13px; letter-spacing: 2px; }
+.tru-ready { padding: 8px 4px; color: #88aabb; font-size: 14px; line-height: 1.7; }
+.tru-ready-heading { margin-bottom: 10px; color: var(--tru-cyan); font-size: 15px; letter-spacing: 2px; }
+.tru-ready-detail { margin-top: 8px; color: #9ed7ff; font-size: 13px; }
+.tru-try-label { margin-top: 8px; color: #557788; font-size: 12px; }
+.tru-suggestions { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; }
+.tru-suggestions button, .tru-command-strip button { min-height: 40px; border: 1px solid rgba(0, 229, 255, .25); border-radius: 10px; background: rgba(0, 229, 255, .08); color: #cfeeff; font: inherit; cursor: pointer; }
+.tru-suggestions button { padding: 11px 14px; text-align: left; font-size: 14px; }
+.tru-suggestions button:hover, .tru-command-strip button:hover { background: rgba(0, 229, 255, .18); }
+
+.tru-input-area { flex-shrink: 0; padding: 5px 14px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid rgba(0, 229, 255, .25); background: rgba(0, 4, 10, .96); }
+.tru-status { min-height: 16px; padding: 2px 0 4px; color: rgba(0, 229, 255, .55); font-size: 9px; letter-spacing: 1px; text-align: center; }
+.tru-command-strip { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 7px; }
+.tru-command-strip button { min-width: 58px; min-height: 30px; padding: 4px 8px; border-radius: 999px; font-size: 10px; letter-spacing: .7px; }
+.tru-command-strip button:last-of-type { color: #ff9d92; border-color: rgba(255, 138, 128, .35); }
+.tru-utility-link { display: inline-flex; align-items: center; padding: 0 8px; color: #80cbc4; font-size: 10px; letter-spacing: .7px; text-decoration: none; }
+.tru-inputbar { display: flex; align-items: center; gap: 10px; }
+.tru-inputbar input { flex: 1; min-height: 48px; padding: 14px 18px; border: 1px solid rgba(0, 229, 255, .4); border-radius: 24px; outline: none; background: rgba(0, 20, 30, .8); color: #fff; font: inherit; font-size: 16px; }
+.tru-inputbar input:focus { border-color: var(--tru-cyan); box-shadow: 0 0 12px rgba(0, 229, 255, .3); }
+.tru-inputbar > button { width: 48px; height: 48px; flex-shrink: 0; border: 0; border-radius: 50%; background: var(--tru-cyan); color: #001018; box-shadow: 0 0 16px rgba(0, 229, 255, .5); font-size: 18px; font-weight: bold; cursor: pointer; }
+.tru-inputbar > button:disabled { background: #002a36; color: #446; box-shadow: none; }
+
+@media (min-width: 760px) {
+  .tru-apex { width: min(100%, 760px); margin: 0 auto; box-shadow: 0 0 80px rgba(0, 229, 255, .08); }
+  .tru-chat { padding-left: 28px; padding-right: 28px; }
+  .tru-message { max-width: 76%; }
+}
