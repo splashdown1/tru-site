@@ -3,6 +3,7 @@ import type { ViteDevServer } from "vite";
 import { createServer as createViteServer } from "vite";
 import config from "./zosite.json";
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { writeFileSync, existsSync, mkdirSync, appendFileSync, readFileSync, renameSync, copyFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
@@ -47,6 +48,13 @@ try {
 
 type Mode = "development" | "production";
 const app = new Hono();
+
+app.use("/api/*", cors({
+  origin: ["https://splashdown1.github.io"],
+  allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+  allowHeaders: ["Content-Type", "Accept", "Authorization"],
+  exposeHeaders: ["Content-Disposition", "Retry-After", "X-LLM-Gateway", "X-LLM-Gateway-Attempts"],
+}));
 
 const mode: Mode =
   process.env.NODE_ENV === "production" ? "production" : "development";

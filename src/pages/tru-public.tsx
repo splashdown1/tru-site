@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiUrl, siteUrl } from "../lib/api";
 
 type ChatRole = "assistant" | "user";
 
@@ -158,7 +159,7 @@ export default function TruPublic() {
         meta: "COMMAND · CAPABILITIES",
       };
     }
-    const r = await fetch("/api/tru/stats", { headers: { Accept: "application/json" } });
+    const r = await fetch(apiUrl("/api/tru/stats"), { headers: { Accept: "application/json" } });
     const j = (await r.json()) as TruStats;
     if (!j.ok) {
       return {
@@ -194,7 +195,7 @@ export default function TruPublic() {
         push("assistant", reply.text, reply.meta);
         return;
       }
-      const r = await fetch("/api/tru/ask", {
+      const r = await fetch(apiUrl("/api/tru/ask"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -225,7 +226,7 @@ export default function TruPublic() {
     setBaking(true);
     setBakeStatus("Baking…");
     try {
-      const r = await fetch("/api/tru/ghost?download=1", { method: "POST", headers: { Accept: "application/json" } });
+      const r = await fetch(apiUrl("/api/tru/ghost?download=1"), { method: "POST", headers: { Accept: "application/json" } });
       if (!r.ok) {
         setBakeStatus(`Bake failed (${r.status})`);
         return;
@@ -404,10 +405,10 @@ export default function TruPublic() {
             <section className="rounded-2xl border border-white/10 bg-white/5 p-5">
               <div className="text-[10px] uppercase tracking-[0.3em] text-emerald-400">Links</div>
               <div className="mt-4 flex flex-col gap-3 text-sm">
-                <a href="/sovereign" className="text-white/75 transition-colors hover:text-white">Sovereign →</a>
-                <a href="/vision" className="text-white/75 transition-colors hover:text-white">Vision →</a>
-                <a href="/console" className="text-white/75 transition-colors hover:text-white">Console →</a>
-                <a href="/whitepaper" className="text-white/75 transition-colors hover:text-white">Whitepaper →</a>
+                <a href={siteUrl("/sovereign")} className="text-white/75 transition-colors hover:text-white">Sovereign →</a>
+                <a href={siteUrl("/vision")} className="text-white/75 transition-colors hover:text-white">Vision →</a>
+                <a href={siteUrl("/console")} className="text-white/75 transition-colors hover:text-white">Console →</a>
+                <a href={siteUrl("/whitepaper")} className="text-white/75 transition-colors hover:text-white">Whitepaper →</a>
               </div>
             </section>
           </aside>

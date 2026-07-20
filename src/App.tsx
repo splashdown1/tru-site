@@ -7,10 +7,12 @@ import TruWhitepaper from "./pages/tru-whitepaper";
 import TruSovereign from "./pages/tru-sovereign";
 import { ThemeProvider } from "@/components/theme-provider";
 
+const basename = (import.meta.env.BASE_URL || "/").replace(/\/$/, "") || "/";
+
 export default function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<TruPublic />} />
           <Route path="/vision" element={<TruVision />} />

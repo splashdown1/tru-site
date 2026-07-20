@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { askBrain, brain, type BrainResult } from "@/brain";
 import { makeExporter } from "@/tru_export";
+import { apiUrl } from "../lib/api";
 
 interface Turn {
   q: string;

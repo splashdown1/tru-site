@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { apiUrl, siteUrl } from "../lib/api";
 
 type Stats = {
   ok: boolean;
@@ -35,7 +36,7 @@ export default function TruConsole() {
 
   const refreshStats = useCallback(async () => {
     try {
-      const r = await fetch("/api/tru/stats");
+      const r = await fetch(apiUrl("/api/tru/stats"));
       const j = await r.json();
       if (j.ok) setStats(j);
       push(`STATS · brain=${j.brain} kjv=${j.kjv} session=${j.sessionKeys}`);
@@ -47,7 +48,7 @@ export default function TruConsole() {
   const checkTripwire = useCallback(async () => {
     setTripwire("CHECKING");
     try {
-      const r = await fetch("/api/tru/tripwire");
+      const r = await fetch(apiUrl("/api/tru/tripwire"));
       const j = await r.json();
       setTripwire(j.armed ? "ARMED" : "OFFLINE");
       setTripwireDetail({ patterns: j.patterns, hits: j.hits, lastHit: j.lastHit, heartbeat: j.heartbeat });
@@ -66,7 +67,7 @@ export default function TruConsole() {
     setBusy(true);
     push("GHOST · firing POST /api/tru/ghost …");
     try {
-      const r = await fetch("/api/tru/ghost", { method: "POST" });
+      const r = await fetch(apiUrl("/api/tru/ghost"), { method: "POST" });
       const j: GhostResult = await r.json();
       if (j.ok) {
         push(`GHOST · OK · ${j.path} · ${j.bytes?.toLocaleString()}B · brain=${j.brain} kjv=${j.kjv} session_keys=${j.session_keys}`);
@@ -87,7 +88,7 @@ export default function TruConsole() {
     push("GHOST · firing POST /api/tru/ghost?download=1 …");
     try {
       const body = JSON.stringify({ _ts: Date.now() });
-      const r = await fetch("/api/tru/ghost?download=1", {
+      const r = await fetch(apiUrl("/api/tru/ghost?download=1"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body,
@@ -278,7 +279,7 @@ export default function TruConsole() {
 
         <div className="mt-8 pt-4 border-t border-neutral-900 flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-700">
           <span>TRU · sovereign · airgapped</span>
-          <a href="/onboard" className="hover:text-emerald-400 transition-colors">get offline copy →</a>
+          <a href={siteUrl("/onboard")} className="hover:text-emerald-400 transition-colors">get offline copy →</a>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { apiUrl, siteUrl } from "../lib/api";
 
 type Upload = {
   name: string;
@@ -116,7 +117,7 @@ export default function TruOnboard() {
     setPhase("baking");
     push("BAKE · POST /api/tru/ghost?download=1 …");
     try {
-      const r = await fetch("/api/tru/ghost?download=1", {
+      const r = await fetch(apiUrl("/api/tru/ghost?download=1"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -163,7 +164,7 @@ export default function TruOnboard() {
             <span className="text-[11px] uppercase tracking-[0.4em] text-emerald-300">TRU · GHOST</span>
             <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">capture → bake → download</span>
           </div>
-          <a href="/" className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-emerald-400">
+          <a href={siteUrl("/")} className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-emerald-400">
             ← public
           </a>
         </div>

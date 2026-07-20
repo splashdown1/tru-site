@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { marked } from "https://esm.sh/marked@12.0.2";
+import { siteUrl } from "../lib/api";
 
 export default function TruWhitepaper() {
   const [html, setHtml] = useState<string>("");
   const [err, setErr] = useState<string>("");
 
   useEffect(() => {
-    fetch("/TRU_WHITEPAPER.md")
+    fetch(siteUrl("/TRU_WHITEPAPER.md"))
       .then((r) => (r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`)))
       .then((md) => setHtml(marked.parse(md, { breaks: true }) as string))
       .catch((e) => setErr(String(e)));
@@ -17,7 +18,7 @@ export default function TruWhitepaper() {
       <div className="mx-auto max-w-3xl px-6 py-16 sm:py-24">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-neutral-600 mb-16">
           <span>TRU · Whitepaper</span>
-          <a href="/" className="hover:text-neutral-300 transition-colors">← back</a>
+          <a href={siteUrl("/")} className="hover:text-neutral-300 transition-colors">← back</a>
         </div>
 
         {err ? (
@@ -36,7 +37,7 @@ export default function TruWhitepaper() {
             Speculative framework · not a patent
           </div>
           <a
-            href="/vision"
+            href={siteUrl("/vision")}
             className="text-[10px] uppercase tracking-[0.3em] text-neutral-700 hover:text-white transition-colors"
           >
             see the codex →

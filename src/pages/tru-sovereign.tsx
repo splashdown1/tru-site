@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiUrl, siteUrl } from "../lib/api";
 
 type SearchResult = { title: string; url: string; snippet: string };
 type MemEntry = { id: string; ts: number; updated: number; kind: string; text: string; tags: string[] };
@@ -60,7 +61,7 @@ export default function TruSovereign() {
 
   const loadMetrics = useCallback(async () => {
     try {
-      const r = await fetch("/api/tru/metrics");
+      const r = await fetch(apiUrl("/api/tru/metrics"));
       const j = await r.json();
       if (j.ok) setMetrics(j);
     } catch {}
@@ -87,7 +88,7 @@ export default function TruSovereign() {
   const refreshStatus = useCallback(async () => {
     if (!gate) return;
     try {
-      const r = await fetch("/api/tru/mail/status", { headers: authH() });
+      const r = await fetch(apiUrl("/api/tru/mail/status"), { headers: authH() });
       const j = await r.json();
       setStatus(j);
       push(`STATUS · gate=${j.gate} bridge=${j.bridge} owner=${j.owner}`);
@@ -99,7 +100,7 @@ export default function TruSovereign() {
   const loadMem = useCallback(async () => {
     if (!gate) return;
     try {
-      const r = await fetch("/api/tru/memory", { headers: authH() });
+      const r = await fetch(apiUrl("/api/tru/memory"), { headers: authH() });
       const j = await r.json();
       if (j.ok) {
         setEntries(j.entries || []);
@@ -123,7 +124,7 @@ export default function TruSovereign() {
     setResults([]);
     push(`SEARCH · ${sq}`);
     try {
-      const r = await fetch(`/api/tru/search?q=${encodeURIComponent(sq)}`);
+      const r = await fetch(apiUrl(`/api/tru/search?q=${encodeURIComponent(sq)}`));
       const j = await r.json();
       if (j.ok) {
         setResults(j.results || []);
@@ -138,7 +139,7 @@ export default function TruSovereign() {
     if (alsoAskTru && sq.trim()) {
       setTruRead(null);
       try {
-        const tr = await fetch("/api/tru/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: sq.trim() }) });
+        const tr = await fetch(apiUrl("/api/tru/ask"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: sq.trim() }) });
         const tj = await tr.json();
         if (tj.ok) {
           setTruRead({ kind: tj.t || tj.kind, v: tj.v || tj.text, text: tj.text, score: tj.score, source: tj.source, ref: tj.ref });
@@ -156,7 +157,7 @@ export default function TruSovereign() {
     setReflectResult(null);
     push("REFLECT · distilling recent asks…");
     try {
-      const r = await fetch("/api/tru/reflect", { method: "POST", headers: { ...authH() } });
+      const r = await fetch(apiUrl("/api/tru/reflect"), { method: "POST", headers: { ...authH() } });
       const j = await r.json();
       setReflectResult(j);
       if (j.ok) {
@@ -176,7 +177,7 @@ export default function TruSovereign() {
     setAskA(null);
     push(`TRU · ${askQ}`);
     try {
-      const r = await fetch("/api/tru/ask/sovereign", {
+      const r = await fetch(apiUrl("/api/tru/ask/sovereign"), {
         method: "POST",
         headers: { ...authH(), "Content-Type": "application/json" },
         body: JSON.stringify({ q: askQ.trim() }),
@@ -197,7 +198,7 @@ export default function TruSovereign() {
     const body: any = { text: etxt.trim(), kind: ekind, tags: etags.split(",").map((t) => t.trim()).filter(Boolean) };
     if (editId) body.id = editId;
     try {
-      const r = await fetch("/api/tru/memory", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch(apiUrl("/api/tru/memory"), { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json();
       if (j.ok) {
         push(`MEMORY · ${editId ? "updated" : "created"} · ${j.entry.id}`);
@@ -223,7 +224,7 @@ export default function TruSovereign() {
     if (memBusy) return;
     setMemBusy(true);
     try {
-      const r = await fetch(`/api/tru/memory?id=${id}`, { method: "DELETE", headers: authH() });
+      const r = await fetch(apiUrl(`/api/tru/memory?id=${id}`), { method: "DELETE", headers: authH() });
       const j = await r.json();
       if (j.ok) {
         push(`MEMORY · deleted · ${id}`);
@@ -243,7 +244,7 @@ export default function TruSovereign() {
     setArchiveReport(null);
     push("ARCHIVE · git + mail …");
     try {
-      const r = await fetch("/api/tru/memory/archive", { method: "POST", headers: authH() });
+      const r = await fetch(apiUrl("/api/tru/memory/archive"), { method: "POST", headers: authH() });
       const j = await r.json();
       setArchiveReport(j);
       push(`ARCHIVE · git=${j.git?.pushed || j.git?.error || "—"} mail=${j.mail?.ok ? "sent" : j.mail?.detail || "—"}`);
@@ -256,7 +257,7 @@ export default function TruSovereign() {
 
   const exportMem = async () => {
     try {
-      const r = await fetch("/api/tru/memory/export", { headers: authH() });
+      const r = await fetch(apiUrl("/api/tru/memory/export"), { headers: authH() });
       const blob = await r.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -274,7 +275,7 @@ export default function TruSovereign() {
 
   const loadVersions = async () => {
     try {
-      const r = await fetch("/api/tru/memory/versions", { headers: authH() });
+      const r = await fetch(apiUrl("/api/tru/memory/versions"), { headers: authH() });
       const j = await r.json();
       if (j.ok) { setVersions(j.versions || []); push(`VERSIONS · ${j.count} git versions`); }
       else push(`VERSIONS · fail · ${j.error}`);
@@ -284,7 +285,7 @@ export default function TruSovereign() {
   const restoreLatest = async () => {
     setMemBusy(true); setRestoreReport(null);
     try {
-      const r = await fetch("/api/tru/memory/restore", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git-latest" }) });
+      const r = await fetch(apiUrl("/api/tru/memory/restore"), { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git-latest" }) });
       const j = await r.json();
       setRestoreReport(j);
       if (j.ok) { await loadMem(); push(`RESTORE · git-latest · ${j.before}→${j.after} entries`); }
@@ -296,7 +297,7 @@ export default function TruSovereign() {
   const restoreFromHash = async (hash: string) => {
     setMemBusy(true); setRestoreReport(null);
     try {
-      const r = await fetch("/api/tru/memory/restore", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git", hash }) });
+      const r = await fetch(apiUrl("/api/tru/memory/restore"), { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ source: "git", hash }) });
       const j = await r.json();
       setRestoreReport(j);
       if (j.ok) { await loadMem(); push(`RESTORE · ${hash.slice(0,8)} · ${j.before}→${j.after} entries`); }
@@ -310,7 +311,7 @@ export default function TruSovereign() {
     setMailBusy(true);
     setMailResult(null);
     try {
-      const r = await fetch("/api/tru/mail", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ action: "send", to: mTo || undefined, subject: mSubject, body: mBody }) });
+      const r = await fetch(apiUrl("/api/tru/mail"), { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ action: "send", to: mTo || undefined, subject: mSubject, body: mBody }) });
       const j = await r.json();
       setMailResult(j);
       push(`MAIL · send · ${j.ok ? "ok" : j.detail || "fail"}`);
@@ -326,7 +327,7 @@ export default function TruSovereign() {
     setMailBusy(true);
     setInbox([]);
     try {
-      const r = await fetch("/api/tru/mail", { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ action: "read", query: readQ, max: 8 }) });
+      const r = await fetch(apiUrl("/api/tru/mail"), { method: "POST", headers: { ...authH(), "Content-Type": "application/json" }, body: JSON.stringify({ action: "read", query: readQ, max: 8 }) });
       const j = await r.json();
       if (j.ok) {
         const list = typeof j.detail === "string" ? safeParse(j.detail) : j.detail;
@@ -364,7 +365,7 @@ export default function TruSovereign() {
             ) : (
               <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600">locked</span>
             )}
-            <a href="/" className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-emerald-400">← tru</a>
+            <a href={siteUrl("/")} className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 hover:text-emerald-400">← tru</a>
           </div>
         </div>
 
