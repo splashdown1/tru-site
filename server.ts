@@ -449,6 +449,61 @@ function lookupVerseText(v: { key: string }): string | null {
   return buildVerseText(refKey) || buildVerseText(refKey.replace(/(\d+) /, "$1 "));
 }
 
+const THEOLOGY_ROUTE = {
+  creation: {
+    title: "Creation",
+    answer: "TRU's anchored answer is the biblical creation account: God created the heaven and the earth, and Genesis presents creation as intentional, ordered, and completed in six days. The exact age of the earth is not stated as a single number in Scripture. A young-earth reading derives a chronology from the genealogies and related passages, commonly placing creation roughly six to ten thousand years ago; that is an interpretation of the text, not a verse giving the number 6,000 or 10,000.",
+    refs: ["Genesis 1:1", "Genesis 1:31", "Exodus 20:11"],
+  },
+  evolution: {
+    title: "Evolution",
+    answer: "TRU's biblical frame is that God created life and that humanity is made in God's image. Evolution is not one single claim: change within populations is different from the claim that unguided processes fully explain the origin of life, all biological diversity, and humanity. The first claim is observed biology; the stronger claim is a materialist explanation that conflicts with a literal Genesis creation reading. TRU should state that distinction instead of pretending the dispute does not exist.",
+    refs: ["Genesis 1:24-27", "Genesis 1:31", "Romans 1:20"],
+  },
+  creator: {
+    title: "The Creator",
+    answer: "The Bible's answer is God. Genesis opens, 'In the beginning God created the heaven and the earth.' The New Testament identifies the Word, Jesus Christ, as the one through whom all things were made. Creation is therefore not presented as self-originating or purposeless.",
+    refs: ["Genesis 1:1", "John 1:1", "John 1:3", "Colossians 1:16"],
+  },
+  meaning: {
+    title: "Meaning of life",
+    answer: "Biblically, the meaning of life is to know God, love God, obey him, and love your neighbour. Eternal life is described as knowing the only true God and Jesus Christ whom he sent. The point is not self-invention, consumption, or status; it is faithful relationship with the Creator and rightly ordered love.",
+    refs: ["John 17:3", "Mark 12:30-31", "Ecclesiastes 12:13"],
+  },
+  flood: {
+    title: "Noah's flood",
+    answer: "Genesis presents Noah's flood as God's judgement on widespread human wickedness, a real worldwide event within the biblical narrative, and a rescue of Noah's household in the ark. The waters prevailed for 150 days; afterward God established his covenant and set the bow in the cloud as its sign. TRU should not flatten that account into either a vague moral fable or an unqualified scientific proof claim.",
+    refs: ["Genesis 6:5-8", "Genesis 7:11-24", "Genesis 9:11-17"],
+  },
+} as const;
+
+type TheologyRouteKey = keyof typeof THEOLOGY_ROUTE;
+
+function classifyTheologyRoute(q: string): TheologyRouteKey | null {
+  const n = norm(q);
+  if (/\b(age of (the )?earth|old is (the )?earth|young earth|creation date|when did god create|six days)\b/.test(n)) return "creation";
+  if (/\b(evolution|darwinism|natural selection|common descent)\b/.test(n)) return "evolution";
+  if (/\b(who created|creator of|created the world|origin of (the )?world)\b/.test(n)) return "creator";
+  if (/\b(meaning of life|purpose of life|why are we here|what is life for)\b/.test(n)) return "meaning";
+  if (/\b(noah('?s)? flood|flood of noah|great flood|global flood)\b/.test(n)) return "flood";
+  return null;
+}
+
+function theologyAnswer(q: string, route: TheologyRouteKey): Record<string, unknown> {
+  const item = THEOLOGY_ROUTE[route];
+  return {
+    ok: true,
+    kind: "theology",
+    q,
+    v: `${item.answer}\n\nAnchors: ${item.refs.join("; ")}.`,
+    t: "THEOLOGY",
+    source: "TRU_SCRIPTURE_FIRST",
+    grounded: true,
+    refs: item.refs,
+    route: item.title,
+  };
+}
+
 type QueryClass = "identity" | "definition" | "dilemma" | "topic";
 
 type NodeRow = {
@@ -1352,6 +1407,8 @@ app.post("/api/tru/ask", async (c) => {
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
   const command = parseTruCommand(q);
   if (command) return c.json(commandResponse(command));
+  const theologyRoute = classifyTheologyRoute(q);
+  if (theologyRoute) return c.json(theologyAnswer(q, theologyRoute));
   maybeReloadPacks();
   ensureBrainDb();
   const conversation = conversationAnswer(q);
