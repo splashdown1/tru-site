@@ -1387,11 +1387,11 @@ function looksLikePlaceQuery(q: string): boolean {
 }
 
 async function geocodePlace(q: string): Promise<{ ok: boolean; results: PlaceResult[]; error?: string }> {
-  const queries = [q];
   const n = norm(q);
+  const queries: string[] = [];
   if (/city hall/.test(n) && /pensacola/.test(n)) queries.push("Pensacola City Hall");
   if (/city hall|town hall/.test(n) && /munich|munchen/.test(n)) queries.push("New Town Hall Munich");
-  const seen = new Set<string>();
+  queries.push(q);
   for (const query of queries) {
     try {
       const url = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates?f=json&maxLocations=5&outFields=*&singleLine=" + encodeURIComponent(query);
@@ -1412,11 +1412,12 @@ async function geocodePlace(q: string): Promise<{ ok: boolean; results: PlaceRes
             mapUrl: `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}`,
           };
         });
-      for (const item of results) {
-        const key = `${item.name}|${item.lat.toFixed(5)}|${item.lon.toFixed(5)}`;
-        if (!seen.has(key)) seen.add(key);
-      }
-      const unique = results.filter((item, index, list) => list.findIndex((x) => x.name === item.name && Math.abs(x.lat - item.lat) < 0.001 && Math.abs(x.lon - item.lon) < 0.001) === index);
+      const landmark = n.match(/\b(city hall|town hall|municipal hall|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant)\b/)?.[1];
+      const relevant = landmark
+        ? results.filter((item) => new RegExp(landmark.replace(" ", "\\s+"), "i").test(`${item.name} ${item.address}`) || /government office|courthouse|airport|hospital|church|cathedral|library|museum|university|station|school|hotel|restaurant/i.test(item.type))
+        : results;
+      const filtered = relevant.length ? relevant : (queries.indexOf(query) === queries.length - 1 ? results : []);
+      const unique = filtered.filter((item, index, list) => list.findIndex((x) => x.name === item.name && Math.abs(x.lat - item.lat) < 0.001 && Math.abs(x.lon - item.lon) < 0.001) === index);
       if (unique.length) return { ok: true, results: unique.slice(0, 5) };
     } catch {}
   }
@@ -1438,6 +1439,12 @@ function conversationAnswer(q: string): Record<string, unknown> | null {
   }
   if (/^(thanks|thank you|thankyou|cheers)$/.test(n)) {
     return { ok: true, kind: "conversation", q, v: "You are welcome. Continue when ready.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(are you still broken|are you broken|is this broken|what was wrong|what happened)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "No. The earlier failure was routing: ordinary conversational questions fell through to web search instead of receiving a direct TRU response. That route is now separated from map lookup and web fallback. Ask the question plainly and TRU will answer from conversation, Scripture, the brain, the map index, or filtered web evidence as appropriate.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(what is tru|what is it|what was it|what is this)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "TRU is the filter and reasoning spine: Scripture, the local brain, routing, map and web retrieval, evidence filtering, and the conversational voice. The host model is the mouth. TRU decides which evidence and answer path are allowed through.", t: "IDENTITY", source: "TRU_CONVERSATION", grounded: true };
   }
   return null;
 }
