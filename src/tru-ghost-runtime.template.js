@@ -413,17 +413,11 @@
     var text = "";
     if (queryClass === "identity") {
       text = teachesNow || whatItWas;
-      var extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
-      if (extra.length) text += "\nRelated: " + extra.join(" | ");
     } else if (bestScore >= 18) {
-      var lines = [
-        `What it was: ${whatItWas}`,
-        whyItMattered ? `Why it mattered: ${whyItMattered}` : "",
-        hiddenEngine ? `Hidden engine: ${hiddenEngine}` : "",
-        failureMode ? `Failure mode: ${failureMode}` : "",
-        teachesNow ? `What it teaches now: ${teachesNow}` : "",
-      ].filter(Boolean);
-      text = lines.join("\n");
+      var parts = [whatItWas, whyItMattered, hiddenEngine, failureMode, teachesNow]
+        .filter(Boolean)
+        .map(function (part) { return firstSentence(part, 260); });
+      text = parts.filter(function (part, index) { return parts.indexOf(part) === index; }).join(" ");
     } else {
       var closests = scored.slice(0, 3).map(function (item) { return firstSentence(item.node.v, 120); }).filter(Boolean);
       var closest = closests;

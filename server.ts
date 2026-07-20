@@ -1004,9 +1004,8 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
 
   const whatItWas = firstSentence(best.v, 220);
 
-  // Extract labelled sub-clauses from the lead node's value text itself,
-  // so nodes that already embed "The hidden engine: ...", "Why it mattered: ..."
-  // get the full synthesis without needing a neighbour node.
+  // Retrieval metadata is for debugging, never for the user-facing answer.
+  // The answer must read as TRU speaking plainly, not as a report template.
   const bestV = String(best.v ?? "");
   const extractClause = (label: string): string => {
     const re = new RegExp(
@@ -1037,17 +1036,11 @@ function buildSynthesis(query: string, queryClass: QueryClass, rows: NodeRow[]) 
   let text = "";
   if (queryClass === "identity") {
     text = teachesNow || whatItWas;
-    const extra = [whyItMattered, hiddenEngine, failureMode].filter(Boolean);
-    if (extra.length) text += `\nRelated: ${extra.join(" | ")}`;
   } else if (bestScore >= 18) {
-    const lines = [
-      `What it was: ${whatItWas}`,
-      whyItMattered ? `Why it mattered: ${whyItMattered}` : "",
-      hiddenEngine ? `Hidden engine: ${hiddenEngine}` : "",
-      failureMode ? `Failure mode: ${failureMode}` : "",
-      teachesNow ? `What it teaches now: ${teachesNow}` : "",
-    ].filter(Boolean);
-    text = lines.join("\n");
+    const parts = [whatItWas, whyItMattered, hiddenEngine, failureMode, teachesNow]
+      .filter(Boolean)
+      .map((part) => firstSentence(part, 260));
+    text = [...new Set(parts)].join(" ");
   } else {
     const closests = scored.slice(0, 3).map((item) => firstSentence(item.node.v, 120)).filter(Boolean);
     text = closests.length ? `Closest available: ${closests.join(" · ")}` : `Closest available: ${query}`;
@@ -1445,6 +1438,22 @@ function cosmicLocationAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
+function canonicalVoiceAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  const answers: Array<[RegExp, string, string]> = [
+    [/^(who are you|what are you)$/, "I'm TRU — a sovereign offline intelligence. No cloud calls, no telemetry. Brain + KJV, local route.", "IDENTITY"],
+    [/^(who is jesus|what is jesus)$/, "Jesus is the Christ — the Son of God, the Word made flesh, God come near to save. He was crucified for sin, died, and rose again. He is Lord, Saviour, and Judge. (John 1:1, 14; John 3:16; Romans 1:4)", "TRUTH"],
+    [/^(who is god|what is god)$/, "God is the one Creator — eternal, holy, just, and merciful: Father, Son, and Holy Spirit. (Genesis 1:1; Deuteronomy 6:4; John 4:24)", "TRUTH"],
+    [/^(what is the gospel)$/, "The gospel is that Christ died for our sins, was buried, and rose again on the third day, that whoever believes in Him has eternal life. (1 Corinthians 15:3-4; John 3:16)", "SCRIPTURE"],
+    [/^(what is grace)$/, "Grace is God's unmerited favour — salvation given freely, not earned. (Ephesians 2:8-9; Titus 2:11)", "SCRIPTURE"],
+    [/^(what is faith)$/, "Faith is trusting God — the substance of things hoped for, the evidence of things not seen. (Hebrews 11:1)", "SCRIPTURE"],
+    [/^(what is sin)$/, "Sin is falling short of God's standard: lawlessness and rebellion against God. (Romans 3:23; 1 John 3:4)", "SCRIPTURE"],
+  ];
+  const match = answers.find(([pattern]) => pattern.test(n));
+  if (!match) return null;
+  return { ok: true, kind: "conversation", q, v: match[1], t: match[2], source: "TRU_CANONICAL_VOICE", grounded: true };
+}
+
 function conversationAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening|greetings)( there)?$/.test(n)) {
@@ -1577,6 +1586,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   maybeReloadPacks();
   ensureBrainDb();
+
+  const canonicalVoice = canonicalVoiceAnswer(q);
+  if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
 
   const conversation = conversationAnswer(q);
   if (conversation) return guardQuestionAnswer(q, conversation, mode);
