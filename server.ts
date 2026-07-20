@@ -489,18 +489,51 @@ function classifyTheologyRoute(q: string): TheologyRouteKey | null {
   return null;
 }
 
-function theologyAnswer(q: string, route: TheologyRouteKey): Record<string, unknown> {
+function theologySearchQuery(q: string, route: TheologyRouteKey): string {
+  if (route === "creation") return `${q} scientific estimate radiometric dating biblical creation six days`;
+  if (route === "evolution") return `${q} biology origin of life biblical creation`;
+  if (route === "creator") return `${q} creation Genesis John 1 biblical account`;
+  if (route === "meaning") return `${q} purpose God Jesus Bible meaning`;
+  return `${q} Genesis biblical account historical evidence`;
+}
+
+function webEvidenceLine(results: { title: string; url: string; snippet: string }[]): string {
+  const first = results.find((result) => result.snippet.trim()) || results[0];
+  if (!first) return "The web search returned no usable evidence.";
+  return `${firstSentence(first.snippet, 320)} Source: ${first.title} (${first.url})`;
+}
+
+async function theologyAnswer(q: string, route: TheologyRouteKey): Promise<Record<string, unknown>> {
   const item = THEOLOGY_ROUTE[route];
+  const searched = await webSearch(theologySearchQuery(q, route));
+  const sources = searched.ok ? searched.results.slice(0, 5) : [];
+  let filtered: string;
+  if (route === "creation") {
+    filtered = "Web search finds the prevailing scientific estimate of approximately 4.54 billion years, based on radiometric dating. That is a scientific age estimate, not a quotation from Scripture. Through the Bible lens, Genesis begins with God creating the heaven and the earth, and Exodus 20:11 explicitly says the LORD made heaven and earth, the sea, and all that is in them in six days. Scripture does not state the earth's age as a single numeral; the commonly cited young-earth estimate of roughly 6,000–10,000 years is a chronology inferred from genealogies and related passages. TRU should present both claims accurately, while keeping the biblical text primary rather than letting a web consensus erase it.";
+  } else if (route === "evolution") {
+    filtered = "Web search returns the mainstream biological account of evolution. Through the Bible lens, TRU separates observed change within populations from the larger claim that unguided processes explain the origin of life, all biological diversity, and humanity. Genesis presents God as Creator, life after its kinds, and humanity made in God's image. The scientific model may describe mechanisms claimed by biology; it does not settle the theological question of who created or what human beings are for.";
+  } else if (route === "creator") {
+    filtered = "Web search returns competing creation accounts and explanations. Filtering those results through Scripture gives a clear answer: God created the world. Genesis 1:1 states it directly, while John identifies the Word as God and says all things were made by him. The web may discuss mechanisms; it does not replace the primary claim that creation is dependent on God and, in the New Testament, on Christ.";
+  } else if (route === "meaning") {
+    filtered = "Web search returns philosophical and psychological accounts of meaning. Through the Bible lens, meaning is not self-invention: know God, love God, obey him, love your neighbour, and receive life through Jesus Christ. The web can catalogue opinions about purpose; it cannot turn those opinions into authority over the biblical answer.";
+  } else {
+    filtered = "Web search returns historical, theological, and secular treatments of Noah's flood. Through the Bible lens, Genesis presents it as God's judgement on human wickedness, the preservation of Noah's household in the ark, and a covenant marked by the bow. The waters prevailed for 150 days. TRU should neither reduce the account to a vague moral fable nor pretend that a search result alone proves every scientific detail.";
+  }
   return {
     ok: true,
     kind: "theology",
     q,
-    v: `${item.answer}\n\nAnchors: ${item.refs.join("; ")}.`,
+    v: `${filtered}\n\nScripture anchors: ${item.refs.join("; ")}.\nWeb evidence considered: ${webEvidenceLine(sources)}`,
     t: "THEOLOGY",
-    source: "TRU_SCRIPTURE_FIRST",
+    source: "WEB_FILTERED_BIBLE_LENS",
     grounded: true,
     refs: item.refs,
     route: item.title,
+    webSearched: true,
+    webQuery: theologySearchQuery(q, route),
+    webResultCount: sources.length,
+    webResults: sources,
+    webError: searched.ok ? undefined : searched.error,
   };
 }
 
@@ -1408,7 +1441,7 @@ app.post("/api/tru/ask", async (c) => {
   const command = parseTruCommand(q);
   if (command) return c.json(commandResponse(command));
   const theologyRoute = classifyTheologyRoute(q);
-  if (theologyRoute) return c.json(theologyAnswer(q, theologyRoute));
+  if (theologyRoute) return c.json(await theologyAnswer(q, theologyRoute));
   maybeReloadPacks();
   ensureBrainDb();
   const conversation = conversationAnswer(q);
