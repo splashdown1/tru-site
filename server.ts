@@ -1447,153 +1447,101 @@ async function onlineTruAnswer(q: string, local: Record<string, unknown> | null,
   return null;
 }
 
-// Local ask — routes through baked brain. No external call.
-app.post("/api/tru/ask", async (c) => {
-  let body: { q?: string } = {};
-  try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
-  const q = (body.q || "").trim();
-  if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+type QuestionMode = "public" | "sovereign";
+
+type QuestionAnswer = Record<string, unknown>;
+
+function isUnresolvedAnswer(answer: QuestionAnswer): boolean {
+  return answer.blank === true || answer.t === "UNKNOWN" || answer.grounded === false ||
+    (typeof answer.score === "number" && answer.score < 18);
+}
+
+function recordSovereignAnswer(q: string, raw: QuestionAnswer): QuestionAnswer {
+  const answer = foldMemory(raw, q);
+  const learned = autoLearn(q, answer);
+  logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", unresolved: answer.t === "UNKNOWN" || answer.blank === true, learned });
+  if (learned.length) (answer as any).learned = learned;
+  if (learned.length) maybeAutoArchive().catch(() => {});
+  return answer;
+}
+
+function guardQuestionAnswer(q: string, raw: QuestionAnswer, mode: QuestionMode): QuestionAnswer {
+  const answer = mode === "sovereign" ? recordSovereignAnswer(q, raw) : raw;
+  return tripwireGuard(answer) || answer;
+}
+
+async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise<QuestionAnswer> {
   const command = parseTruCommand(q);
-  if (command) return c.json(commandResponse(command));
+  if (command) return commandResponse(command);
+
   const theologyRoute = classifyTheologyRoute(q);
-  if (theologyRoute) return c.json(await theologyAnswer(q, theologyRoute));
+  if (theologyRoute) {
+    return guardQuestionAnswer(q, await theologyAnswer(q, theologyRoute), mode);
+  }
+
   maybeReloadPacks();
   ensureBrainDb();
-  const conversation = conversationAnswer(q);
-  if (conversation) return c.json(conversation);
 
-  // Scripture shortcut
+  const conversation = conversationAnswer(q);
+  if (conversation) return guardQuestionAnswer(q, conversation, mode);
+
   const v = parseVerse(q);
   if (v) {
-    const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
-    if (existsSync(kjvPath)) {
-      try {
-        const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
-        const refKey = v.key.toLowerCase();
-        const text = lookupVerseText(v);
-        if (text) {
-          const scriptureAns = { ok: true, kind: "scripture", ref: v.key, text };
-          const blocked = tripwireGuard(scriptureAns);
-          if (blocked) return c.json(blocked);
-          return c.json(scriptureAns);
-        }
-      } catch {}
+    const text = lookupVerseText(v);
+    if (text) {
+      return guardQuestionAnswer(q, { ok: true, kind: "scripture", ref: v.key, text }, mode);
     }
   }
+
   if (!existsSync(BRAIN_DB)) {
-    return c.json({ ok: false, kind: "unknown", q, error: "brain.db not found" }, 404);
+    return { ok: false, kind: "unknown", q, error: "brain.db not found" };
   }
+
   try {
     const db = new Database(BRAIN_DB, { readonly: true });
     const queryClass = classifyQuery(q);
     const candidates = collectCandidates(db, q, queryClass);
     db.close();
 
-    const answer = buildSynthesis(q, queryClass, candidates);
+    let answer = buildSynthesis(q, queryClass, candidates) as QuestionAnswer;
     const intent = classifyConversationalIntent(q);
     const deterministic = deterministicIntentAnswer(q, intent);
-    if (deterministic) return c.json(deterministic);
-    const online = await onlineTruAnswer(q, answer, intent);
-    if (online) {
-      const blockedOnline = tripwireGuard(online);
-      if (blockedOnline) return c.json(blockedOnline);
-      return c.json(online);
+    if (deterministic) return guardQuestionAnswer(q, deterministic, mode);
+
+    if (mode === "public") {
+      const online = await onlineTruAnswer(q, answer, intent);
+      if (online) return guardQuestionAnswer(q, online, mode);
     }
-    const blockedPub = tripwireGuard(answer);
-    if (blockedPub) return c.json(blockedPub);
-    // Web fallback: when the brain and online model cannot answer, defer to DuckDuckGo.
-    const brainMiss = answer.blank === true || answer.t === "UNKNOWN" || !answer.grounded ||
-      (typeof answer.score === "number" && answer.score < 18);
-    if (brainMiss) {
+
+    if (isUnresolvedAnswer(answer)) {
       const web = await webSearch(q);
-      
       if (web.ok && web.results.length > 0) {
-        const top = web.results.slice(0, 5);
-        const webText = top.map((r, i) =>
-          `${i + 1}. ${r.title}\n   ${r.url}\n   ${firstSentence(r.snippet, 160)}`
-        ).join("\n\n");
-        return c.json({
-          ok: true,
-          kind: "web",
-          q,
-          source: "WEB_FALLBACK",
-          v: `TRU's brain doesn't hold this. Here's what the web knows:\n\n${webText}`,
-          results: top,
-          brainMiss: true,
-        });
+        answer = formatWebFallback(q, web.results) as QuestionAnswer;
+        return guardQuestionAnswer(q, answer, mode);
       }
     }
-    return c.json(answer);
-  } catch (e) {
-    return c.json({ ok: false, error: String(e) }, 500);
+
+    return guardQuestionAnswer(q, answer, mode);
+  } catch (error) {
+    return { ok: false, error: String(error) };
   }
+}
+
+app.post("/api/tru/ask", async (c) => {
+  let body: { q?: string } = {};
+  try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  const q = (body.q || "").trim();
+  if (!q) return c.json({ ok: false, error: "empty query" }, 400);
+  return c.json(await answerQuestion(q, "public"));
 });
 
-// SOVEREIGN ASK — gated. Same retrieval as /ask, but folds TRU's own
-// remembered memory into the answer. Public /ask stays brain+KJV only;
-// memory is the owner's private knowledge and must not leak to anon
-// queries. In the UNKNOWN case, a strong memory match becomes the answer.
 app.post("/api/tru/ask/sovereign", async (c) => {
   if (!requireGate(c)) return c.json({ ok: false, error: "unauthorized" }, 401);
   let body: { q?: string } = {};
   try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
-  maybeReloadPacks();
-  ensureBrainDb();
-  // Scripture shortcut — same as public /ask.
-  const v = parseVerse(q);
-  if (v) {
-    const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
-    if (existsSync(kjvPath)) {
-      try {
-        const kjv = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>;
-        const refKey = v.key.toLowerCase();
-        const text = lookupVerseText(v);
-        if (text) {
-          const ans = foldMemory({ ok: true, kind: "scripture", ref: v.key, text }, q);
-          const learned = autoLearn(q, ans);
-          logAsk({ ts: Date.now(), q, kind: "scripture", unresolved: false, learned });
-          if (learned.length) (ans as any).learned = learned;
-          const blockedSov = tripwireGuard(ans);
-          if (blockedSov) return c.json(blockedSov);
-          return c.json(ans);
-        }
-      } catch {}
-    }
-  }
-  if (!existsSync(BRAIN_DB)) {
-    return c.json({ ok: false, error: "brain.db not found" }, 404);
-  }
-  try {
-    const db = new Database(BRAIN_DB, { readonly: true });
-    const queryClass = classifyQuery(q);
-    const candidates = collectCandidates(db, q, queryClass);
-    db.close();
-    const answer = foldMemory(buildSynthesis(q, queryClass, candidates), q);
-    // Self-writing memory: extract teachings/identity/preferences, log for reflection.
-    const learned = autoLearn(q, answer);
-    logAsk({ ts: Date.now(), q, kind: answer.kind || "brain", unresolved: answer.t === "UNKNOWN" || answer.blank === true, learned });
-    if (learned.length) (answer as any).learned = learned;
-    if (learned.length) maybeAutoArchive().catch(() => {});
-    // WEB FALLBACK — if brain AND memory both miss (still UNKNOWN/blank),
-    // defer to DuckDuckGo so the sovereign owner gets real answers,
-    // not a dead-end. Same honest source labeling as /ask.
-    if (answer.blank === true || answer.t === "UNKNOWN" || answer.grounded === false) {
-      const web = await webSearch(q);
-      if (web.ok && web.results && web.results.length > 0) {
-        const webAns = formatWebFallback(q, web.results);
-        const blockedSovWeb = tripwireGuard(webAns);
-        if (blockedSovWeb) return c.json(blockedSovWeb);
-        return c.json(webAns);
-      }
-    }
-    const blockedSovBrain = tripwireGuard(answer);
-    if (blockedSovBrain) return c.json(blockedSovBrain);
-    return c.json(answer);
-  } catch (e) {
-    return c.json({ ok: false, error: String(e) }, 500);
-  }
+  return c.json(await answerQuestion(q, "sovereign"));
 });
 
 // ── REFLECT — LLM distillation of unresolved asks into durable memory ──
