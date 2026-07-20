@@ -3,12 +3,14 @@
 // no telemetry. Runs from file://.
 //
 // Build-time placeholders (replaced by server before serving):
-//   __BRAIN__   — JSON.stringify of the full brain array
-//   __KJV__     — JSON.stringify of the KJV lookup object
-//   __SESSION__ — JSON.stringify of merged user state (text, notes, uploads)
-//   __META__    — JSON.stringify of { baked, brain, kjv, uploads }
-//   __PRIMARIES__ — lock string injected at boot
-//   __MEMORY__  — JSON.stringify of { entries:[...], version:N } self-writing memory
+//   __BRAIN__       — JSON.stringify of the full brain array
+//   __KJV__         — JSON.stringify of the KJV lookup object
+//   __SESSION__     — JSON.stringify of merged user state (text, notes, uploads)
+//   __META__        — JSON.stringify of { baked, brain, kjv, uploads }
+//   __PRIMARIES__   — lock string injected at boot
+//   __MEMORY__      — JSON.stringify of { entries:[...], version:N } self-writing memory
+//   __GREEK__       — JSON.stringify of tru_greek_nt.json (Greek NT, optional)
+//   __TRANSLATION__ — JSON.stringify of tru_translation.json (TRU trans, optional)
 (function () {
   "use strict";
 
@@ -19,6 +21,8 @@
   const SESSION = __SESSION__ || {};
   const META    = __META__ || {};
   const BAKED_MEMORY = __MEMORY__ || { entries: [], version: 0 };
+  const GREEK = (typeof __GREEK__ !== "undefined") ? __GREEK__ : null;
+  const TRANSLATION = (typeof __TRANSLATION__ !== "undefined") ? __TRANSLATION__ : null;
 
   // ── GHOST MEMORY — baked memory from server + locally taught entries ──
   // Baked memory is read-only (inherited at bake time). Locally taught
@@ -580,9 +584,150 @@
     document.getElementById("statKjv").textContent   = (Object.keys(KJV).length || 0).toLocaleString();
     document.getElementById("statImg").textContent    = "0";
     document.getElementById("statFiles").textContent  = "0";
+    var gEl = document.getElementById("statGreek");
+    if (gEl) gEl.textContent = GREEK && GREEK.meta ? GREEK.meta.verses.toLocaleString() : "—";
+    var tEl = document.getElementById("statTrans");
+    if (tEl) tEl.textContent = TRANSLATION ? (TRANSLATION.verses_with_translation || TRANSLATION.total_verses || 0).toLocaleString() : "—";
+    var mEl = document.getElementById("statMem");
+    if (mEl) mEl.textContent = ((BAKED_MEMORY && BAKED_MEMORY.entries) ? BAKED_MEMORY.entries.length : 0).toLocaleString();
     if (META.baked) document.getElementById("ts").textContent = "baked " + META.baked;
     var meta = document.getElementById("meta");
     if (meta) meta.textContent = "ghost · " + (META.uploads || 0) + " uploads · " + (BRAIN.length || 0) + " brain · " + (Object.keys(KJV).length || 0) + " kjv";
+  }
+
+  // ── GREEK & TRANSLATION LOOKUP — read-only, no retrieval scoring ──
+  // The monolith bakes the SBLGNT Greek NT and the TRU translation. Both
+  // are addressable by reference (e.g. "MT 1:1", "JN 3:16"). The lookup
+  // is independent of the brain — pure data, no inference. If the user
+  // asks a Greek query that is not a clean ref, we fall back to a simple
+  // token search across the verse text.
+  const GREEK_BOOK_ALIAS = {
+    matthew: "MT", matt: "MT", mt: "MT",
+    mark: "MK", mk: "MK", mar: "MK", mr: "MK",
+    luke: "LK", lk: "LK", lu: "LK",
+    john: "JN", jn: "JN", jhn: "JN",
+    acts: "AC", ac: "AC", act: "AC",
+    romans: "ROM", rom: "ROM", rm: "ROM",
+    "1cor": "1CO", "1co": "1CO", "1corinthians": "1CO",
+    "2cor": "2CO", "2co": "2CO", "2corinthians": "2CO",
+    galatians: "GAL", gal: "GAL", ga: "GAL",
+    ephesians: "EPH", eph: "EPH",
+    philippians: "PHIL", phil: "PHIL", php: "PHIL",
+    colossians: "COL", col: "COL",
+    "1thess": "1TH", "1th": "1TH", "1thessalonians": "1TH",
+    "2thess": "2TH", "2th": "2TH", "2thessalonians": "2TH",
+    "1tim": "1TI", "1ti": "1TI", "1timothy": "1TI",
+    "2tim": "2TI", "2ti": "2TI", "2timothy": "2TI",
+    titus: "TIT", tit: "TIT",
+    philemon: "PHM", phm: "PHM",
+    hebrews: "HEB", heb: "HEB",
+    james: "JAS", jas: "JAS", jam: "JAS",
+    "1peter": "1PE", "1pe": "1PE", "1pet": "1PE",
+    "2peter": "2PE", "2pe": "2PE", "2pet": "2PE",
+    "1john": "1JN", "1jn": "1JN", "1jhn": "1JN",
+    "2john": "2JN", "2jn": "2JN", "2jhn": "2JN",
+    "3john": "3JN", "3jn": "3JN", "3jhn": "3JN",
+    jude: "JUD", jud: "JUD",
+    revelation: "REV", rev: "REV", ap: "REV",
+  };
+  function parseGreekRef(q) {
+    var m = String(q || "").trim().toUpperCase().match(/^([1-3]?\s?[A-Z]+)\s+(\d+)\s*[:.]\s*(\d+)/);
+    if (!m) return null;
+    var raw = m[1].replace(/\s+/g, "");
+    var abbr = GREEK_BOOK_ALIAS[raw.toLowerCase()] || raw;
+    return { abbr: abbr, chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
+  }
+  function lookupGreek(ref) {
+    if (!GREEK || !GREEK.books) return null;
+    var p = parseGreekRef(ref);
+    if (!p) return null;
+    var book = GREEK.books[p.abbr];
+    if (!book || !book.chapters) return null;
+    var ch = book.chapters[String(p.chapter)];
+    if (!ch || !Array.isArray(ch.verses)) return null;
+    var verse = ch.verses.find(function (v) { return v.verse === p.verse; });
+    if (!verse) return null;
+    return { abbr: p.abbr, chapter: p.chapter, verse: p.verse, greek: verse.text, book: book.name || p.abbr };
+  }
+  function lookupTranslation(ref) {
+    if (!TRANSLATION || !Array.isArray(TRANSLATION.verses)) return null;
+    var p = parseGreekRef(ref);
+    if (!p) return null;
+    var ref1 = p.abbr + " " + p.chapter + ":" + p.verse;
+    var ref2 = p.abbr + " " + p.chapter + " " + p.verse;
+    return TRANSLATION.verses.find(function (v) { return v.ref === ref1 || v.ref === ref2; }) || null;
+  }
+  function greekSearch(q, limit) {
+    if (!GREEK || !GREEK.books) return [];
+    limit = limit || 8;
+    var ql = norm(q);
+    var qTokens = tokenize(q);
+    var hits = [];
+    for (var abbr in GREEK.books) {
+      var book = GREEK.books[abbr];
+      if (!book || !book.chapters) continue;
+      for (var chKey in book.chapters) {
+        var ch = book.chapters[chKey];
+        if (!ch || !Array.isArray(ch.verses)) continue;
+        for (var i = 0; i < ch.verses.length; i++) {
+          var v = ch.verses[i];
+          var t = String(v.text || "").toLowerCase();
+          var score = 0;
+          for (var j = 0; j < qTokens.length; j++) if (t.indexOf(qTokens[j]) !== -1) score += 3;
+          if (ql.length >= 4 && t.indexOf(ql) !== -1) score += 5;
+          if (score > 0) hits.push({ score: score, ref: abbr + " " + chKey + ":" + v.verse, text: v.text, book: abbr });
+        }
+      }
+    }
+    hits.sort(function (a, b) { return b.score - a.score; });
+    return hits.slice(0, limit);
+  }
+  function askGreek() {
+    var qEl = document.getElementById("greekQ");
+    var out = document.getElementById("greekOut");
+    var q = (qEl && qEl.value || "").trim();
+    if (!q || !out) return;
+    var lines = [];
+    if (!GREEK && !TRANSLATION) {
+      out.innerHTML = '<div class="verdict unknown">NO GREEK DATA</div><div class="answer">This ghost was baked without Greek/Translation data.</div>';
+      qEl.value = ""; qEl.focus();
+      return;
+    }
+    var ref = parseGreekRef(q);
+    if (ref) {
+      var g = lookupGreek(q);
+      var t = lookupTranslation(q);
+      var refLabel = ref.abbr + " " + ref.chapter + ":" + ref.verse;
+      lines.push('<div class="verdict">REFERENCE · ' + esc(refLabel) + '</div>');
+      if (g) {
+        lines.push('<div class="answer"><span style="font-size:9px;color:var(--dim);letter-spacing:0.2em">GREEK · SBLGNT</span><br>' + esc(g.greek) + '<span class="src">' + esc(g.book) + ' ' + ref.chapter + ':' + ref.verse + '</span></div>');
+      } else {
+        lines.push('<div class="answer"><em style="color:var(--muted)">No Greek text at ' + esc(refLabel) + '.</em></div>');
+      }
+      if (t) {
+        lines.push('<div class="answer" style="margin-top:12px"><span style="font-size:9px;color:var(--dim);letter-spacing:0.2em">TRU TRANSLATION</span><br>' + esc(t.translation || t.text || "") + '<span class="src">' + esc(t.ref) + '</span></div>');
+      } else {
+        lines.push('<div class="answer" style="margin-top:12px"><em style="color:var(--muted)">No TRU translation at ' + esc(refLabel) + ' yet.</em></div>');
+      }
+    } else {
+      var hits = greekSearch(q, 8);
+      if (hits.length === 0) {
+        lines.push('<div class="verdict unknown">NO GREEK MATCH</div><div class="answer">No Greek verse contains: ' + esc(q) + '</div>');
+      } else {
+        lines.push('<div class="verdict">GREEK SEARCH · ' + hits.length + ' HITS</div>');
+        hits.forEach(function (h) {
+          lines.push('<div class="answer" style="border-left:2px solid var(--line-2);padding-left:10px;margin:8px 0"><span style="font-size:9px;color:var(--truth);letter-spacing:0.2em">' + esc(h.ref) + '</span><br>' + esc(firstSentence(h.text, 220)) + '</div>');
+        });
+      }
+    }
+    out.innerHTML = lines.join("");
+    qEl.value = ""; qEl.focus();
+  }
+  function showGreekPanel() {
+    if (GREEK || TRANSLATION) {
+      var p = document.getElementById("greekPanel");
+      if (p) p.style.display = "";
+    }
   }
 
   function renderLineage() {
@@ -642,9 +787,16 @@
     renderLineage();
     renderNotes();
     renderUploads();
+    showGreekPanel();
     document.getElementById("askBtn").addEventListener("click", ask);
     document.getElementById("q").addEventListener("keydown", function (e) {
       if (e.key === "Enter") ask();
+    });
+    var gBtn = document.getElementById("greekAskBtn");
+    if (gBtn) gBtn.addEventListener("click", askGreek);
+    var gQ = document.getElementById("greekQ");
+    if (gQ) gQ.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") askGreek();
     });
     var qEl = document.getElementById("q");
     if (qEl) qEl.focus();

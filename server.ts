@@ -11,6 +11,7 @@ import Database from "bun:sqlite";
 import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { simpleParser } from "mailparser";
+import { chatCompletion, gatewayStatus, GatewayError, type ChatCompletionRequest } from "./backend-lib/llm-gateway";
 import { loadKnowledgePacks, scorePackMatch, type QueryClass } from "./src/knowledge-packs";
 // canon + truth-layer live in the sibling TRU/ monorepo (present on the
 // canonical account). On instances without that sibling they degrade to
@@ -1060,6 +1061,77 @@ function mergeSnapshot(payload: Record<string, unknown>) {
 }
 
 app.get("/api/hello-zo", (c) => c.json({ msg: "Hello from Zo" }));
+
+const gatewayWindows = new Map<string, { startedAt: number; requests: number }>();
+const GATEWAY_WINDOW_MS = 60_000;
+const GATEWAY_REQUESTS_PER_WINDOW = 20;
+const GATEWAY_MAX_BODY_BYTES = 256 * 1024;
+
+function gatewayClientAddress(c: any): string {
+  return c.req.header("cf-connecting-ip") || c.req.header("x-real-ip") || c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+}
+
+function gatewayRateLimited(c: any): boolean {
+  const address = gatewayClientAddress(c);
+  const now = Date.now();
+  const current = gatewayWindows.get(address);
+  if (!current || now - current.startedAt >= GATEWAY_WINDOW_MS) {
+    gatewayWindows.set(address, { startedAt: now, requests: 1 });
+    return false;
+  }
+  current.requests += 1;
+  return current.requests > GATEWAY_REQUESTS_PER_WINDOW;
+}
+
+function gatewayAccess(c: any): "ok" | "missing" | "invalid" {
+  const secret = process.env.LLM_GATEWAY_API_KEY;
+  if (!secret) return "missing";
+  const auth = c.req.header("authorization") || "";
+  if (!auth.startsWith("Bearer ")) return "invalid";
+  const token = Buffer.from(auth.slice(7));
+  const expected = Buffer.from(secret);
+  if (token.length !== expected.length || !timingSafeEqual(token, expected)) return "invalid";
+  return "ok";
+}
+
+async function handleGatewayRequest(c: any): Promise<Response> {
+  const access = gatewayAccess(c);
+  if (access === "missing") return c.json({ error: { message: "LLM gateway is not configured", type: "configuration_error" } }, 503);
+  if (access !== "ok") return c.json({ error: { message: "unauthorized", type: "authentication_error" } }, 401);
+  const contentLength = Number(c.req.header("content-length") || 0);
+  if (contentLength > GATEWAY_MAX_BODY_BYTES) {
+    return c.json({ error: { message: "request body too large", type: "invalid_request_error" } }, 413);
+  }
+  if (gatewayRateLimited(c)) {
+    return c.json({ error: { message: "gateway rate limit exceeded", type: "rate_limit_error" } }, 429, { "Retry-After": "60" });
+  }
+  let body: ChatCompletionRequest;
+  try {
+    body = (await c.req.json()) as ChatCompletionRequest;
+  } catch {
+    return c.json({ error: { message: "invalid JSON request", type: "invalid_request_error" } }, 400);
+  }
+  try {
+    const result = await chatCompletion(body);
+    return c.json(result.data, 200, {
+      "X-LLM-Gateway": "round-robin",
+      "X-LLM-Gateway-Attempts": String(result.attempts),
+      "X-LLM-Gateway-Key-Index": String(result.keyIndex),
+    });
+  } catch (error) {
+    if (error instanceof GatewayError) {
+      const headers: Record<string, string> = {};
+      if (error.retryAfter) headers["Retry-After"] = String(Math.ceil(error.retryAfter / 1000));
+      return c.json({ error: { message: error.message, type: error.status === 429 ? "rate_limit_error" : "gateway_error", detail: error.detail } }, error.status as any, headers);
+    }
+    console.error("[llm-gateway]", error);
+    return c.json({ error: { message: "gateway failure", type: "gateway_error" } }, 502);
+  }
+}
+
+app.post("/api/llm/chat", handleGatewayRequest);
+app.post("/api/llm/v1/chat/completions", handleGatewayRequest);
+
 
 // Primaries verification audit — returns the report from the last boot check.
 app.get("/api/tru/primaries", (c) => {
@@ -2849,6 +2921,177 @@ function configureProduction(app: Hono) {
     return serveStatic({ path: "./dist/index.html" })(c, next);
   });
 }
+
+/* ---------------------------------------------------------------------
+ * COIL v2 — chunked bundle ingest endpoints (paired with
+ * tru-offline/coil/scripts/coil_receiver.py)
+ *
+ * Each incoming bundle chunk arrives as a raw binary body. A 1 KiB
+ * 256-byte sha256 trailer carries the expected sha256 of the chunk
+ *  *before* truncation, so the receiver can refuse reordering or
+ *  corruption. Session state lives in /tmp/coil_inbox/<sid>/; the
+ *  finalised MANIFEST + ROLLUP land in /home/workspace/TRU/ghost/.
+ * ------------------------------------------------------------------- */
+const COIL_INCOMING = process.env.COIL_INCOMING || "/tmp/coil_inbox";
+const COIL_GHOST_OUT = process.env.COIL_GHOST_OUT || "/home/workspace/TRU/ghost";
+type CoilSession = {
+  sessionId: string;
+  bundleName: string;
+  chunkSize: number;
+  totalChunks: number;
+  expectedSha256: string;
+  received: number;
+  bytesReceived: number;
+  startedAt: number;
+  chunks: Map<number, { size: number; sha256: string; path: string }>;
+};
+const coilSessions = new Map<string, CoilSession>();
+function safeId(raw: string): string {
+  return raw.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "session";
+}
+app.post("/api/coil/session", async (c) => {
+  const body = await c.req.parseBody<Record<string, string>>();
+  const sessionId = safeId(String(body.sessionId || ""));
+  const bundleName = safeId(String(body.bundleName || "bundle"));
+  const chunkSize = parseInt(String(body.chunkSize || "0"), 10) || 0;
+  const totalChunks = parseInt(String(body.totalChunks || "0"), 10) || 0;
+  const expectedSha256 = String(body.expectedSha256 || "").toLowerCase();
+  if (!sessionId || !bundleName || chunkSize <= 0 || totalChunks <= 0) {
+    return c.json({ ok: false, error: "bad session params" }, 400);
+  }
+  const dir = `${COIL_INCOMING}/${sessionId}`;
+  await Bun.write(`${dir}/.keep`, new Uint8Array(0)).catch(() => {});
+  // Ensure dir exists by writing a tiny marker.
+  try { await Bun.$`mkdir -p ${dir}`; } catch {}
+  coilSessions.set(sessionId, {
+    sessionId, bundleName, chunkSize, totalChunks, expectedSha256,
+    received: 0, bytesReceived: 0, startedAt: Date.now(),
+    chunks: new Map(),
+  });
+  return c.json({ ok: true, sessionId, incomingDir: dir });
+});
+app.post("/api/coil/chunk", async (c) => {
+  const sessionId = safeId(c.req.header("x-coil-session") || "");
+  const idxHeader = c.req.header("x-coil-index") || "";
+  const idx = parseInt(idxHeader, 10);
+  const totalHeader = c.req.header("x-coil-total") || "";
+  const total = parseInt(totalHeader, 10);
+  const sid = coilSessions.get(sessionId);
+  if (!sid) return c.json({ ok: false, error: "no active session" }, 404);
+  if (!Number.isInteger(idx) || idx < 0 || idx >= sid.totalChunks) {
+    return c.json({ ok: false, error: "bad chunk index" }, 400);
+  }
+  const buf = new Uint8Array(await c.req.arrayBuffer());
+  if (buf.length < 256) {
+    return c.json({ ok: false, error: "chunk too small" }, 400);
+  }
+  const trailerStart = buf.length - 256;
+  const payload = buf.subarray(0, trailerStart);
+  const trailer = Buffer.from(buf.subarray(trailerStart)).toString("utf-8").trim();
+  // Trailer is a sha256 of the payload BEFORE the trailing newline;
+  // it must match what the packer wrote. Recompute on the server side.
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(payload);
+  const computed = hasher.digest("hex");
+  if (computed !== trailer) {
+    return c.json({ ok: false, error: "bad chunk sha256" }, 400);
+  }
+  const dir = `${COIL_INCOMING}/${sessionId}`;
+  const name = `chunk-${String(idx).padStart(8, "0")}`;
+  const path = `${dir}/${name}`;
+  await Bun.write(path, payload);
+  sid.chunks.set(idx, { size: payload.length, sha256: computed, path });
+  sid.received = sid.chunks.size;
+  sid.bytesReceived += payload.length;
+  return c.json({
+    ok: true,
+    sessionId,
+    index: idx,
+    total,
+    received: sid.received,
+    bytesReceived: sid.bytesReceived,
+  });
+});
+app.post("/api/coil/finalize", async (c) => {
+  const sessionId = safeId(c.req.header("x-coil-session") || "");
+  const sid = coilSessions.get(sessionId);
+  if (!sid) return c.json({ ok: false, error: "no active session" }, 404);
+  if (sid.received < sid.totalChunks) {
+    return c.json({
+      ok: false,
+      error: `missing chunks: have ${sid.received} of ${sid.totalChunks}`,
+    }, 409);
+  }
+  // Concatenate chunks in order, hash, write MANIFEST + ROLLUP.
+  let combined = new Uint8Array(sid.bytesReceived);
+  let offset = 0;
+  const fileDigests: Array<{ index: number; size: number; sha256: string }> = [];
+  for (let i = 0; i < sid.totalChunks; i++) {
+    const ch = sid.chunks.get(i);
+    if (!ch) return c.json({ ok: false, error: `missing chunk ${i}` }, 409);
+    const data = await Bun.file(ch.path).bytes();
+    combined.set(data, offset);
+    offset += data.length;
+    fileDigests.push({ index: i, size: ch.size, sha256: ch.sha256 });
+  }
+  const top = new Bun.CryptoHasher("sha256");
+  top.update(combined);
+  const topSha = top.digest("hex");
+  if (sid.expectedSha256 && topSha !== sid.expectedSha256) {
+    return c.json({ ok: false, error: "top-level sha256 mismatch" }, 400);
+  }
+  try { await Bun.$`mkdir -p ${COIL_GHOST_OUT}`; } catch {}
+  const bundlePath = `${COIL_GHOST_OUT}/${sid.bundleName}`;
+  await Bun.write(bundlePath, combined);
+  const manifest = {
+    bundleName: sid.bundleName,
+    sessionId: sid.sessionId,
+    bytes: combined.length,
+    topSha256: topSha,
+    chunks: sid.totalChunks,
+    chunkSize: sid.chunkSize,
+    receivedAt: new Date().toISOString(),
+    fileDigests,
+  };
+  const manifestPath = `${COIL_GHOST_OUT}/${sid.bundleName}.MANIFEST.json`;
+  await Bun.write(manifestPath, JSON.stringify(manifest, null, 2));
+  // Append to a long-running ROLLUP log.
+  const rollPath = `${COIL_GHOST_OUT}/COIL_ROLLUP.ndjson`;
+  const rollLine = JSON.stringify({
+    ts: new Date().toISOString(),
+    sessionId: sid.sessionId,
+    bundle: sid.bundleName,
+    bytes: combined.length,
+    topSha256: topSha,
+    chunks: sid.totalChunks,
+  }) + "\n";
+  await Bun.write(rollPath, rollLine, { append: true }).catch(async () => {
+    // If the file does not exist, this should still work; fall back to
+    // a read-modify-write if the runtime refuses append.
+    let prior = "";
+    try { prior = await Bun.file(rollPath).text(); } catch {}
+    await Bun.write(rollPath, prior + rollLine);
+  });
+  coilSessions.delete(sessionId);
+  return c.json({
+    ok: true,
+    bundle: sid.bundleName,
+    bytes: combined.length,
+    topSha256: topSha,
+    bundlePath,
+    manifestPath,
+  });
+});
+app.get("/api/coil/status", (c) => {
+  return c.json({
+    ok: true,
+    enabled: true,
+    activeSessions: coilSessions.size,
+    incoming: COIL_INCOMING,
+    ghostOut: COIL_GHOST_OUT,
+  });
+});
+
 
 async function configureDevelopment(app: Hono): Promise<ViteDevServer> {
   const vite = await createViteServer({

@@ -261,11 +261,23 @@
     <div class="files" id="filesBody"></div>
   </section>
 
+  <section class="panel" id="greekPanel" style="display:none">
+    <h2>Greek &amp; Translation</h2>
+    <div id="greekAskRow" style="display:flex;gap:10px;align-items:center">
+      <input id="greekQ" type="text" placeholder="Greek ref (e.g. MT 1:1, JN 3:16) or word…" autocomplete="off" spellcheck="false">
+      <button class="ask" id="greekAskBtn">Lookup</button>
+    </div>
+    <div id="greekOut" style="margin-top:14px"></div>
+  </section>
+
   <section class="panel">
     <h2>Engine Stats</h2>
     <div class="stats">
       <div class="stat"><div class="lbl">Brain</div><div class="val" id="statBrain">—</div></div>
       <div class="stat"><div class="lbl">KJV</div><div class="val" id="statKjv">—</div></div>
+      <div class="stat"><div class="lbl">Greek</div><div class="val" id="statGreek">—</div></div>
+      <div class="stat"><div class="lbl">Trans</div><div class="val" id="statTrans">—</div></div>
+      <div class="stat"><div class="lbl">Memory</div><div class="val" id="statMem">—</div></div>
       <div class="stat"><div class="lbl">Images</div><div class="val" id="statImg">—</div></div>
       <div class="stat"><div class="lbl">Files</div><div class="val" id="statFiles">—</div></div>
     </div>
