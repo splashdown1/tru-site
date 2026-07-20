@@ -22,4 +22,6 @@ Set these in the service environment, not in committed files:
 
 The gateway uses process-wide round-robin selection. Each request starts at the next key, skips keys still cooling down, and retries the same request on the next pool member after HTTP 429. When every key is exhausted, it returns HTTP 429 with `Retry-After`; it does not spin or retry indefinitely.
 
+`GET /api/llm/status` requires the same `LLM_GATEWAY_API_KEY` bearer token and returns provider/model metadata, pooled key count, round-robin cursor, per-key request totals, rate-limit totals, failure totals, and cooldown state. It never returns key values.
+
 Clients should send `Authorization: Bearer <LLM_GATEWAY_API_KEY>` to the gateway. Client-side routing should select between gateway URLs if multiple gateway instances are deployed; it must never contain provider keys.

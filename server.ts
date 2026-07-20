@@ -1240,6 +1240,12 @@ async function handleGatewayRequest(c: any): Promise<Response> {
 
 app.post("/api/llm/chat", handleGatewayRequest);
 app.post("/api/llm/v1/chat/completions", handleGatewayRequest);
+app.get("/api/llm/status", (c) => {
+  const access = gatewayAccess(c);
+  if (access === "missing") return c.json({ error: { message: "LLM gateway is not configured", type: "configuration_error" } }, 503);
+  if (access !== "ok") return c.json({ error: { message: "unauthorized", type: "authentication_error" } }, 401);
+  return c.json({ ok: true, gateway: gatewayStatus() });
+});
 
 
 // Primaries verification audit — returns the report from the last boot check.
