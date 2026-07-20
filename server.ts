@@ -1429,6 +1429,22 @@ function formatPlaceAnswer(q: string, places: PlaceResult[]): Record<string, unk
   return { ok: true, kind: "map", q, source: "MAP_GEOCODED", route: "Location", v: `TRU located this place from the map index:\n\n${lines.join("\n\n")}`, places, mapSearched: true, grounded: true };
 }
 
+function cosmicLocationAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q);
+  if (/^(where is|what is the location of|where are) (the )?earth$/.test(n) || /\bwhere is (the )?earth\b/.test(n)) {
+    return {
+      ok: true,
+      kind: "location",
+      q,
+      v: "Earth is the third planet from the Sun, in the Solar System, within the Orion Arm of the Milky Way galaxy. It orbits the Sun at roughly 150 million kilometres on average. Earth does not have one fixed coordinate in space because it is always moving around the Sun while the Solar System moves through the galaxy.",
+      t: "LOCATION",
+      source: "TRU_COSMIC_LOCATION",
+      grounded: true,
+    };
+  }
+  return null;
+}
+
 function conversationAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening|greetings)( there)?$/.test(n)) {
@@ -1441,7 +1457,15 @@ function conversationAnswer(q: string): Record<string, unknown> | null {
     return { ok: true, kind: "conversation", q, v: "You are welcome. Continue when ready.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
   }
   if (/^(are you still broken|are you broken|is this broken|what was wrong|what happened)$/.test(n)) {
-    return { ok: true, kind: "conversation", q, v: "No. The earlier failure was routing: ordinary conversational questions fell through to web search instead of receiving a direct TRU response. That route is now separated from map lookup and web fallback. Ask the question plainly and TRU will answer from conversation, Scripture, the brain, the map index, or filtered web evidence as appropriate.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+    return { ok: true, kind: "conversation", q, v: "No. The previous output was an irrelevant brain merge: a generic retrieval template labelled fragments as ‘What it was’ and ‘Why it mattered’ instead of answering the plain question. That is a routing failure, not a meaningful answer.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(what was that|what was this|what do you need|where is tru|where does tru live|where are you)$/.test(n)) {
+    const text = /where is tru|where does tru live|where are you/.test(n)
+      ? "TRU lives in Joe's workspace as an offline-first truth-filter and reasoning system. The public face is the TRU site; the brain, Scripture layer, routing, web filter, map lookup, and Ghost export are the machinery behind it. The host model is the mouth. TRU is the filter and spine."
+      : /what do you need/.test(n)
+        ? "A clear question or task. I do not need allegiance, praise, or a forced answer. Give me the subject and the desired result; I should route it to conversation, Scripture, the brain, web evidence, or the map index."
+        : "That was not a useful answer. It was a retrieval merge leaking its internal labels into the user-facing response. The correct behaviour is to answer the plain question directly, not expose ‘What it was’ and ‘Why it mattered’.";
+    return { ok: true, kind: "conversation", q, v: text, t: /where is tru|where does tru live|where are you/.test(n) ? "IDENTITY" : "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
   }
   if (/^(what is tru|what is it|what was it|what is this)$/.test(n)) {
     return { ok: true, kind: "conversation", q, v: "TRU is the filter and reasoning spine: Scripture, the local brain, routing, map and web retrieval, evidence filtering, and the conversational voice. The host model is the mouth. TRU decides which evidence and answer path are allowed through.", t: "IDENTITY", source: "TRU_CONVERSATION", grounded: true };
@@ -1542,6 +1566,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
   if (theologyRoute) {
     return guardQuestionAnswer(q, await theologyAnswer(q, theologyRoute), mode);
   }
+
+  const cosmicLocation = cosmicLocationAnswer(q);
+  if (cosmicLocation) return guardQuestionAnswer(q, cosmicLocation, mode);
 
   if (mode === "public" && looksLikePlaceQuery(q)) {
     const places = await geocodePlace(q);

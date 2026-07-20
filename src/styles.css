@@ -315,3 +315,5 @@ body {
   .tru-mission-footer { flex-direction: column; line-height: 1.7; }
 }
 .verdict-map { color: #4dd0e1; border-color: #4dd0e1; }
+
+.verdict-location { color: #80cbc4; border-color: #80cbc4; }
