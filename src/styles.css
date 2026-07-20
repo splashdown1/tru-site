@@ -252,3 +252,65 @@ body {
   .tru-chat { padding-left: 28px; padding-right: 28px; }
   .tru-message { max-width: 76%; }
 }
+
+.tru-mission {
+  min-height: 100dvh;
+  background: #020405;
+  color: #dcecf2;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  padding: 0 6vw;
+}
+.tru-mission a { color: inherit; text-decoration: none; }
+.tru-mission-nav {
+  max-width: 1180px; margin: 0 auto; padding: 24px 0;
+  display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 1px solid rgba(0,229,255,.16);
+}
+.tru-mission-mark { color: #00e5ff !important; font-family: Georgia, serif; letter-spacing: .28em; font-size: 13px; text-shadow: 0 0 14px rgba(0,229,255,.45); }
+.tru-mission-nav-links { display: flex; gap: 22px; color: #64808c; font-size: 10px; letter-spacing: .16em; text-transform: uppercase; }
+.tru-mission-nav-links a:hover, .tru-mission-footer a:hover { color: #00e5ff; }
+.tru-mission-hero { max-width: 1180px; margin: 0 auto; padding: 14vh 0 12vh; }
+.tru-mission-kicker, .tru-mission-label { color: #00e5ff; font-size: 10px; letter-spacing: .28em; text-transform: uppercase; }
+.tru-mission-hero h1 { margin: 24px 0 24px; color: #e9fbff; font: 300 clamp(42px, 8vw, 94px)/.98 Georgia, serif; letter-spacing: -.045em; }
+.tru-mission-hero h1 span { color: #52717c; }
+.tru-mission-lead { max-width: 700px; color: #93abb4; font-size: 16px; line-height: 1.85; }
+.tru-mission-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; margin-top: 34px; font-size: 11px; letter-spacing: .15em; text-transform: uppercase; }
+.tru-mission-primary { padding: 13px 17px; border: 1px solid #00e5ff; color: #00e5ff !important; box-shadow: 0 0 22px rgba(0,229,255,.12); }
+.tru-mission-primary:hover { background: rgba(0,229,255,.1); }
+.tru-mission-primary span { margin-left: 12px; font-size: 17px; }
+.tru-mission-secondary { color: #78919a !important; }
+.tru-mission-secondary:hover { color: #e9fbff !important; }
+.tru-mission-grid { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 18px; }
+.tru-mission-panel { border: 1px solid rgba(0,229,255,.15); background: rgba(4,18,23,.55); padding: clamp(22px,4vw,42px); }
+.tru-mission-panel-accent { border-color: rgba(0,229,255,.42); background: linear-gradient(135deg, rgba(0,229,255,.09), rgba(4,18,23,.42)); }
+.tru-mission-panel h2 { margin: 24px 0 16px; color: #dffaff; font: 300 clamp(25px,3vw,38px)/1.08 Georgia, serif; }
+.tru-mission-panel p, .tru-mission-section-head p { color: #8da6ae; font-size: 13px; line-height: 1.8; }
+.tru-mission-section { max-width: 1180px; margin: 0 auto; padding: 12vh 0 0; }
+.tru-mission-section-head { display: grid; grid-template-columns: .75fr 1.25fr; gap: 8vw; align-items: start; padding-bottom: 28px; border-bottom: 1px solid rgba(0,229,255,.13); }
+.tru-mission-principles { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; background: rgba(0,229,255,.13); }
+.tru-mission-principles > div { min-height: 150px; padding: 24px 20px; background: #020405; }
+.tru-mission-principles b { display: block; color: #b9e8f2; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; }
+.tru-mission-principles span { display: block; margin-top: 16px; color: #6f8993; font-size: 12px; line-height: 1.7; }
+.tru-layer-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: rgba(0,229,255,.13); }
+.tru-layer { display: flex; gap: 17px; min-height: 145px; padding: 24px 20px; background: #020405; }
+.tru-layer-number { color: #00e5ff; font-size: 11px; letter-spacing: .1em; }
+.tru-layer h3 { margin: 0; color: #c5eaf2; font-size: 14px; letter-spacing: .12em; text-transform: uppercase; }
+.tru-layer p { margin: 13px 0 0; color: #708993; font-size: 12px; line-height: 1.7; }
+.tru-mission-boundary { padding-bottom: 2px; }
+.tru-mission-not-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 0 30px; border-bottom: 1px solid rgba(0,229,255,.13); }
+.tru-mission-not-grid div { padding: 18px 0; border-top: 1px solid rgba(0,229,255,.1); color: #8099a2; font-size: 13px; line-height: 1.6; }
+.tru-doc-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+.tru-doc { display: flex; flex-direction: column; gap: 14px; min-height: 108px; padding: 20px; border: 1px solid rgba(0,229,255,.13); background: rgba(4,18,23,.42); }
+.tru-doc:hover { border-color: #00e5ff; background: rgba(0,229,255,.07); }
+.tru-doc b { color: #bdeaf2; font-size: 11px; letter-spacing: .14em; }
+.tru-doc span { color: #708993; font-size: 11px; line-height: 1.6; }
+.tru-mission-footer { max-width: 1180px; margin: 14vh auto 0; padding: 25px 0 35px; border-top: 1px solid rgba(0,229,255,.13); display: flex; justify-content: space-between; gap: 20px; color: #4f6871; font-size: 9px; letter-spacing: .2em; }
+.tru-mission-footer a { color: #6d8993; }
+@media (max-width: 800px) {
+  .tru-mission { padding: 0 18px; }
+  .tru-mission-nav-links { gap: 11px; font-size: 8px; }
+  .tru-mission-grid, .tru-mission-section-head, .tru-mission-principles, .tru-layer-grid, .tru-mission-not-grid, .tru-doc-grid { grid-template-columns: 1fr; }
+  .tru-mission-hero { padding: 11vh 0 9vh; }
+  .tru-mission-section-head { gap: 18px; }
+  .tru-mission-footer { flex-direction: column; line-height: 1.7; }
+}
