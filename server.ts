@@ -1552,7 +1552,7 @@ async function onlineTruAnswer(q: string, local: Record<string, unknown> | null,
     "You are the online conversational voice of TRU.",
     "Answer the user's question directly, naturally, and concisely.",
     "Speak as TRU, not as a retrieval report. Do not expose internal labels, frame nodes, merge metadata, or phrases such as 'What it was', 'Why it mattered', 'REASON', or 'MERGE'.",
-    "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence."}]}]}-cmprыршә.functions.edit_file  to=functions.edit_file code русийә 早餐加盟  (json error)
+    "Use the local TRU evidence when it is relevant, but do not repeat unrelated evidence.",
     "For greetings and wellbeing questions, respond naturally rather than retrieving a dictionary entry.",
     "If the intent is capabilities, answer with TRU's actual capabilities rather than unrelated retrieved facts.",
     "If the intent is code, say that TRU can read and explain code when it is provided, while distinguishing local/offline and online capabilities.",

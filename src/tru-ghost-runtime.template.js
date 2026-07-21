@@ -337,119 +337,51 @@
 
   function buildSynthesis(query, queryClass, nodes) {
     var qNorm = norm(query);
-    var qTokens = tokenize(query);
+    var qTokens = tokenize(query).filter(function (t) { return t.length >= 3; });
     var scored = nodes
       .map(function (node) { return { node: node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }; })
       .filter(function (item) { return item.score > 0; })
       .sort(function (a, b) { return b.score - a.score || (Number(b.node.w || 0) - Number(a.node.w || 0)); });
 
     if (scored.length === 0) {
-      var fallback = nodes[0];
-      return {
-        kind: 'unknown',
-        t: fallback ? String(fallback.t || 'SYNTHESIS').toUpperCase() : 'TRUTH',
-        score: fallback ? Math.min(35, Math.round(Number(fallback.w || 0) * 20)) : 0,
-        v: fallback ? 'Closest available: ' + firstSentence(fallback.v, 220) : 'Closest available: ' + q,
-        source: fallback ? (fallback.source || 'TRU_CORE') : 'TRU_CORE',
-      };
+      var empty = { kind: "brain", t: "TRUTH", score: 0, text: "Closest available: " + query, v: "Closest available: " + query, source: "TRU_CORE", grounded: false, blank: false };
+      return empty;
     }
 
-    var best = scored[0].node;
-    var bestScore = scored[0].score;
-    var rest = scored.slice(1).map(function (item) { return item.node; });
-    var frame = pickFramingNode(scored);
-
-    var whatItWas = firstSentence(best.v, 220);
-
-    // Extract labelled sub-clauses from the lead node's value text first,
-    // so nodes that embed "The hidden engine: ..." or "Why it mattered: ..."
-    // get the full synthesis without needing a neighbour.
-    var bestVText = String(best.v || "");
-    function extractClause(label) {
-      var re = new RegExp(
-        "(?:^|[\\s\\.;\\(\\)\\-])" + label + "\\s*:\\s*([^\\n;]+(?:[\\n;](?!\\s*(?:Lesson|See also|Why|What|Hidden|Failure|What it teaches|Source|Note)\\s*:)[^\\n;]+)*)",
-        "i"
-      );
-      var m = bestVText.match(re);
-      if (!m) return "";
-      return firstSentence(m[1], 180);
-    }
-    var embeddedHidden = extractClause("The hidden engine");
-    var embeddedWhy = extractClause("Why it mattered");
-
-    var whyItMattered = embeddedWhy || firstSentence(
-      firstMatch(rest, function (n) {
-        var kind = String(n.t || "").toLowerCase();
-        return kind === "knowledge" || kind === "concept" || kind === "fact" || kind === "wisdom";
-      })?.v || (frame && frame.v) || "",
-      180
-    );
-    var hiddenEngine = embeddedHidden || firstSentence(
-      firstMatch(rest, function (n) {
-        var kind = String(n.t || "").toLowerCase();
-        return kind === "rule" || kind === "wisdom" || kind === "knowledge" || kind === "concept" || kind === "fact";
-      })?.v || "",
-      180
-    );
-    var failureMode = firstSentence(
-      firstMatch(rest, function (n) { return String(n.t || "").toLowerCase() === "dilemma"; })?.v ||
-        firstMatch(rest, function (n) {
-          var kind = String(n.t || "").toLowerCase();
-          return kind === "rule" || kind === "wisdom";
-        })?.v ||
-        "",
-      180
-    );
-    var teachesNow = firstSentence(
-      (frame && frame.v) ||
-        firstMatch(rest, function (n) {
-          var kind = String(n.t || "").toLowerCase();
-          return kind === "identity" || kind === "rule" || kind === "wisdom";
-        })?.v ||
-        "",
-      180
-    );
-
-    var text = "";
-    if (queryClass === "identity") {
-      text = teachesNow || whatItWas;
-    } else if (bestScore >= 18) {
-      var parts = [whatItWas, whyItMattered, hiddenEngine, failureMode, teachesNow]
-        .filter(Boolean)
-        .map(function (part) { return firstSentence(part, 260); });
-      text = parts.filter(function (part, index) { return parts.indexOf(part) === index; }).join(" ");
-    } else {
-      var closests = scored.slice(0, 3).map(function (item) { return firstSentence(item.node.v, 120); }).filter(Boolean);
-      var closest = closests;
-      if (closest.length === 0) {
-        return {
-          kind: 'unknown',
-          t: 'UNKNOWN',
-          score: 0,
-          v: 'Closest available: ' + q + '\nAdd it with: remember: ' + q + ' = <the truth you want TRU to hold>',
-          source: 'TRU_CORE',
-        };
-      }
-
-      return {
-        kind: 'unknown',
-        t: 'UNKNOWN',
-        score: 0,
-        v: 'Closest available: ' + closest.join(' · ') + '\nAdd it with: remember: ' + q + ' = <the truth you want TRU to hold>',
-        source: 'TRU_CORE',
-      };
+    function isFrame(node) {
+      var kind = String(node.t || "").toLowerCase();
+      return FRAME_SET.has(norm(node.k || "")) || kind === "identity" || kind === "rule" || kind === "wisdom";
     }
 
-    return {
+    function matches(node, requireAll) {
+      var hay = new Set(tokenize((node.k || "") + " " + (node.v || "") + " " + (node.ref || "")));
+      if (!qTokens.length) return true;
+      var hits = qTokens.filter(function (token) { return hay.has(token); }).length;
+      return requireAll ? hits === qTokens.length : hits > 0;
+    }
+
+    var bestItem = scored.find(function (item) { return !isFrame(item.node) && matches(item.node, true); }) ||
+      scored.find(function (item) { return !isFrame(item.node) && matches(item.node, false); }) ||
+      scored[0];
+    var best = bestItem.node;
+    var text = firstSentence(best.v, 260);
+    var meaningful = qTokens;
+    var hay = new Set(tokenize((best.k || "") + " " + (best.v || "") + " " + (best.ref || "")));
+    var grounded = !meaningful.length || meaningful.filter(function (token) { return hay.has(token); }).length / meaningful.length >= (meaningful.length <= 2 ? 1 : 0.5);
+    var answer = {
       ok: true,
       kind: "brain",
       k: best.k,
+      text: text,
       v: text,
-      t: bestScore >= 18 ? String(best.t || "SYNTHESIS").toUpperCase() : "UNKNOWN",
+      t: String(best.t || "TRUTH").toUpperCase(),
       source: best.source || "TRU_CORE",
-      score: Math.min(99, Math.round(bestScore)),
+      score: Math.min(99, Math.round(bestItem.score)),
+      grounded: grounded,
+      blank: false,
       nodes: scored.slice(0, 5).map(function (item) { return item.node.k + ":" + (item.node.t || ""); })
     };
+    return answer;
   }
 
   function lookup(q) {
