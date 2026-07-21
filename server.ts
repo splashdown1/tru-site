@@ -1532,7 +1532,7 @@ function classifyConversationalIntent(q: string): string | null {
 
 function deterministicIntentAnswer(q: string, intent: string | null): Record<string, unknown> | null {
   if (intent === "capabilities") {
-    return { ok: true, kind: "conversation", q, v: "I can answer from TRU's 256,514-node brain, retrieve KJV scripture, route grounded questions, use web fallback when the brain misses, explain code you provide, maintain local browser history, and provide the offline Ghost export. The online model is the mouth; TRU's local routing and evidence are the spine.", t: "CAPABILITIES", source: "TRU_CONVERSATION", grounded: true };
+    return { ok: true, kind: "conversation", q, v: "I can answer from TRU's loaded local brain, retrieve KJV scripture, route grounded questions, use web fallback when the brain misses, explain code you provide, maintain local browser history, and provide the offline Ghost export. The online model is the mouth; TRU's local routing and evidence are the spine.", t: "CAPABILITIES", source: "TRU_CONVERSATION", grounded: true };
   }
   if (intent === "code") {
     return { ok: true, kind: "conversation", q, v: "Yes. Give me code and I can read, explain, debug, or help improve it. The online TRU site can analyse code you paste into chat; the offline Ghost can do the same without network access when the code and required context are available locally.", t: "CODE", source: "TRU_CONVERSATION", grounded: true };
