@@ -511,7 +511,7 @@
       var learnBadge = r.learned ? ' · <span style="color:#6b8f71">auto-remembered</span>' : '';
       return '<div class="verdict">' + esc(r.t || "TRUTH") + ' · ' + r.score + '%' +
              (r.source ? ' · ' + esc(r.source) : '') + learnBadge + '</div>' +
-             '<div class="answer">' + esc(r.text) +
+             '<div class="answer">' + esc(r.text || r.v) +
              (r.ref ? '<span class="src">ref: ' + esc(r.ref) + '</span>' : '') +
              '</div>' + memHtml2;
     }
