@@ -1524,6 +1524,25 @@ function conversationalParityAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
+function incompleteDefinitionAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  const bare = /^(define|what is|what are|explain|describe|tell me about)$/.test(n);
+  const target = n.match(/^(?:define|what is|what are|explain|describe|tell me about)\s+(.+)$/)?.[1]?.trim() || "";
+  if (!bare && !(target && target.length < 3)) return null;
+  const subject = target || "the term";
+  return {
+    ok: true,
+    kind: "unknown",
+    q,
+    v: `I need a more complete term before I define it. Teach me: remember: ${subject} = <the truth you would have TRU hold>.`,
+    t: "UNKNOWN",
+    source: "TRU_CORE",
+    score: 0,
+    grounded: false,
+    blank: true,
+  };
+}
+
 function shortDefinitionAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   const target = n.match(/^(?:define|what is|what are|explain|describe)\s+(.+)$/)?.[1]?.trim();
@@ -1691,6 +1710,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   const parity = conversationalParityAnswer(q);
   if (parity) return guardQuestionAnswer(q, parity, mode);
+
+  const incompleteDefinition = incompleteDefinitionAnswer(q);
+  if (incompleteDefinition) return guardQuestionAnswer(q, incompleteDefinition, mode);
 
   const shortDefinition = shortDefinitionAnswer(q);
   if (shortDefinition) return guardQuestionAnswer(q, shortDefinition, mode);

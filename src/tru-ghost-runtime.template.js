@@ -550,8 +550,9 @@
       return conversational;
     }
     var target = definitionTarget(originalQuery);
-    if (target && target.length < 3) {
-      return { kind: "unknown", text: "I do not have a grounded definition for that term. Teach me: remember: " + target + " = <the truth you want TRU to hold>.", t: "UNKNOWN", source: "TRU_CORE", score: 0, blank: true };
+    if (/^(define|what is|what are|explain|describe|tell me about)$/.test(norm(originalQuery).replace(/[?!.]+$/g, "").trim()) || (target && target.length < 3)) {
+      var subject = target || "the term";
+      return { kind: "unknown", text: "I need a more complete term before I define it. Teach me: remember: " + subject + " = <the truth you would have TRU hold>.", t: "UNKNOWN", source: "TRU_CORE", score: 0, blank: true };
     }
     var followUp = isFollowUpQuestion(originalQuery);
     var topic = followUp ? lastGroundedTopic() : null;
