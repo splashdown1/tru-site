@@ -1524,6 +1524,14 @@ function conversationalParityAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
+function shortDefinitionAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  const target = n.match(/^(?:define|what is|what are|explain|describe)\s+(.+)$/)?.[1]?.trim();
+  if (!target || target.length < 3) return null;
+  if (target === "love") return { ok: true, kind: "conversation", q, v: "God is love. Love wills the good of the other and is shown at the cross. (1 John 4:8; John 3:16)", t: "SCRIPTURE", source: "TRU_CANONICAL_VOICE", grounded: true };
+  return null;
+}
+
 function canonicalVoiceAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   const answers: Array<[RegExp, string, string]> = [
@@ -1683,6 +1691,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   const parity = conversationalParityAnswer(q);
   if (parity) return guardQuestionAnswer(q, parity, mode);
+
+  const shortDefinition = shortDefinitionAnswer(q);
+  if (shortDefinition) return guardQuestionAnswer(q, shortDefinition, mode);
 
   const canonicalVoice = canonicalVoiceAnswer(q);
   if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
