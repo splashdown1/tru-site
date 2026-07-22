@@ -1,0 +1,66 @@
+[
+  {
+    "k": "quantum computing frontiers",
+    "v": "Quantinuum and SoftBank's Quantum Computing Frontiers study maps quantum chemistry and topological data analysis for large-scale graph analytics against a projected hardware and algorithm roadmap. Its timelines and market scenarios are illustrative, not commercial or financial forecasts.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.9,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "quantum chemistry",
+    "v": "Quantum chemistry applies quantum mechanics to chemical systems. In the Quantum Computing Frontiers study it represents materials discovery and energy research: useful near-term TRU value is structured literature, experiment, molecule, material, and energy knowledge retrieval; quantum hardware is an optional future accelerator, not a TRU dependency.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.9,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "topological data analysis",
+    "v": "Topological data analysis studies shape and structure in complex datasets. The Quantinuum–SoftBank study connects it with quantum algorithms and large-scale graph analytics, including telecommunications fraud detection. TRU can represent the concepts and route graph evidence locally without pretending to perform quantum computation.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.9,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "graph analytics",
+    "v": "Graph analytics treats entities and relationships as a graph to detect structure, communities, anomalies, and suspicious paths. For TRU this maps directly to brain nodes, cross-references, provenance, contradiction edges, and future federation telemetry; the immediate engineering target is a typed evidence graph with explainable paths, not a quantum backend.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.92,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "telecommunications fraud detection",
+    "v": "Telecommunications fraud detection is a graph-analytics use case in which accounts, devices, locations, calls, and transactions form a relationship network. TRU should treat this as a possible applied benchmark for provenance-aware anomaly reasoning, with privacy, authorisation, and false-positive controls before any operational deployment.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.86,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "hybrid quantum ai hpc",
+    "v": "The paper considers quantum computing integrated with AI and high-performance computing in future data-centre infrastructure. For TRU the correct architectural lesson is hybrid and replaceable execution: keep the sovereign truth layer, routing, provenance, and offline Ghost independent of any accelerator, while allowing a verified quantum or HPC worker to become an optional computation provider.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.9,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "quantum readiness",
+    "v": "Quantum readiness means preparing problems, data, benchmarks, interfaces, and classical baselines before fault-tolerant quantum systems become commercially useful. TRU is ready to begin at the interface and evidence layers: typed graph representation, reproducible benchmark datasets, classical baselines, provenance receipts, and an adapter boundary for future quantum or HPC execution.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.93,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  },
+  {
+    "k": "quantum computing and tru",
+    "v": "TRU does not need a quantum computer now. Apply the paper as a capability boundary and roadmap: build a local typed evidence graph, add benchmarkable graph and chemistry knowledge packs, preserve classical fallbacks, record provenance and uncertainty, and expose an optional accelerator adapter only after a concrete workload proves benefit. The sovereign core remains offline-first and model-agnostic.",
+    "t": "knowledge",
+    "source": "TRU_QUANTUM_RESEARCH",
+    "w": 0.98,
+    "ref": "https://www.quantinuum.com/quantinuum-and-softbank-corp-white-paper"
+  }
+]

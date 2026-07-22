@@ -465,6 +465,21 @@
         "topic": 17,
         "dilemma": 4
       }
+    },
+    {
+      "id": "quantum-computing-frontiers",
+      "file": "knowledge-packs/quantum-computing-frontiers.json",
+      "shape": "array-nodes",
+      "source": "TRU_QUANTUM_RESEARCH",
+      "type": "knowledge",
+      "weight": 0.9,
+      "description": "Source-labelled summary of the Quantinuum–SoftBank Quantum Computing Frontiers study and its implications for TRU.",
+      "boosts": {
+        "identity": 6,
+        "definition": 18,
+        "topic": 20,
+        "dilemma": 12
+      }
     }
   ]
 }

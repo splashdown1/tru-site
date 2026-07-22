@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadKnowledgePacks, scorePackMatch, type LoadedPack, type PackNode, type QueryClass } from "../src/knowledge-packs";
@@ -8,6 +8,7 @@ import { loadKnowledgePacks, scorePackMatch, type LoadedPack, type PackNode, typ
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const STATE_DIR = join(ROOT, "..", "state");
 const DB_PATH = join(STATE_DIR, "tru_brain.db");
+const BUILD_PATH = join(STATE_DIR, "tru_brain.rebuild.tmp.db");
 const CACHE_PATH = join(STATE_DIR, "knowledge-pack-cache.json");
 
 function ensureDir(path: string): void {
@@ -64,7 +65,8 @@ function main(): void {
     return;
   }
 
-  const db = new Database(DB_PATH);
+  if (existsSync(BUILD_PATH)) unlinkSync(BUILD_PATH);
+  const db = new Database(BUILD_PATH);
   db.exec(`
     DROP TABLE IF EXISTS nodes;
     CREATE TABLE nodes (
@@ -225,15 +227,21 @@ function main(): void {
     }
 
     const classType = parseQueryClass(pack.type);
-    for (const node of nodes) {
-      const weight = Math.max(node.w, pack.weight + scorePackMatch(pack, classType) * 0.01);
-      insert.run(node.k, node.v, weight, node.t, node.source, node.ref || null, null, null, node.meta ? JSON.stringify(node.meta) : null);
-      count += 1;
-    }
+    const insertPack = db.transaction((packNodes: PackNode[]) => {
+      for (const node of packNodes) {
+        const weight = Math.max(node.w, pack.weight + scorePackMatch(pack, classType) * 0.01);
+        insert.run(node.k, node.v, weight, node.t, node.source, node.ref || null, null, null, node.meta ? JSON.stringify(node.meta) : null);
+      }
+      return packNodes.length;
+    });
+    count += insertPack(nodes);
     packCount += 1;
   }
 
   db.close();
+  const backupPath = `${DB_PATH}.bak-${Date.now()}`;
+  if (existsSync(DB_PATH)) renameSync(DB_PATH, backupPath);
+  renameSync(BUILD_PATH, DB_PATH);
   saveCache(index.signature);
   console.log(JSON.stringify({ ok: true, rebuilt: true, db: DB_PATH, signature: index.signature, packs: packCount, nodes: count, bytes: index.summary.bytes }, null, 2));
 }
