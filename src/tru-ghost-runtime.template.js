@@ -671,7 +671,7 @@
   }
 
   function renderStats() {
-    document.getElementById("statBrain").textContent = (BRAIN.length || 0).toLocaleString();
+    document.getElementById("statBrain").textContent = (CLEAN_BRAIN.length || 0).toLocaleString();
     document.getElementById("statKjv").textContent   = (Object.keys(KJV).length || 0).toLocaleString();
     document.getElementById("statImg").textContent    = "0";
     document.getElementById("statFiles").textContent  = "0";
@@ -683,7 +683,7 @@
     if (mEl) mEl.textContent = ((BAKED_MEMORY && BAKED_MEMORY.entries) ? BAKED_MEMORY.entries.length : 0).toLocaleString();
     if (META.baked) document.getElementById("ts").textContent = "baked " + META.baked;
     var meta = document.getElementById("meta");
-    if (meta) meta.textContent = "ghost · " + (META.uploads || 0) + " uploads · " + (BRAIN.length || 0) + " brain · " + (Object.keys(KJV).length || 0) + " kjv";
+    if (meta) meta.textContent = "ghost · " + (META.uploads || 0) + " uploads · " + (CLEAN_BRAIN.length || 0) + " clean brain · " + (Object.keys(KJV).length || 0) + " kjv";
   }
 
   // ── GREEK & TRANSLATION LOOKUP — read-only, no retrieval scoring ──
@@ -832,7 +832,7 @@
       "It runs entirely from this file. No server, no cloud, no key.",
       "",
       "WHAT'S INSIDE",
-      "  Brain:     " + (BRAIN.length || 0).toLocaleString() + " curated knowledge nodes",
+      "  Brain:     " + (CLEAN_BRAIN.length || 0).toLocaleString() + " clean curated knowledge nodes",
       "  KJV:       " + (Object.keys(KJV).length || 0).toLocaleString() + " verses (King James Bible)",
       "  Memory:    " + memCount + " remembered entries (local, mutable)",
       "  Primaries: " + lock,
@@ -913,8 +913,8 @@
   function boot() {
     document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
     document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
-    document.getElementById("sub").textContent = CLEAN_BRAIN.length.toLocaleString() + " nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
-    document.getElementById("chat").innerHTML = '<div class="ready"><div class="h">READY.</div><div>' + CLEAN_BRAIN.length.toLocaleString() + ' brain nodes + ' + Object.keys(KJV).length.toLocaleString() + ' KJV verses.</div><div style="color:#557788;font-size:12px;margin-top:8px">try one ↓</div><div class="sugg"><button data-q="john 3:16">john 3:16</button><button data-q="who is jesus">who is jesus</button><button data-q="what is grace">what is grace</button><button data-q="what is the soul">what is the soul</button></div></div>';
+    document.getElementById("sub").textContent = META.brain.toLocaleString() + " source nodes · " + CLEAN_BRAIN.length.toLocaleString() + " clean nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
+    document.getElementById("chat").innerHTML = '<div class="ready"><div class="h">READY.</div><div>' + META.brain.toLocaleString() + ' source brain nodes · ' + CLEAN_BRAIN.length.toLocaleString() + ' clean nodes + ' + Object.keys(KJV).length.toLocaleString() + ' KJV verses.</div><div style="color:#557788;font-size:12px;margin-top:8px">try one ↓</div><div class="sugg"><button data-q="john 3:16">john 3:16</button><button data-q="who is jesus">who is jesus</button><button data-q="what is grace">what is grace</button><button data-q="what is the soul">what is the soul</button></div></div>';
     var send = document.getElementById("send");
     var input = document.getElementById("input");
     send.disabled = false;
