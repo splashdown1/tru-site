@@ -348,7 +348,7 @@ function collectStatsSnapshot() {
     try {
       const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
       const files = readdirSync(ghostDir)
-        .filter((f: string) => f.startsWith("TRU_HOLO_GHOST_") && f.endsWith(".html"))
+        .filter((f: string) => (f.startsWith("TRU_HOLO_GHOST_") || f === "TRU_CLEAN.html") && f.endsWith(".html"))
         .map((f: string) => ({ f, m: statSync(join(ghostDir, f)).mtimeMs, s: statSync(join(ghostDir, f)).size }));
       files.sort((a, b) => b.m - a.m);
       if (files.length > 0) {
@@ -626,7 +626,7 @@ function refreshPackIndex(): void {
     const index = loadKnowledgePacks();
     if (index.signature !== _packSignature) {
       _packSignature = index.signature;
-      _packBoosts = Object.fromEntries(index.packs.map((p) => [p.id, p.boosts]));
+      _packBoosts = Object.fromEntries(index.packs.flatMap((p) => [[p.id, p.boosts], [p.source, p.boosts]]));
     }
   } catch {}
 }
@@ -1131,7 +1131,7 @@ function maybeReloadPacks(): void {
     const index = loadKnowledgePacks();
     if (index.signature && index.signature !== _packSignature) {
       _packSignature = index.signature;
-      _packBoosts = Object.fromEntries(index.packs.map((p) => [p.id, p.boosts]));
+      _packBoosts = Object.fromEntries(index.packs.flatMap((p) => [[p.id, p.boosts], [p.source, p.boosts]]));
     }
   } catch {}
 }
@@ -1317,7 +1317,7 @@ app.get("/api/tru/stats", (c) => {
     try {
       const { readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
       const files = readdirSync(ghostDir)
-        .filter((f: string) => f.startsWith("TRU_HOLO_GHOST_") && f.endsWith(".html"))
+        .filter((f: string) => (f.startsWith("TRU_HOLO_GHOST_") || f === "TRU_CLEAN.html") && f.endsWith(".html"))
         .map((f: string) => ({ f, m: statSync(join(ghostDir, f)).mtimeMs, s: statSync(join(ghostDir, f)).size }));
       files.sort((a, b) => b.m - a.m);
       if (files.length > 0) {

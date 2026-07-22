@@ -870,10 +870,14 @@
     var started = Date.now();
     addChatMessage("user", text);
     document.body.classList.add("thinking");
+    var status = document.getElementById("status");
+    if (status) status.textContent = "● EXECUTING • " + text.slice(0, 30);
     var result;
     try { result = lookup(text); } catch (error) { result = { kind: "unknown", text: "TRU runtime fault: " + error.message, t: "ERROR", score: 0 }; }
-    addChatMessage("tru", result.text || result.v || "", result.kind === "scripture" ? "SCRIPTURE" : (result.t || "REASON"), Date.now() - started);
+    var verdict = result.kind === "scripture" ? "SCRIPTURE" : (result.t || "REASON");
+    addChatMessage("tru", result.text || result.v || "", verdict, Date.now() - started);
     document.body.classList.remove("thinking");
+    if (status) status.textContent = "● " + verdict + " • OFFLINE";
   }
 
   function boot() {
@@ -888,6 +892,8 @@
     input.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); sendChat(); } });
     document.querySelectorAll("[data-q]").forEach(function (button) { button.addEventListener("click", function () { sendChat(button.getAttribute("data-q")); }); });
     input.focus();
+    var status = document.getElementById("status");
+    if (status) status.textContent = "● ONLINE • OFFLINE-READY";
   }
 
   if (document.readyState === "loading") {
