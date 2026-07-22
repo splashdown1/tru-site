@@ -13,7 +13,7 @@ import { ImapFlow } from "imapflow";
 import nodemailer from "nodemailer";
 import { simpleParser } from "mailparser";
 import { chatCompletion, gatewayStatus, GatewayError, type ChatCompletionRequest } from "./backend-lib/llm-gateway";
-import { loadKnowledgePacks, scorePackMatch, type QueryClass } from "./src/knowledge-packs";
+import { loadKnowledgePacks, loadPackIndexMeta, scorePackMatch, type QueryClass } from "./src/knowledge-packs";
 // canon + truth-layer live in the sibling TRU/ monorepo (present on the
 // canonical account). On instances without that sibling they degrade to
 // "UNAVAILABLE" honestly: the server boots and /api/tru/primaries reports
@@ -359,6 +359,45 @@ function collectStatsSnapshot() {
     } catch {}
   }
   return { brain, kjv, sessionKeys, lastBuild, lastBuildBytes, ghostPath };
+}
+
+async function sha256File(path: string): Promise<string | null> {
+  if (!existsSync(path)) return null;
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(await Bun.file(path).arrayBuffer());
+  return hasher.digest("hex");
+}
+
+function gitValue(command: string): string | null {
+  try {
+    return execSync(command, { cwd: process.cwd(), timeout: 5000, stdio: ["ignore", "pipe", "ignore"] }).toString().trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function federationReceipt() {
+  const ghostPath = join(process.cwd(), "..", "TRU", "ghost", "TRU_CLEAN.html");
+  const dbStats = collectStatsSnapshot();
+  const packIndex = loadPackIndexMeta();
+  const primaries = __PRIMARIES_REPORT || { status: "UNAVAILABLE", stored: "", computed: "", assets: {} };
+  const payload = {
+    schema: "tru-federation-receipt/v1",
+    instance: process.env.TRU_INSTANCE_ID || "splashdown1",
+    generated_at: new Date().toISOString(),
+    online: { api: true, mode },
+    offline: { available: existsSync(ghostPath), runtime: "file://", network_dependency: false },
+    code: { commit: gitValue("git rev-parse HEAD"), dirty: Boolean(gitValue("git status --porcelain")) },
+    brain: { database_nodes: dbStats.brain, json_bytes: existsSync(GHOST_BRAIN) ? (await Bun.file(GHOST_BRAIN).size) : 0, sha256: await sha256File(GHOST_BRAIN) },
+    kjv: { lookup_keys: dbStats.kjv },
+    ghost: { path: ghostPath, bytes: existsSync(ghostPath) ? await Bun.file(ghostPath).size : 0, sha256: await sha256File(ghostPath) },
+    primaries: { status: primaries.status, stored: primaries.stored, computed: primaries.computed },
+    packs: { count: packIndex.packs.length, signature: packIndex.signature, bytes: packIndex.summary.bytes },
+  };
+  const canonical = JSON.stringify(payload);
+  const receiptHash = new Bun.CryptoHasher("sha256");
+  receiptHash.update(canonical);
+  return { ...payload, receipt: { algorithm: "SHA-256", value: receiptHash.digest("hex"), canonical_bytes: canonical.length } };
 }
 
 function commandResponse(command: TruCommand) {
@@ -1328,6 +1367,14 @@ app.get("/api/tru/stats", (c) => {
     } catch {}
   }
   return c.json({ ok: true, brain, kjv, sessionKeys, lastBuild, lastBuildBytes, ghostPath });
+});
+
+app.get("/api/tru/federation/receipt", async (c) => {
+  try {
+    return c.json({ ok: true, receipt: await federationReceipt() });
+  } catch (error) {
+    return c.json({ ok: false, error: String(error) }, 503);
+  }
 });
 
 // ── SOVEREIGNTY TRIPWIRE (real, active on retrieval) ────────────
