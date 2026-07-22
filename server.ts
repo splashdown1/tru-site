@@ -1510,6 +1510,20 @@ function snapshotAnalysisAnswer(q: string): Record<string, unknown> | null {
   };
 }
 
+function conversationalParityAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  if (/^(whats good|what s good|whats up|what s up)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "There is good to pursue: truth, love, mercy, and the work before us. Name the question and I will search the brain and the Scripture.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(whats wrong|what s wrong)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "Nothing is wrong with this route. TRU is online, the local brain is loaded, the KJV is available, and the offline Ghost remains ready.", t: "CONVERSATION", source: "TRU_CONVERSATION", grounded: true };
+  }
+  if (/^(define love|what is love)$/.test(n)) {
+    return { ok: true, kind: "conversation", q, v: "God is love. Love wills the good of the other and is shown at the cross. (1 John 4:8; John 3:16)", t: "SCRIPTURE", source: "TRU_CANONICAL_VOICE", grounded: true };
+  }
+  return null;
+}
+
 function canonicalVoiceAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   const answers: Array<[RegExp, string, string]> = [
@@ -1666,6 +1680,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
   const intent = classifyConversationalIntent(q);
   const deterministic = deterministicIntentAnswer(q, intent);
   if (deterministic) return guardQuestionAnswer(q, deterministic, mode);
+
+  const parity = conversationalParityAnswer(q);
+  if (parity) return guardQuestionAnswer(q, parity, mode);
 
   const canonicalVoice = canonicalVoiceAnswer(q);
   if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
