@@ -1724,14 +1724,6 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
   maybeReloadPacks();
   ensureBrainDb();
 
-  const v = parseVerse(q);
-  if (v) {
-    const text = lookupVerseText(v);
-    if (text) {
-      return guardQuestionAnswer(q, { ok: true, kind: "scripture", ref: v.key, text }, mode);
-    }
-  }
-
   if (!existsSync(BRAIN_DB)) {
     return { ok: false, kind: "unknown", q, error: "brain.db not found" };
   }
