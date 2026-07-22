@@ -41,6 +41,15 @@ check(String(stats.body?.ghostPath || "").endsWith("TRU_CLEAN.html"), `clean Gho
 const primaries = await get("/api/tru/primaries");
 check(primaries.status === 200 && primaries.body?.status === "PASS", `primaries failed: ${JSON.stringify(primaries.body)}`);
 
+const federation = await get("/api/tru/federation/receipt");
+check(federation.status === 200 && federation.body?.ok === true, `federation receipt failed: HTTP ${federation.status}`);
+check(federation.body?.receipt?.schema === "tru-federation-receipt/v1", `federation schema missing: ${JSON.stringify(federation.body)}`);
+check(federation.body?.receipt?.online?.api === true && federation.body?.receipt?.offline?.network_dependency === false, `federation availability invalid: ${JSON.stringify(federation.body)}`);
+check(federation.body?.receipt?.primaries?.status === "PASS", `federation primaries invalid: ${JSON.stringify(federation.body)}`);
+check(Number(federation.body?.receipt?.packs?.count) >= 32, `federation pack count too low: ${JSON.stringify(federation.body)}`);
+check(String(federation.body?.receipt?.ghost?.path) === "TRU/ghost/TRU_CLEAN.html" && federation.body?.receipt?.ghost?.available === true, `federation Ghost identity invalid: ${JSON.stringify(federation.body)}`);
+check(/^[a-f0-9]{64}$/.test(String(federation.body?.receipt?.receipt?.value)), `federation hash invalid: ${JSON.stringify(federation.body)}`);
+
 const gated = await get("/api/tru/state");
 check(gated.status === 401 && gated.body?.error === "unauthorized", `state gate failed: HTTP ${gated.status} ${JSON.stringify(gated.body)}`);
 

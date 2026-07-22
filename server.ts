@@ -390,7 +390,7 @@ async function federationReceipt() {
     code: { commit: gitValue("git rev-parse HEAD"), dirty: Boolean(gitValue("git status --porcelain")) },
     brain: { database_nodes: dbStats.brain, json_bytes: existsSync(GHOST_BRAIN) ? (await Bun.file(GHOST_BRAIN).size) : 0, sha256: await sha256File(GHOST_BRAIN) },
     kjv: { lookup_keys: dbStats.kjv },
-    ghost: { path: ghostPath, bytes: existsSync(ghostPath) ? await Bun.file(ghostPath).size : 0, sha256: await sha256File(ghostPath) },
+    ghost: { path: "TRU/ghost/TRU_CLEAN.html", available: existsSync(ghostPath), bytes: existsSync(ghostPath) ? await Bun.file(ghostPath).size : 0, sha256: await sha256File(ghostPath) },
     primaries: { status: primaries.status, stored: primaries.stored, computed: primaries.computed },
     packs: { count: packIndex.packs.length, signature: packIndex.signature, bytes: packIndex.summary.bytes },
   };
