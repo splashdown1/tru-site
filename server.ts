@@ -1695,6 +1695,12 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
   const shortDefinition = shortDefinitionAnswer(q);
   if (shortDefinition) return guardQuestionAnswer(q, shortDefinition, mode);
 
+  const v = parseVerse(q);
+  if (v) {
+    const text = lookupVerseText(v);
+    if (text) return guardQuestionAnswer(q, { ok: true, kind: "scripture", ref: v.key, text }, mode);
+  }
+
   const canonicalVoice = canonicalVoiceAnswer(q);
   if (canonicalVoice) return guardQuestionAnswer(q, canonicalVoice, mode);
 

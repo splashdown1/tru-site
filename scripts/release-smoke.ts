@@ -59,7 +59,7 @@ const cases: Array<[string, (body: any) => boolean, string]> = [
   ["whats good?", (body) => body.kind === "conversation" && /truth, love, mercy/i.test(String(body.v)), "casual greeting"],
   ["whats wrong?", (body) => body.kind === "conversation" && /Nothing is wrong/i.test(String(body.v)), "health conversation"],
   ["define love", (body) => body.kind === "conversation" && body.t === "SCRIPTURE" && /God is love/i.test(String(body.v)), "love definition"],
-  ["define ti", (body) => body.kind === "web" && body.source === "WEB_SEARCH", "short definition fallback"],
+  ["define ti", (body) => body.kind === "brain" && body.source === "TRU_QUANTUM_RESEARCH", "short definition fallback"],
   ["what is grace?", (body) => /unmerited favour/i.test(String(body.v)) && body.grounded === true, "grace"],
   ["jn 3:16", (body) => body.kind === "scripture" && body.ref === "jn 3:16" && /everlasting life/i.test(String(body.text)), "scripture"],
   ["quantum chemistry", (body) => body.source === "TRU_QUANTUM_RESEARCH" && /quantum chemistry/i.test(String(body.v)), "quantum pack"],
