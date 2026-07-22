@@ -500,6 +500,25 @@
     };
   }
 
+  function conversationAnswer(query) {
+    var n = norm(query).replace(/[?!.]+$/g, "").trim();
+    if (n === "help") return { kind: "conversation", text: "Commands: HELP, INTRO, STATUS, CAPABILITIES. Ask Scripture by reference or ask a grounded question in plain language.", v: "Commands: HELP, INTRO, STATUS, CAPABILITIES. Ask Scripture by reference or ask a grounded question in plain language.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
+    if (n === "intro") return { kind: "conversation", text: "I am TRU. Truth is constant. Perspective is fluid. I answer from anchored knowledge rather than guess.", v: "I am TRU. Truth is constant. Perspective is fluid. I answer from anchored knowledge rather than guess.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
+    if (n === "status") return { kind: "conversation", text: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready", v: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
+    if (n === "capabilities") return { kind: "conversation", text: "Scripture lookup from the KJV; grounded brain retrieval; local browser memory; and an offline Ghost that runs from this file without network access.", v: "Scripture lookup from the KJV; grounded brain retrieval; local browser memory; and an offline Ghost that runs from this file without network access.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
+    if (/^(hello|hi|hey|hiya|greetings|whats up|what s up|whats good|what s good|good morning|good afternoon|good evening)$/.test(n)) return { kind: "conversation", text: "There is good to pursue: truth, love, mercy, and the work before us. Name the question and I will search the brain and the scripture.", v: "There is good to pursue: truth, love, mercy, and the work before us. Name the question and I will search the brain and the scripture.", t: "CONVERSATION", source: "TRU_CONVERSATION", score: 99 };
+    if (/^(how are you|how is it going|you ok|are you ok|are you alright)$/.test(n)) return { kind: "conversation", text: "I am operating normally and ready to help. What do you need?", v: "I am operating normally and ready to help. What do you need?", t: "CONVERSATION", source: "TRU_CONVERSATION", score: 99 };
+    if (/^(whats wrong|what s wrong)$/.test(n)) return { kind: "conversation", text: "Nothing is wrong with this offline route. It is running from the Ghost file, using its local brain and KJV without a network call.", v: "Nothing is wrong with this offline route. It is running from the Ghost file, using its local brain and KJV without a network call.", t: "CONVERSATION", source: "TRU_CONVERSATION", score: 99 };
+    if (/^(define love|what is love)$/.test(n)) return { kind: "brain", k: "what is love", text: DOCTRINE["what is love"], v: DOCTRINE["what is love"], t: "SCRIPTURE", source: "TRU_CANONICAL_VOICE", score: 99 };
+    return null;
+  }
+
+  function definitionTarget(query) {
+    var n = norm(query).replace(/[?!.]+$/g, "").trim();
+    var m = n.match(/^(?:define|what is|what are|explain|describe|tell me about)\s+(.+)$/);
+    return m ? m[1].trim() : "";
+  }
+
   function isFollowUpQuestion(query) {
     return /^(?:what does that mean|what do you mean|explain that|say more|tell me more|go deeper|expand on that|what about that|and why|why)\??$/i.test(String(query || "").trim());
   }
@@ -525,6 +544,15 @@
   function lookup(q) {
     if (!q) return null;
     var originalQuery = String(q).trim();
+    var conversational = conversationAnswer(originalQuery);
+    if (conversational) {
+      rememberGroundedTopic(originalQuery, conversational);
+      return conversational;
+    }
+    var target = definitionTarget(originalQuery);
+    if (target && target.length < 3) {
+      return { kind: "unknown", text: "I do not have a grounded definition for that term. Teach me: remember: " + target + " = <the truth you want TRU to hold>.", t: "UNKNOWN", source: "TRU_CORE", score: 0, blank: true };
+    }
     var followUp = isFollowUpQuestion(originalQuery);
     var topic = followUp ? lastGroundedTopic() : null;
     if (followUp && topic && topic.answer && topic.answer.text) {
