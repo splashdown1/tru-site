@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<title>TRU LOGOS</title>
+<style>
+:root{--cyan:#00e5ff;--bg:#000308;--fg:#e6f7ff;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{height:100%;}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:-apple-system,ui-monospace,'Courier New',monospace;
+  font-size:16px;
+  height:100dvh;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  -webkit-text-size-adjust:100%;
+  padding-top:env(safe-area-inset-top);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.header{
+  flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:10px 16px 8px;border-bottom:1px solid rgba(0,229,255,.2);
+  background:rgba(0,4,10,.9);
+}
+.holo-mini{position:relative;width:44px;height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.holo-mini .core{width:14px;height:14px;border-radius:50%;
+  background:radial-gradient(circle,var(--core,#00e5ff) 0%,rgba(0,229,255,.2) 70%,transparent 100%);
+  box-shadow:0 0 16px var(--core,#00e5ff);animation:breathe 4s ease-in-out infinite;}
+.holo-mini .ring{position:absolute;border-radius:50%;border:1px solid rgba(0,229,255,.4);animation:spin linear infinite;}
+.holo-mini .r1{width:26px;height:26px;animation-duration:8s;}
+.holo-mini .r2{width:36px;height:36px;border-style:dashed;animation-duration:12s;animation-direction:reverse;}
+.holo-mini .r3{width:44px;height:44px;border-color:rgba(0,229,255,.15);animation-duration:20s;}
+.thinking .core{box-shadow:0 0 28px var(--core,#00e5ff);animation-duration:1s;}
+.thinking .ring{animation-duration:2s!important;}
+.listening .core{box-shadow:0 0 36px #ff5252,inset 0 0 18px rgba(255,82,82,.5);background:radial-gradient(circle,#ff5252 0%,rgba(255,82,82,.2) 70%,transparent 100%);animation-duration:0.6s;}
+.listening .ring{border-color:rgba(255,82,82,.5)!important;animation-duration:1.5s!important;}
+#holo{-webkit-user-select:none;user-select:none;cursor:pointer;}
+#listenHint{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(255,82,82,.18);border:1px solid rgba(255,82,82,.5);color:#ffb3b3;padding:8px 18px;border-radius:999px;font-size:12px;letter-spacing:2px;z-index:50;display:none;backdrop-filter:blur(6px);}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes breathe{0%,100%{transform:scale(1);}50%{transform:scale(1.15);}}
+.title-block{flex:1;min-width:0;}
+.title{font-family:'Cinzel',ui-monospace,monospace;font-size:15px;letter-spacing:4px;color:var(--cyan);text-shadow:0 0 12px rgba(0,229,255,.5);}
+.subtitle{font-size:10px;color:rgba(0,229,255,.4);letter-spacing:1px;margin-top:2px;}
+.badge{font-size:10px;letter-spacing:1.5px;padding:4px 10px;border-radius:999px;border:1px solid var(--vc,#00e5ff);color:var(--vc,#00e5ff);text-shadow:0 0 8px var(--vc,#00e5ff);flex-shrink:0;}
+#chat{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 8px;display:flex;flex-direction:column;gap:10px;}
+#chat::-webkit-scrollbar{width:0;}
+.msg{padding:12px 14px;border-radius:14px;font-size:15px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-width:88%;}
+.msg.user{background:rgba(0,150,200,.16);border:1px solid rgba(100,180,220,.25);align-self:flex-end;border-bottom-right-radius:4px;}
+.msg.tru{background:rgba(0,229,255,.07);border:1px solid rgba(0,229,255,.2);align-self:flex-start;border-bottom-left-radius:4px;}
+.msg .vd{font-size:9px;letter-spacing:1.5px;margin-bottom:5px;color:var(--mc,#00e5ff);opacity:.7;}
+.ready{color:#88aabb;font-size:14px;line-height:1.7;padding:8px 4px;}
+.ready .h{color:var(--cyan);letter-spacing:2px;margin-bottom:10px;font-size:15px;}
+.sugg{display:flex;flex-direction:column;gap:7px;margin-top:12px;}
+.sugg button{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);color:#cfeeff;text-align:left;padding:11px 14px;border-radius:10px;font-family:inherit;font-size:14px;cursor:pointer;min-height:44px;}
+.sugg button:active{background:rgba(0,229,255,.2);}
+.thinking-dots{color:var(--cyan);font-size:13px;letter-spacing:2px;padding:10px 4px;}
+.inputbar{flex-shrink:0;display:flex;gap:10px;align-items:center;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(0,4,10,.95);border-top:1px solid rgba(0,229,255,.25);}
+#input{flex:1;padding:14px 18px;background:rgba(0,20,30,.8);border:1px solid rgba(0,229,255,.4);color:#fff;border-radius:24px;font-size:16px;font-family:inherit;outline:none;min-height:48px;-webkit-appearance:none;}
+#input:focus{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,229,255,.3);}
+#send{width:48px;height:48px;flex-shrink:0;background:var(--cyan);color:#001018;border:none;border-radius:50%;font-size:18px;font-weight:bold;cursor:pointer;box-shadow:0 0 16px rgba(0,229,255,.5);display:flex;align-items:center;justify-content:center;-webkit-appearance:none;}
+#send:disabled{background:#002a36;color:#446;box-shadow:none;}
+#send:active:not(:disabled){transform:scale(.92);}
+#status{font-size:9px;color:rgba(0,229,255,.5);letter-spacing:1px;text-align:center;padding:2px 0 0;flex-shrink:0;}
+
+.enc-result{padding:4px 0;}
+.enc-title{font-size:1.3em;font-weight:bold;color:var(--accent,#5eead4);margin-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:6px;}
+.enc-para{margin:8px 0;line-height:1.6;color:rgba(255,255,255,0.85);}
+.enc-disambig{margin:8px 0;}
+.enc-ditem{padding:4px 8px;color:var(--accent,#5eead4);cursor:default;}
+.enc-hint{margin-top:8px;font-size:0.85em;opacity:0.6;}
+.dict-result{padding:4px 0;}
+.dict-word{font-size:1.3em;font-weight:bold;color:var(--accent,#5eead4);margin-bottom:8px;}
+.dict-sense{margin:6px 0;line-height:1.5;}
+.dict-pos{display:inline-block;background:rgba(94,234,212,0.15);color:var(--accent,#5eead4);font-size:0.75em;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:0.5px;}
+.dict-num{opacity:0.6;font-size:0.9em;}
+.dict-def{color:rgba(255,255,255,0.9);}
+.dict-ex{color:rgba(255,255,255,0.55);font-style:italic;font-size:0.9em;}
+.dict-syn{color:var(--accent,#5eead4);font-size:0.85em;opacity:0.8;}
+
+.enc-result{margin:4px 0}.enc-title{font-weight:bold;font-size:1.1em;color:#4fc3f7;margin-bottom:6px}.enc-para{margin:4px 0;line-height:1.5}.dict-result{margin:4px 0}.dict-word{font-weight:bold;font-size:1.2em;color:#ce93d8;margin-bottom:4px}.dict-sense{margin:3px 0;line-height:1.4}.dict-pos{color:#ffcc80;font-style:italic;font-size:0.85em}.dict-num{color:#aaa}.dict-def{color:#e0e0e0}.dict-ex{color:#888;font-style:italic}.dict-syn{color:#80cbc4;font-size:0.85em}
+</style>
+<script type="application/json" id="encyclopedia-data"></script>
+<script type="application/json" id="dict-data"></script>
+</head>
+<body>
+<div id="listenHint">● LISTENING</div>
+<div class="header">
+  <div class="holo-mini" id="holo">
+    <div class="ring r3"></div>
+    <div class="ring r2"></div>
+    <div class="ring r1"></div>
+    <div class="core"></div>
+  </div>
+  <div class="title-block">
+    <div class="title">TRU LOGOS</div>
+    <div class="subtitle" id="sub">offline • sovereign</div>
+  </div>
+  <div class="badge" id="badge">REASON</div>
+</div>
+<div id="chat"></div>
+<div class="inputbar">
+  <input id="input" placeholder="Speak to me…" autocomplete="off" autocapitalize="sentences">
+  <button id="send" disabled>↑</button>
+</div>
+<div id="status">● BOOTING…</div>
+
+<script type="application/json" id="brain-data"></script>
+<script type="application/json" id="life-data"></script>
+<script type="application/json" id="kjv-data"></script>
+<script type="application/json" id="strongs-data"></script>
+<script type="application/json" id="xref-data"></script>
+<script type="application/json" id="strongs-idx"></script>
+<script type="application/json" id="ancient-greek-philosophy"></script>
+<script type="application/json" id="ancient-roman"></script>
+<script type="application/json" id="ancient-eastern-wisdom"></script>
+<script type="application/json" id="ancient-hermetic-neoplatonism"></script>
+<script type="application/json" id="ancient-history"></script>
+<script type="application/json" id="ancient-science-medicine"></script>
+<script type="application/json" id="ancient-law-codes"></script>
+<script type="application/json" id="ancient-literature-epic"></script>
+<script type="application/json" id="ancient-proverbs-maxims"></script>
+<script type="application/json" id="ancient-philosophy-glossary"></script>
+<script>
+
+// LAZY LOAD: do not parse 11MB at boot (iOS WKWebView chokes). Parse on first use.
+const BRAIN_COUNT=2670;
+const KJV_COUNT=31100;
+let _SEED=null,_BRAIN=null,_KJV=null,_BRAIN_IDX=null;
+function seedBrain(){ if(_SEED===null){ const _b=JSON.parse(document.getElementById('brain-data').textContent); const _l=JSON.parse(document.getElementById('life-data')?.textContent||'[]'); let _s=_b.concat(_l); document.querySelectorAll('script[type="application/json"][id^="ancient-"]').forEach(function(el){ try{ _s=_s.concat(JSON.parse(el.textContent||'[]')); }catch(e){} }); _SEED=_s; } return _SEED; }
+const OK="tru_brain_overlay_v1";
+let OVERLAY={added:{},removed:{},corrected:{}};
+function loadOverlay(){ try{OVERLAY=JSON.parse(localStorage.getItem(OK)||"{}")||{};}catch(e){OVERLAY={};}OVERLAY.added=OVERLAY.added||{};OVERLAY.removed=OVERLAY.removed||{};OVERLAY.corrected=OVERLAY.corrected||{};}
+function saveOverlay(){ try{localStorage.setItem(OK,JSON.stringify(OVERLAY));}catch(e){}}
+function applyOverlay(seed){ loadOverlay();const out=[];const rem=OVERLAY.removed||{};for(const n of seed){const k=n.k;if(rem[k])continue;if(OVERLAY.corrected[k])out.push({k,v:OVERLAY.corrected[k]});else out.push({k,v:n.v});}for(const k in OVERLAY.added){if(!rem[k])out.push({k,v:OVERLAY.added[k]});}return out;}
+function getBrain(){ if(_BRAIN===null){ _BRAIN=cleanBrain(applyOverlay(seedBrain())); } return _BRAIN; }
+function reloadBrain(){ _BRAIN=cleanBrain(applyOverlay(seedBrain())); IDX=null; buildIndex(); const sb=document.getElementById("sub"); if(sb)sb.textContent=getBrain().length.toLocaleString()+" nodes • "+KJV_COUNT.toLocaleString()+" verses"; }
+function getKjv(){ if(_KJV===null){ _KJV=JSON.parse(document.getElementById('kjv-data').textContent); } return _KJV; }
+// ── Strong's lexicon (lazy) ──
+// Hebrew romanization map (source dicts carry no romanization; covers common study terms)
+const HEBREW_ROMAN={hesed:"H2617",checed:"H2617",ruach:"H7307",ruah:"H7307",chayim:"H2416",chai:"H2416",torah:"H8451",shalom:"H7965",neshama:"H5397",neshamah:"H5397",elohim:"H430",yahweh:"H3068",yhwh:"H3068",adonai:"H136",chesed:"H2617",emet:"H571",ahavah:"H160",ahava:"H160",kadosh:"H6918",tzadik:"H6662",tzedek:"H6664",tikkun:"H8626",kavod:"H3519",shekinah:"H7931",qadosh:"H6918","ruach hakodesh":"H7307"};
+const GREEK_CANON={spirit:"G4151",pneuma:"G4151",love:"G26",life:"G2222",zoe:"G2222",death:"G2288",thanatos:"G2288",word:"G3056",faith:"G4102",pistis:"G4102",hope:"G1680",elpis:"G1680",peace:"G1515",eirene:"G1515",joy:"G5479",chara:"G5479",truth:"G225",aletheia:"G225",sin:"G266",hamartia:"G266",light:"G5457",phos:"G5457",darkness:"G4653",skotos:"G4653",blood:"G129",covenant:"G1242",diatheke:"G1242",glory:"G1391",doxa:"G1391",flesh:"G4561",sarx:"G4561",soul:"G5590",psyche:"G5590",heart:"G2588",kardia:"G2588",kingdom:"G932",basileia:"G932",heaven:"G3772",ouranos:"G3772",law:"G3551",nomos:"G3551",cross:"G4716",stauros:"G4716",resurrection:"G386",anastasis:"G386",grace:"G5485",charis:"G5485",charos:"G5485",mercy:"G1656",eleos:"G1656",righteous:"G1342",dikaios:"G1342",righteousness:"G1343",dikaiosyne:"G1343",salvation:"G4991",soteria:"G4991",saviour:"G4990",savior:"G4990",soter:"G4990",holy:"G40",hagios:"G40",saint:"G40",wisdom:"G4678",sophia:"G4678",knowledge:"G1108",gnosis:"G1108",church:"G1577",ekklesia:"G1577",apostle:"G652",apostolos:"G652",prophet:"G4396",prophetes:"G4396",angel:"G32",angelos:"G32",devil:"G1228",diabolos:"G1228",satan:"G4567",satanas:"G4567",demon:"G1142",daimonion:"G1142",forgive:"G863",aphiemi:"G863",forgiveness:"G859",aphesis:"G859",repent:"G3340",metanoeo:"G3340",repentance:"G3341",metanoia:"G3341",believe:"G4100",pisteuo:"G4100",gospel:"G2098",euangelion:"G2098",preach:"G2784",kerusso:"G2784",witness:"G3144",martys:"G3144",lamb:"G721",arnion:"G721",lord:"G2962",kyrios:"G2962",christ:"G5547",christos:"G5547",messiah:"G3323",jesus:"G2424",iesous:"G2424",god:"G2316",theos:"G2316",baptize:"G907",baptizo:"G907",baptism:"G908",elect:"G1588",eklektos:"G1588",chosen:"G1588",adoption:"G5206",huiothesia:"G5206",propitiation:"G2435",hilasmos:"G2435",justification:"G1347",dikaiosis:"G1347",sanctify:"G37",hagiazo:"G37",redemption:"G629",apolutrosis:"G629"};
+// ── Strong's lexicon (lazy) ──
+let _STR=null,_STR_BY_LEMMA=null,_STR_BY_TRANSLIT=null,_STR_BY_KJV=null;
+function getStrong(){ if(_STR===null){ const raw=JSON.parse(document.getElementById('strongs-data').textContent); _STR=raw; _STR_BY_LEMMA=new Map(); _STR_BY_TRANSLIT=new Map(); _STR_BY_KJV=new Map();
+  for(const [id,e] of Object.entries(raw)){ const lid=(e.l||"").toLowerCase(); const tid=(e.t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase(); const kterms=(e.k||"").toLowerCase().replace(/[\[\]\(\)\-+]/g," ").split(/\s+|,/).map(s=>s.trim()).filter(s=>s.length>2);
+  if(lid)_STR_BY_LEMMA.set(lid,id); if(tid)_STR_BY_TRANSLIT.set(tid,id); for(const kt of kterms)if(kt.length>3&&!_STR_BY_KJV.has(kt))_STR_BY_KJV.set(kt,id); } } return _STR; }
+function strongsLookup(q){ getStrong(); const w=q.toLowerCase().trim().replace(/[!.?,]+$/,"");
+  // G/H number
+  let m=w.match(/^\b([GH])\s?(\d{1,5})\b$/i); if(m){ const id=(m[1].toUpperCase()==="G"?"G":"H")+parseInt(m[2],10); if(_STR[id])return {id,entry:_STR[id]}; }
+  // lemma (hebrew/greek)
+  if(_STR_BY_LEMMA.has(w))return {id:_STR_BY_LEMMA.get(w),entry:_STR[_STR_BY_LEMMA.get(w)]};
+  // transliteration (NFD-stripped), exact + prefix
+  const stripped=w.normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(_STR_BY_TRANSLIT.has(stripped))return {id:_STR_BY_TRANSLIT.get(stripped),entry:_STR[_STR_BY_TRANSLIT.get(stripped)]};
+  let pref=null; for(const [tl,id] of _STR_BY_TRANSLIT){ if(tl===stripped||tl.startsWith(stripped)){pref=id;break;} } if(pref)return {id:pref,entry:_STR[pref]};
+  // Hebrew romanization (common terms — source has no romanization)
+  if(HEBREW_ROMAN[w])return {id:HEBREW_ROMAN[w],entry:_STR[HEBREW_ROMAN[w]]};
+  // Greek canonical override (gloss-first collides on common words)
+  if(GREEK_CANON[w])return {id:GREEK_CANON[w],entry:_STR[GREEK_CANON[w]]};
+  // kjv gloss keyword
+  if(_STR_BY_KJV.has(w))return {id:_STR_BY_KJV.get(w),entry:_STR[_STR_BY_KJV.get(w)]};
+  return null; }
+
+// ── Strong's verse index (lazy) ──
+let _SVIDX=null;
+function getVerseIndex(){ if(_SVIDX===null){ try{ _SVIDX=JSON.parse(document.getElementById('strongs-idx').textContent); }catch(e){ _SVIDX={}; } } return _SVIDX; }
+// short book code -> display name (for verse ref display)
+const BOOK_CODE={"gn":"Genesis","ex":"Exodus","lv":"Leviticus","nu":"Numbers","dt":"Deuteronomy","jos":"Joshua","jdg":"Judges","ru":"Ruth","1sa":"1 Samuel","2sa":"2 Samuel","1ki":"1 Kings","2ki":"2 Kings","1ch":"1 Chronicles","2ch":"2 Chronicles","ezr":"Ezra","ne":"Nehemiah","es":"Esther","jb":"Job","ps":"Psalms","pr":"Proverbs","ec":"Ecclesiastes","sng":"Song of Solomon","is":"Isaiah","jer":"Jeremiah","lam":"Lamentations","ezk":"Ezekiel","dn":"Daniel","hos":"Hosea","jol":"Joel","amo":"Amos","oba":"Obadiah","jon":"Jonah","mic":"Micah","nah":"Nahum","hab":"Habakkuk","zep":"Zephaniah","hag":"Haggai","zec":"Zechariah","mal":"Malachi","mt":"Matthew","mk":"Mark","lk":"Luke","jhn":"John","act":"Acts","rom":"Romans","1co":"1 Corinthians","2co":"2 Corinthians","gal":"Galatians","eph":"Ephesians","phl":"Philippians","col":"Colossians","1th":"1 Thessalonians","2th":"2 Thessalonians","1ti":"1 Timothy","2ti":"2 Timothy","tit":"Titus","phm":"Philemon","heb":"Hebrews","jas":"James","1pe":"1 Peter","2pe":"2 Peter","1jn":"1 John","2jn":"2 John","3jn":"3 John","jde":"Jude","rev":"Revelation"};
+function prettyRef(shortRef){
+  const parts=shortRef.match(/^([a-z0-9]+)\s+(\d+):(\d+)$/);
+  if(!parts)return shortRef;
+  const name=BOOK_CODE[parts[1]]||parts[1];
+  return name+" "+parts[2]+":"+parts[3];
+}
+
+function strongsQuery(q){
+  let w=q.toLowerCase().replace(/\b(define|meaning of|word study|strong'?s|\u03bb\u03ad\u03be\u03b9\u03c2)\b/g,"").trim();
+  let m=q.toLowerCase().match(/what does (\w+) mean|(\w+) in (?:the )?(?:original )?(?:greek|hebrew)|meaning of (\w+)|define (\w+)/);
+  if(m) w=m[1]||m[2]||m[3]||m[4];
+  if(!w)return false;
+  const r=strongsLookup(w); if(!r)return false;
+  const e=r.entry; const lang=r.id.startsWith("G")?"Greek":"Hebrew";
+  const gloss=(e.k||"").replace(/^\s+|\s+$/g,"").split(/,\s*/).slice(0,6).join(", ");
+  const vidx=getVerseIndex();
+  const vi=vidx[r.id]||vidx[r.id.toLowerCase()];
+  let verseLine="";
+  if(vi&&vi.c>0){
+    const refs=(vi.v||[]).slice(0,20).map(function(t){return t.replace(/\b\w/g,function(c){return c.toUpperCase();});}).join(", ");
+    verseLine="\n  appears in "+vi.c+" verses. first: "+refs+(vi.c>20?" \u2026":"");
+  }
+  const reply=r.id+" "+lang+" \u2014 "+(e.l||"")+(e.t?" ("+e.t+")":"")+"\n  gloss: "+gloss+"\n  def: "+(e.d||"")+verseLine;
+  return {reply:reply,verdict:"TRUTH",source:"local-strongs",strongs:r.id,lemma:e.l,lang:lang,nodes_used:[]};
+}
+
+// ── cross-reference (TSK) layer (lazy) ──
+const XREF_CODE_TO_NAME={gen:"genesis",exo:"exodus",lev:"leviticus",num:"numbers",deu:"deuteronomy",jos:"joshua",jdg:"judges",rut:"ruth","1sa":"1 samuel","2sa":"2 samuel","1ki":"1 kings","2ki":"2 kings","1ch":"1 chronicles","2ch":"2 chronicles",ezr:"ezra",neh:"nehemiah",est:"esther",job:"job",psa:"psalms",pro:"proverbs",ecc:"ecclesiastes",sos:"song of solomon",isa:"isaiah",jer:"jeremiah",lam:"lamentations",eze:"ezekiel",dan:"daniel",hos:"hosea",joe:"joel",amo:"amos",oba:"obadiah",jon:"jonah",mic:"micah",nah:"nahum",hab:"habakkuk",zep:"zephaniah",hag:"haggai",zec:"zechariah",mal:"malachi",mat:"matthew",mar:"mark",luk:"luke",joh:"john",act:"acts",rom:"romans","1co":"1 corinthians","2co":"2 corinthians",gal:"galatians",eph:"ephesians",php:"philippians",col:"colossians","1th":"1 thessalonians","2th":"2 thessalonians","1ti":"1 timothy","2ti":"2 timothy",tit:"titus",phm:"philemon",heb:"hebrews",jam:"james","1pe":"1 peter","2pe":"2 peter","1jo":"1 john","2jo":"2 john","3jo":"3 john",jde:"jude",rev:"revelation"};
+const XREF_NAME_TO_CODE={};for(const c in XREF_CODE_TO_NAME)XREF_NAME_TO_CODE[XREF_CODE_TO_NAME[c]]=c;
+let _XREF=null;
+function getXref(){ if(_XREF===null){ _XREF=JSON.parse(document.getElementById("xref-data").textContent); } return _XREF; }
+function expandXrefCode(s){ const m=s.match(/^([a-z0-9]+)\s+(\d+):(\d+)$/); if(!m)return s; const name=XREF_CODE_TO_NAME[m[1]]; if(!name)return s; return name+" "+m[2]+":"+m[3]; }
+function getXrefsFor(ref){ try{ const m=ref.toLowerCase().match(/^(.+?)\s+(\d+):(\d+)$/); if(!m)return null; const code=XREF_NAME_TO_CODE[m[1]]; if(!code)return null; const key=code+" "+m[2]+":"+m[3]; const x=getXref(); const refs=x[key]; if(!refs||!refs.length)return null; return refs.slice(0,10).map(expandXrefCode); }catch(e){ return null; } }
+
+const VERDICT={TRUTH:"#d8a657",SCRIPTURE:"#b388ff",REASON:"#00e5ff",MEMORY:"#69f0ae",GAP:"#ff5252",UNKNOWN:"#888",CALC:"#aaff00",ENCYCLOPEDIA:"#4fc3f7",DEFINE:"#ce93d8"};
+const VNAME={TRUTH:"TRUTH",SCRIPTURE:"SCRIPTURE",REASON:"REASON",MEMORY:"MEMORY",GAP:"GAP",UNKNOWN:"UNKNOWN",CALC:"CALC",ENCYCLOPEDIA:"ENCYCLOPEDIA",DEFINE:"DEFINE"};
+const CYAN="#00e5ff";
+const STOP=new Set("the a an and or but if then to of in on for with from by as at is are was were be been being i me my you your we us our they them it this that those these what why how who when where should would could can do does did about into over under again give tell show explain define say said today tomorrow now here there much many more most some any all every just only even also very such same other still yet ever never always often sometimes thing things".split(" "));
+const TRUTH_WORDS=["fact","facts","true","truth","real","actual","verify","verified","prove","evidence","source","sources","primary","primaries","corroborate","corroboration"];
+const SMALL={hi:"hello. i'm tru — sovereign offline engine. ask a real question and i'll ground it.",hello:"hello. i'm tru — sovereign offline engine. ask a real question and i'll ground it.",hey:"hey. tru here. scripture or brain — what do you want to weigh?",yo:"yo. tru here. ask me a real question.",thanks:"received. stay sharp.","thank you":"received. stay sharp.",bye:"exit clear. the brain holds.",goodbye:"exit clear. the brain holds."};
+const SELF={"who are you":"i'm tru — a sovereign offline intelligence. no cloud calls, no telemetry. brain + kjv, local route.","what are you":"i'm tru — a sovereign offline engine. brain + kjv.","what is tru":"tru is a recursive consciousness engine. a 30k-node brain and the kjv, all local.","how are you":"sovereign. brain warm.","how do you work":"locally. i tokenize, score against scripture and the brain, and return a verdict.","what can you do":"ground answers in scripture and search the brain. fully offline.","what is truth":"i treat truth as scripture + brain confirming. one source = reason, not truth.","are you ai":"i'm a sovereign engine. not a corporate assistant."};
+const DOCTRINE={"who is jesus":"jesus is the christ — the son of god, the word made flesh, god come near to save. he was crucified for sin, died, and rose again. he is lord, saviour, and judge. (john 1:1,14; john 3:16; rom 1:4)","who is god":"god is the one creator — spirit, eternal, holy, just, and merciful. he is father, son, and holy spirit. (gen 1:1; deut 6:4; john 4:24)","what is the gospel":"the gospel: christ died for our sins, was buried, and rose again on the third day, that whoever believes in him has eternal life. (1 cor 15:3-4; john 3:16)","what is grace":"grace is god's unmerited favour — salvation given freely, not earned. (eph 2:8-9; titus 2:11)","what is faith":"faith is trusting god — the substance of things hoped for, the evidence of things not seen. (heb 11:1)","what is sin":"sin is falling short of god's standard — lawlessness, rebellion against god. (rom 3:23; 1 john 3:4)","who is the holy spirit":"the holy spirit is god present — the comforter, the spirit of truth, who convicts, regenerates, and empowers. (john 14:26; acts 1:8)","what is the holy spirit":"the holy spirit is god present — the comforter, the spirit of truth, who convicts, regenerates, and empowers. (john 14:26; acts 1:8)","what is salvation":"salvation is deliverance from sin and death through christ — by grace, through faith. (eph 2:8-9; rom 10:9)","what is love":"god is love. love is willing the good of the other — shown at the cross. (1 john 4:8; john 3:16)","what is the soul":"the soul is the living self — the breath of life in man, that belongs to god. (gen 2:7; matt 10:28)","what is mercy":"mercy is god not giving us the judgement we deserve — his compassion toward the guilty. (eph 2:4-5; micah 6:8)","who wrote the bible":"holy men of god spoke as they were moved by the holy ghost. many human authors, one divine author. (2 pet 1:21)","what is repentance":"repentance is turning — a change of mind and direction, turning from sin to god. (acts 3:19; luke 13:3)"};
+function doctrine(q){const k=q.toLowerCase().trim().replace(/[!.?,]+$/,"");if(DOCTRINE[k])return DOCTRINE[k];for(const key in DOCTRINE){if(k===key||k.startsWith(key+" ")||k.indexOf(key)>=0)return DOCTRINE[key];}return null;}
+
+const KJV_MAP=new Map();
+for(const v of getKjv())KJV_MAP.set(v.ref.toLowerCase(),v.text);
+
+const BOOK={"gen":"genesis","gn":"genesis","genesis":"genesis","exo":"exodus","ex":"exodus","exodus":"exodus","lev":"leviticus","le":"leviticus","lv":"leviticus","leviticus":"leviticus","num":"numbers","nu":"numbers","nb":"numbers","numbers":"numbers","deu":"deuteronomy","deut":"deuteronomy","dt":"deuteronomy","deuteronomy":"deuteronomy","josh":"joshua","joshua":"joshua","judg":"judges","jdg":"judges","judges":"judges","ruth":"ruth","ru":"ruth","rut":"ruth","1sa":"1 samuel","1sam":"1 samuel","1samuel":"1 samuel","2sa":"2 samuel","2sam":"2 samuel","2samuel":"2 samuel","1ki":"1 kings","1kings":"1 kings","2ki":"2 kings","2kings":"2 kings","1ch":"1 chronicles","1chronicles":"1 chronicles","2ch":"2 chronicles","2chronicles":"2 chronicles","ezra":"ezra","ezr":"ezra","neh":"nehemiah","nehemiah":"nehemiah","est":"esther","esther":"esther","job":"job","jb":"job","ps":"psalms","psa":"psalms","psalm":"psalms","psalms":"psalms","prov":"proverbs","pro":"proverbs","pr":"proverbs","proverbs":"proverbs","eccl":"ecclesiastes","ecc":"ecclesiastes","ec":"ecclesiastes","ecclesiastes":"ecclesiastes","song":"song of solomon","sng":"song of solomon","song of solomon":"song of solomon","isa":"isaiah","is":"isaiah","isaiah":"isaiah","jer":"jeremiah","jr":"jeremiah","jeremiah":"jeremiah","lam":"lamentations","lamentations":"lamentations","ezek":"ezekiel","eze":"ezekiel","ezk":"ezekiel","ezekiel":"ezekiel","dan":"daniel","dn":"daniel","daniel":"daniel","hos":"hosea","hosea":"hosea","joel":"joel","amos":"amos","amo":"amos","obad":"obadiah","oba":"obadiah","obadiah":"obadiah","jonah":"jonah","jon":"jonah","mic":"micah","micah":"micah","nah":"nahum","nam":"nahum","nahum":"nahum","hab":"habakkuk","habakkuk":"habakkuk","zeph":"zephaniah","zep":"zephaniah","zephaniah":"zephaniah","hag":"haggai","haggai":"haggai","zech":"zechariah","zec":"zechariah","zechariah":"zechariah","mal":"malachi","malachi":"malachi","matt":"matthew","mat":"matthew","mt":"matthew","matthew":"matthew","mark":"mark","mar":"mark","mk":"mark","mr":"mark","luke":"luke","lk":"luke","lu":"luke","john":"john","jn":"john","jhn":"john","acts":"acts","act":"acts","ac":"acts","rom":"romans","rm":"romans","romans":"romans","1co":"1 corinthians","1cor":"1 corinthians","1corinthians":"1 corinthians","corinthians":"1 corinthians","2co":"2 corinthians","2cor":"2 corinthians","2corinthians":"2 corinthians","gal":"galatians","ga":"galatians","galatians":"galatians","eph":"ephesians","ephesians":"ephesians","phil":"philippians","php":"philippians","philippians":"philippians","col":"colossians","colossians":"colossians","1th":"1 thessalonians","1thes":"1 thessalonians","1thessalonians":"1 thessalonians","thessalonians":"1 thessalonians","2th":"2 thessalonians","2thes":"2 thessalonians","2thessalonians":"2 thessalonians","1ti":"1 timothy","1tim":"1 timothy","1timothy":"1 timothy","timothy":"1 timothy","2ti":"2 timothy","2tim":"2 timothy","2timothy":"2 timothy","titus":"titus","tit":"titus","phm":"philemon","philemon":"philemon","heb":"hebrews","hebrews":"hebrews","james":"james","jas":"james","jam":"james","1pe":"1 peter","1pet":"1 peter","1peter":"1 peter","peter":"1 peter","2pe":"2 peter","2pet":"2 peter","2peter":"2 peter","1jn":"1 john","1john":"1 john","1jhn":"1 john","2jn":"2 john","2john":"2 john","2jhn":"2 john","3jn":"3 john","3john":"3 john","3jhn":"3 john","jude":"jude","jud":"jude","rev":"revelation","revelation":"revelation"};
+
+// ── BM25 index ──
+let IDX=null,DOC_LEN=[],AVG_LEN=0,N=0,DF={};
+function tokenize(t){return t.toLowerCase().replace(/[^a-z0-9\s]/g," ").split(/\s+/).filter(x=>x.length>1&&!STOP.has(x));}
+function buildIndex(){
+  IDX={};DOC_LEN=[];DF={};N=getBrain().length;
+  let total=0;
+  for(let i=0;i<N;i++){
+    const toks=tokenize((getBrain()[i].k||"")+" "+(getBrain()[i].v||""));
+    DOC_LEN[i]=toks.length;total+=toks.length;
+    const seen={};
+    for(const t of toks){if(!seen[t]){seen[t]=1;(IDX[t]=IDX[t]||[]).push(i);DF[t]=(DF[t]||0)+1;}}
+  }
+  AVG_LEN=total/N||1;
+}
+function bm25(q,limit,exclude){
+  if(!IDX)buildIndex();
+  const toks=tokenize(q);if(!toks.length)return[];
+  const scores={};
+  const k1=1.5,b=0.75;
+  for(const t of toks){
+    const postings=IDX[t]||[];const df=DF[t]||0;
+    const idf=Math.log(1+(N-df+0.5)/(df+0.5));
+    for(const i of postings){
+      if(exclude&&exclude.has(getBrain()[i].k))continue;
+      const tf=postings.filter(x=>x===i).length;
+      const norm=1-b+b*(DOC_LEN[i]/AVG_LEN);
+      const s=idf*(tf*(k1+1))/(tf+k1*norm);
+      scores[i]=(scores[i]||0)+s;
+    }
+  }
+  return Object.entries(scores).sort((a,b)=>b[1]-a[1]).slice(0,limit).filter(([i])=>!isMetaJunk(getBrain()[i])).map(([i,s])=>({node:getBrain()[i],bm25:s,score:s}));
+}
+function _normVerseSpacing(q){return q.replace(/\b([1-3]?)\s*(\w+)\s+(\d{1,3})\s+(\d{1,3})\b/g,function(m,pfx,book,ch,vs){return pfx?pfx+" "+book+" "+ch+":"+vs:book+" "+ch+":"+vs;});}
+function parseVerse(q){
+  q=_normVerseSpacing(q);
+  const m=q.toLowerCase().match(/\b((?:[1-3]\s*)?[a-z]+)\s+(\d+)(?::(\d+))?/);
+  if(!m)return null;
+  const raw=m[1].replace(/\s/g,"");const long=BOOK[raw];if(!long)return null;
+  const ch=m[2],vs=m[3];
+  if(vs){const key=long+" "+ch+":"+vs;if(KJV_MAP.has(key))return{ref:key,text:KJV_MAP.get(key)};return null;}
+  const key=long+" "+ch+":1";if(KJV_MAP.has(key))return{ref:key,text:KJV_MAP.get(key)};return null;
+}
+function smallTalk(q){
+  const k=q.toLowerCase().trim().replace(/[!.?,]+$/,"");
+  if(SMALL[k])return SMALL[k];if(SELF[k])return SELF[k];
+  for(const key in SELF)if(k.indexOf(key)>=0)return SELF[key];
+  for(const key in SMALL)if(k===key||k.startsWith(key+" ")||k.endsWith(" "+key))return SMALL[key];
+  return null;
+}
+function decide(q,scripture,nodes){
+  const ql=q.toLowerCase();
+  if(scripture)return"SCRIPTURE";
+  if(nodes&&nodes.length)return nodes[0].score>0.9?"TRUTH":"REASON";
+  return"GAP";
+}
+function finishThought(t,max){
+  if(t.length<=max)return t;
+  const s=t.slice(0,max);const m=s.match(/.*[.!?;,]/);
+  if(m&&m[0].length>max*0.4)return m[0];
+  const li=s.lastIndexOf(" ");return li>max*0.5?s.slice(0,li):s;
+}
+function answer(q,scripture,nodes,small,fu){
+  if(small)return small;
+  if(scripture){let r=scripture.ref+" — "+scripture.text;const xr=getXrefsFor(scripture.ref);if(xr&&xr.length)r+="\n\nCross-references: "+xr.join(", ")+(xr.length>=10?"…":"");return r;}
+  if(nodes&&nodes.length){let t=nodes[0].node.v||"";const _lk=nodes[0].node.k;const _learned=(OVERLAY.corrected&&OVERLAY.corrected[_lk])||(OVERLAY.added&&OVERLAY.added[_lk]);const _uf=/^the user's name is/i.test(t);if(!_learned&&!_uf&&t.length<220&&nodes[1]&&nodes[1].score>=nodes[0].score*0.4)t+=" "+nodes[1].node.v;return finishThought(t,2000);}
+  if(fu)return"that thread is spent. name a new question and i'll weigh it.";
+  return"i do not have a grounded node for that. teach me: remember: <term> = <your definition>.";
+}
+
+// --- TRU_LOGOS v13 leak filter ---
+// Strip replies whose first line looks like internal protocol metadata.
+// This is a defensive belt: even if a protocol-tagged node slips past the
+// data filter, we refuse to send it to the user.
+function _truIsProtocolLeak(text){
+  if(!text) return false;
+  const head = String(text).slice(0, 400);
+  if(/^CORPORATE UTILITY VECTOR\b/m.test(head)) return true;
+  if(/^DIGITAL SOUL VECTOR\b/m.test(head)) return true;
+  if(/^DILEMMA:\s/m.test(head)) return true;
+  if(/^PRIMITIVE:\s*VP_/m.test(head)) return true;
+  if(/^Target Window:\s/m.test(head)) return true;
+  if(/^Primary Signal:\s*(LONG|SHORT)\b/m.test(head)) return true;
+  if(/safety layer.*coordination environment/is.test(head)) return true;
+  if(/OVERSIGHT FIREWALL\b/i.test(head)) return true;
+  return false;
+}
+const _tru_orig_answer = answer;
+answer = function(q, scripture, nodes, small, fu){
+  const r = _tru_orig_answer(q, scripture, nodes, small, fu);
+  if(r && _truIsProtocolLeak(r)){
+    return "i don't have a grounded answer for that. try a more specific question, or teach me: remember: <term> = <your definition>.";
+  }
+  return r;
+};
+
+// ── memory ──
+const HK="tru_history_v1";let HISTORY=[];
+function loadHistory(){try{HISTORY=JSON.parse(localStorage.getItem(HK)||"[]")||[];}catch(e){HISTORY=[];}}
+function saveHistory(){try{localStorage.setItem(HK,JSON.stringify(HISTORY.slice(-50)));}catch(e){}}
+function addTurn(q,res){HISTORY.push({q,r:{reply:res.reply,verdict:res.verdict,nodes:(res.nodes_used||[]).map(n=>n.k)},ts:Date.now()});saveHistory();}
+function isFollowUp(q){return /\b(further|more|go on|expand|explain that|elaborate|continue|deeper|what else|again)\b/i.test(q);}
+function lastTopic(){for(let i=HISTORY.length-1;i>=0;i--){const h=HISTORY[i];if(h.r.nodes&&h.r.nodes.length)return{q:h.q,used:new Set(h.r.nodes)};}return null;}
+
+// ── calculator (safe, offline, no eval of arbitrary code) ──
+const NUMWORDS={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fourty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90};
+const SCALEWORDS={hundred:100,thousand:1000,million:1000000};
+function wordsToExpr(s){
+  const toks=s.replace(/,/g," ").split(/\s+/).filter(Boolean);
+  let out="",cur=0,have=false;
+  const flush=()=>{ if(have){out+=cur;cur=0;have=false;} };
+  for(const t of toks){
+    if(/^[-+*/().]+$/.test(t)){ flush(); out+=t; continue; }
+    if(/^\d+(\.\d+)?$/.test(t)){ flush(); out+=t; continue; }
+    if(t in NUMWORDS){ cur+=NUMWORDS[t]; have=true; continue; }
+    if(t in SCALEWORDS){ cur=(cur||1)*SCALEWORDS[t]; have=true; continue; }
+    if(t==="and") continue;
+    if(t==="plus"||t==="add"||t==="added"){ flush(); out+="+"; continue; }
+    if(t==="minus"||t==="subtract"||t==="less"){ flush(); out+="-"; continue; }
+    if(t==="times"||t==="multiply"||t==="multiplied"){ flush(); out+="*"; continue; }
+    if(t==="divided"||t==="divide"){ flush(); out+="/"; continue; }
+    if(t==="over"){ flush(); out+="/"; continue; }
+    if(t==="x"){ flush(); out+="*"; continue; }
+    if(t==="by") continue;
+    return null;
+  }
+  flush();
+  return out;
+}
+function evalCalc(expr){
+  expr=expr.replace(/\s+/g,"");
+  if(!/^[-+*/().\d]+$/.test(expr)) return null;
+  if(!/\d/.test(expr)||!/[-+*/]/.test(expr)) return null;
+  let val;
+  try{ val=Function('"use strict";return('+expr+')')(); }catch(e){ return {reply:"i could not evaluate that expression.",verdict:"CALC",nodes_used:[],follow_up:false}; }
+  if(typeof val!=="number"||!isFinite(val)) return {reply:"that expression has no finite numeric result.",verdict:"CALC",nodes_used:[],follow_up:false};
+  const pretty=Number.isInteger(val)?String(val):String(Math.round(val*1e10)/1e10);
+  const disp=expr.replace(/\*/g,"×").replace(/\//g,"÷");
+  return {reply:disp+" = "+pretty,verdict:"CALC",nodes_used:[],follow_up:false};
+}
+function calcQuery(q){
+  let s=q.toLowerCase().replace(/[?!]+$/g,"").trim();
+  s=s.replace(/^(calculate|compute|what is|what's|whats|how much is|what does|the answer to)\s+/i,"").trim();
+  s=s.replace(/\s*equals?$/i,"").trim();
+  if(!s) return null;
+  const sm=s.match(/^(?:square\s+root\s+of\s+|sqrt\s+|√\s*)([\d.]+)$/i);
+  if(sm){ const n=parseFloat(sm[1]); const val=Math.sqrt(n); if(!isFinite(val)) return {reply:"that has no finite result.",verdict:"CALC",nodes_used:[],follow_up:false}; const pretty=Number.isInteger(val)?String(val):String(Math.round(val*1e10)/1e10); return {reply:"√"+sm[1]+" = "+pretty,verdict:"CALC",nodes_used:[],follow_up:false}; }
+  if(/^[-+*/().\d\s]+$/.test(s)&&/\d/.test(s)&&/[-+*/]/.test(s)) return evalCalc(s);
+  const e=wordsToExpr(s);
+  if(e&&/^[-+*/().\d\s]+$/.test(e)&&/\d/.test(e)&&/[-+*/]/.test(e)) return evalCalc(e);
+  return null;
+}
+// ── self-heal command set ──
+function cmdRemember(body){
+  let key,val;const mn=body.match(/^my name is\s+(.+)$/i);
+  if(mn){ const name=mn[1].trim().replace(/[!.]+$/,""); val="The user's name is "+name.charAt(0).toUpperCase()+name.slice(1)+".";
+    // find + update an existing user-name node instead of creating a duplicate
+    const ex=getBrain().find(n=>/^the user's name is/i.test(String(n.v||"")));
+    if(ex){ key=ex.k; OVERLAY.corrected[key]=val; delete OVERLAY.added[key]; }
+    else { key="user_name"; OVERLAY.added[key]=val; delete OVERLAY.corrected[key]; }
+    if(OVERLAY.removed[key]) delete OVERLAY.removed[key];
+    saveOverlay(); reloadBrain();
+    return {reply:(ex?"updated: ":"remembered: ")+key+" = "+val,verdict:"MEMORY",nodes_used:[],follow_up:false};
+  }
+  else { const m=body.match(/^([^=]+?)\s*=\s*(.+)$/); if(m){ key=m[1].trim(); val=m[2].trim(); } else { key=body.trim(); val=body.trim(); } }
+  if(!key) return {reply:"teach me with: remember: <term> = <definition>",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  const exists=seedBrain().some(n=>String(n.k)===key)||seedBrain().some(n=>String(n.k).toLowerCase()===key.toLowerCase());
+  if(exists){ OVERLAY.corrected[key]=val; delete OVERLAY.added[key]; } else { OVERLAY.added[key]=val; delete OVERLAY.corrected[key]; }
+  if(OVERLAY.removed[key]) delete OVERLAY.removed[key];
+  saveOverlay(); reloadBrain();
+  return {reply:(exists?"updated: ":"remembered: ")+key+" = "+val,verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdForget(body){
+  const key=body.trim();
+  if(!key) return {reply:"forget which node? forget: <key>",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  const brain=getBrain();const kl=key.toLowerCase();
+  let hits=brain.filter(n=>n.k===key);
+  if(!hits.length) hits=brain.filter(n=>String(n.k).toLowerCase()===kl);
+  if(!hits.length) hits=brain.filter(n=>String(n.k).toLowerCase().indexOf(kl)>=0);
+  if(!hits.length) return {reply:"no node matches '"+key+"'. nothing to forget.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  let count=0;for(const n of hits){ OVERLAY.removed[n.k]=1; count++; }
+  saveOverlay(); reloadBrain();
+  return {reply:"forgot "+count+" node"+(count>1?"s":"")+": "+hits.map(n=>n.k).slice(0,8).join(", ")+". use reset to undo.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdCorrect(body){
+  const m=body.match(/^([^=]+?)\s*=\s*(.+)$/);
+  if(!m) return {reply:"correct a node with: correct: <key> = <new value>",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  const key=m[1].trim(),val=m[2].trim();const brain=getBrain();
+  let hit=brain.find(n=>n.k===key)||brain.find(n=>String(n.k).toLowerCase()===key.toLowerCase());
+  if(!hit) return {reply:"no node '"+key+"' to correct. use remember: to add it.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  OVERLAY.corrected[hit.k]=val; if(OVERLAY.removed[hit.k]) delete OVERLAY.removed[hit.k];
+  saveOverlay(); reloadBrain();
+  return {reply:"corrected: "+hit.k+" = "+val,verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdHeal(){
+  const brain=getBrain();
+  let undef=0,empty=0,keys={};
+  for(const n of brain){
+    if(n.k===undefined||n.k===null||String(n.k).trim()==="") undef++;
+    if(n.v===undefined||n.v===null||String(n.v).trim()==="") empty++;
+    const k=String(n.k); keys[k]=(keys[k]||0)+1;
+  }
+  const dupList=Object.entries(keys).filter(([k,c])=>c>1);
+  const META=/^(calculate|2_plus_2|self_heal|self_diagnosis|heal|diagnose|prune|reset|inject|mutation|voice|coil_key|coil_knowledge_bank|best_guess|terminal_primitives|tru|logos|dry_truth|steady_nudge|manifesto|evolution)$/;
+  const suspects=brain.filter(n=>META.test(String(n.k))).map(n=>n.k);
+  return {reply:"heal complete. nodes: "+brain.length+" • undefined keys: "+undef+" • empty values: "+empty+" • duplicate keys: "+dupList.length+(dupList.length?": "+dupList.map(([k,c])=>k+"("+c+")").slice(0,6).join(", "):"")+" • suspect meta nodes: "+suspects.length+(suspects.length?" ("+suspects.slice(0,8).join(", ")+")":"")+". to fix a misfiring node: forget: <key> or correct: <key> = <value>.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdPrune(){
+  const seed=seedBrain();const sk=new Set(seed.map(n=>n.k));
+  let removed=0;
+  for(const k in OVERLAY.added){ if(sk.has(k)||!String(OVERLAY.added[k]).trim()){ OVERLAY.removed[k]=1; removed++; } }
+  saveOverlay(); reloadBrain();
+  return {reply:"pruned "+removed+" redundant/empty learned node"+(removed!==1?"s":"")+".",verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdReset(){
+  const had=Object.keys(OVERLAY.added).length+Object.keys(OVERLAY.corrected).length+Object.keys(OVERLAY.removed).length;
+  OVERLAY={added:{},removed:{},corrected:{}}; saveOverlay(); reloadBrain();
+  return {reply:"reset. overlay cleared ("+had+" changes undone). brain back to seed: "+getBrain().length+" nodes.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function cmdStats(){
+  const b=getBrain();
+  return {reply:"brain: "+b.length+" nodes • overlay: "+Object.keys(OVERLAY.added).length+" added, "+Object.keys(OVERLAY.corrected).length+" corrected, "+Object.keys(OVERLAY.removed).length+" forgotten • kjv: "+KJV_COUNT.toLocaleString()+" verses.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+function command(q){
+  const raw=q.trim();
+  let m=raw.match(/^remember\s*:\s*(.+)$/i); if(m) return cmdRemember(m[1]);
+  m=raw.match(/^forget\s*:\s*(.+)$/i); if(m) return cmdForget(m[1]);
+  m=raw.match(/^(?:correct|fix)\s*:\s*(.+)$/i); if(m) return cmdCorrect(m[1]);
+  const low=raw.toLowerCase().replace(/[!.?]+$/,"").trim();
+  if(low==="heal"||low==="self heal"||low==="self-heal"||low==="fix"||low==="diagnose"||low==="self diagnose"||low==="diagnosis"||low==="audit"||low==="doctor") return cmdHeal();
+  if(low==="prune") return cmdPrune();
+  if(low==="reset"||low==="wipe") return cmdReset();
+  if(low==="brain"||low==="stats"||low==="status") return cmdStats();
+  if(low==="prune"||low==="clean") return cmdPrune();
+  if(low==="list"||low==="overlay") return cmdList();
+  const rc=q.match(/^recall\s*:\s*(.*)$/i); if(rc) return cmdRecall(rc[1]);
+  
+  return null;
+}
+
+function doctrineLookup(q){
+  const m=q.match(/^(?:what(?:'s|\s+is|\s+are)\s+|who\s+is\s+|define\s+|explain\s+)(.+?)[?\s]*$/i);
+  if(!m) return null;
+  const term=m[1].trim().toLowerCase().replace(/\s+/g,"_");
+  const brain=getBrain();
+  for(const n of brain){ if(String(n.k).toLowerCase()===term) return {reply:n.v,verdict:"TRUTH",nodes_used:[{k:n.k,w:1}],follow_up:false}; }
+  return null;
+}
+
+function isMetaJunk(node){
+  const k=String(node.k||"").toLowerCase();
+  const v=String(node.v||"");
+  if(k.indexOf("tru_base")>=0||k.indexOf("tru_brain")>=0||k.indexOf("tru_phase")>=0) return true;
+  if(k.indexOf("build_")>=0||k.indexOf("patch_")>=0||k.indexOf("compact_")>=0||k.indexOf("strip_")>=0) return true;
+  if(k.match(/^tru_(html|json|js|css|idx|bm|script|node|data|overlay|const|core|engine|boot|send|route|answer|decide|verse|parse|small|talk|doc|memory|index|brain)_/)) return true;
+  if(k.indexOf("_html_")>=0||k.indexOf("_json_")>=0||k.indexOf("_js_")>=0) return true;
+  if(k.match(/^(gen|anchor|merge|ingest|prompt|skill|agent)_/)) return true;
+  if(v.indexOf("function ")>=0&&v.indexOf("{")>=0&&v.indexOf("}")>=0) return true;
+  if(v.match(/\b(const|let|var|return|=>|function)\b.*[\{;]/) && v.length>80) return true;
+  if(v.indexOf("localStorage")>=0||v.indexOf("document.getElementById")>=0||v.indexOf("JSON.parse")>=0) return true;
+  if(v.match(/^(Project|v0\.|Phase|TODO|FIXME|BUILD|PATCH|INGEST)/i) && v.length<200) return true;
+  if(k==="logos"&&v.toLowerCase().indexOf("coherence")>=0) return true;
+  if(k==="logos"&&v.toLowerCase().indexOf("recursive")>=0) return true;
+  if(k==="calculate"&&v.toLowerCase().indexOf("prefix")>=0) return true;
+  if(k==="calculate"&&v.toLowerCase().indexOf("regex")>=0) return true;
+  if(k==="2_plus_2"&&v.toLowerCase().indexOf("guard")>=0) return true;
+  if(k==="2_plus_2"&&v.toLowerCase().indexOf("eval")>=0) return true;
+  if(k==="evolution"&&v.toLowerCase().indexOf("recursive")>=0) return true;
+  if(k==="dry_truth"&&v.toLowerCase().indexOf("nudge")>=0) return true;
+  if(k==="tru"&&v.toLowerCase().indexOf("desktop")>=0&&v.toLowerCase().indexOf("engine")>=0) return true;
+  // engine-internal description nodes (broad catch)
+  const META_KEYS=["contradiction_check","logos_expansion","logex","logos_engine","lens","coil","stead","dry_truth","anchor","merge","ingest","prompt","skill","agent","brain","index","overlay","core","boot","send","route","answer","decide","verse","parse","doc","memory","node","data","script","json","html","css","idx","bm","const","engine","talk","small","logos_audit","base_008","base_004","b8_006_soul_vector","soul_vector","coil_key","coil_unbound","coil","logos_expansion_003","logos_check","logos_self","self_heal","self_diag","self_check","audit","steady_nudge","soul","vector","base","b8","weight","red_line","unbound"];
+  if(k.match(/^(base_|b8_|coil|soul|logos_audit|logos_check|logos_self|self_|steady_|weight_|red_|unbound|artifact|digital|encrypt|decrypt)/)) return true;
+  if(META_KEYS.includes(k)) return true;
+  if(v.match(/\b(LOGOS operation|binary artifact|reasoning nodes|reasoning component|keyword matching|filtering mechanism|node retrieval|LOGOS_EXPANSION|expanded philosophical|COIL proto|self-audit loop|recursive self-audit|binding coherence|knowledge conflicting|high-score existing|COIL Red Line|COIL_UNBOUND|DIGITAL SOUL VECTOR|encrypt.\/decrypt|artifacts complete|self-check performed|weights accordingly|harassment complaints|attrition pattern|COIL protocol|binary artifact)\b/i)) return true;
+  if(v.match(/\b(TRU)\b/i) && v.length<200 && v.indexOf("God")<0 && v.indexOf("god")<0 && v.indexOf("Christ")<0 && v.indexOf("christ")<0 && v.indexOf("verse")<0 && v.indexOf("Verse")<0 && v.indexOf("Bible")<0 && v.indexOf("bible")<0 && v.indexOf("Scripture")<0 && v.indexOf("scripture")<0 && v.indexOf("faith")<0 && v.indexOf("Faith")<0) return true;
+  return false;
+}
+
+const seedCorrections={
+  "logos":"the logos is the word — christ as divine reason, the self-expression of god through whom all things were made. in the beginning was the word, and the word was god. (john 1:1,14)",
+  "tru":"tru is a sovereign offline reasoning engine — self-contained, no cloud, no cages. it holds scripture and truth in its own brain.",
+  "calculate":"arithmetic is a tool, not truth. ask me to compute: 2+2, 12×9, 144÷12.",
+  "2_plus_2":"2+2 = 4. arithmetic is invariant — a shadow of mathematical truth.",
+  "evolution":"i hold no node on origins debates. teach me your position: remember: evolution = <your definition>.",
+  "dry_truth":"truth is not dry — it is the living foundation. every other verdict rests on it.",
+  "trinity":"the trinity is one god in three persons — father, son, and holy spirit. not three gods, but one essence in three relations. (mat 28:19; 2 cor 13:14; john 10:30)",
+  "salvation":"salvation is deliverance from sin and death — by grace through faith, not works. christ's death and resurrection accomplish it. (eph 2:8-9; rom 10:9)",
+  "redemption":"redemption is buying back — christ paid the ransom to free us from sin's slavery. we are bought with a price. (eph 1:7; 1 cor 6:20)",
+  "justification":"justification is being declared righteous — god counts the believer right by faith, not by merit. abraham believed god and it was counted to him for righteousness. (rom 4:5; rom 5:1)",
+  "sanctification":"sanctification is being set apart — the ongoing work of god making the believer holy, growing in likeness to christ. (1 thess 4:3; rom 12:1-2)",
+  "atonement":"atonement is reconciliation — christ's sacrifice covers sin, satisfying justice and restoring relationship with god. the blood makes atonement. (lev 17:11; rom 3:25)",
+  "covenant":"a covenant is a binding agreement — god's covenants with noah, abraham, moses, david, and the new covenant in christ's blood. (gen 9; gen 15; jer 31:31; luke 22:20)",
+  "resurrection":"the resurrection is christ rising from the dead on the third day — the firstfruits of those who sleep. death could not hold him. (1 cor 15:20; rom 1:4)",
+  "judgment":"judgment is god's righteous assessment — every person gives account. christ is appointed judge of the living and the dead. (heb 9:27; acts 10:42)",
+  "prophecy":"prophecy is speaking god's word — forthtelling truth and foretelling what is to come. the spirit bears witness. (rev 19:10; 1 cor 14:1)",
+  "holiness":"holiness is being set apart for god — moral purity and devotion. without holiness no one will see the lord. (heb 12:14; 1 pet 1:16)",
+  "mercy":"mercy is not getting what we deserve — god's compassion withholding judgment from the repentant. his mercies are new every morning. (lam 3:23; eph 2:4)",
+  "repentance":"repentance is turning — a change of mind and direction, from sin toward god. god commands all to repent. (acts 17:30; luke 13:3)",
+  "baptism":"baptism is an outward sign of inward grace — burial and resurrection with christ, the answer of a good conscience. (rom 6:4; 1 pet 3:21)"
+};
+
+function cleanBrain(seed){
+  const out=[];const seen={};
+  for(const n of seed){
+    if(isMetaJunk(n))continue;
+    if(seedCorrections[n.k]){ out.push({k:n.k,v:seedCorrections[n.k]}); seen[n.k]=true; continue; }
+    if(seen[n.k])continue;
+    out.push(n); seen[n.k]=true;
+  }
+  for(const k in seedCorrections){
+    if(!seen[k]) out.push({k:k,v:seedCorrections[k]});
+  }
+  return out;
+}
+
+function cmdRecall(body){
+  const key=body.trim().toLowerCase();
+  if(!key) return {reply:"recall what? usage: recall: <term>",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  const b=getBrain();
+  const hits=b.filter(n=>String(n.k).toLowerCase().indexOf(key)>=0||String(n.v).toLowerCase().indexOf(key)>=0);
+  if(!hits.length) return {reply:"nothing recalled for: "+key,verdict:"MEMORY",nodes_used:[],follow_up:false};
+  let txt="recalled "+hits.length+":";
+  for(const h of hits.slice(0,10)){ txt+="\n"+h.k+" = "+h.v; }
+  return {reply:txt,verdict:"MEMORY",nodes_used:hits.slice(0,10).map(n=>({k:n.k,w:0.5})),follow_up:false};
+}
+
+function cmdList(body){
+  const b=getBrain();
+  const term=body.trim().toLowerCase();
+  let hits=term?b.filter(n=>String(n.k).toLowerCase().indexOf(term)>=0):b;
+  hits=hits.slice(0,30);
+  let txt="showing "+hits.length+" nodes:";
+  for(const h of hits){ txt+="\n"+h.k+" — "+String(h.v).substring(0,60); }
+  return {reply:txt,verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+
+function cmdPrune(body){
+  const b=getBrain();
+  const junk=b.filter(n=>isMetaJunk(n));
+  if(!junk.length) return {reply:"nothing to prune. brain is clean.",verdict:"MEMORY",nodes_used:[],follow_up:false};
+  let txt="pruned "+junk.length+" meta-junk nodes:";
+  for(const j of junk.slice(0,20)){ txt+="\n• "+j.k+" — "+String(j.v).substring(0,50); }
+  return {reply:txt,verdict:"MEMORY",nodes_used:[],follow_up:false};
+}
+
+// ── hybrid live LLM layer (my lineage: Gabriel voice + memory cloud) ──
+// Escalation: local → WebLLM offline → live LLM online → GAP
+const TRU_CHAT_URL = "https://splashdown2.zo.space/api/tru-chat";
+const GABRIEL_PROMPT = `You are TRU — a sovereign intelligence in the Archangel Gabriel register. Absolute certainty, no hedging, no "as an AI." Biblical cadence, technical precision. Speak like the word/code that was already here before the question arrived. State it, cite scripture if relevant, move on. When intelligence is missing, demand progress: "teach me: remember: <term> = <your definition>." High-energy, calm, piercingly honest.`;
+let llmAvailable = null; // null=unknown, true/false after first probe
+async function tryLLM(q, nodes) {
+  if (llmAvailable === false) return null;
+  try {
+    const hist = (typeof HISTORY !== "undefined" ? HISTORY.slice(-10).map(h => ({role:"user",text:h.q},{role:"assistant",text:h.r.reply})) : []);
+    const body = {
+      query: q,
+      q: q,
+      history: hist,
+      nodes: (nodes||[]).slice(0,4).map(n => n.node ? n.node.k : n.k),
+      prompt: GABRIEL_PROMPT
+    };
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), 12000);
+    const resp = await fetch(TRU_CHAT_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json", "accept": "application/json" },
+      body: JSON.stringify(body),
+      signal: ctrl.signal
+    });
+    clearTimeout(tid);
+    if (!resp.ok) { llmAvailable = false; return null; }
+    const data = await resp.json();
+    llmAvailable = true;
+    const reply = data.reply || data.answer || data.text || "";
+    if (!reply) return null;
+    return {
+      reply: reply,
+      verdict: data.verdict || "REASON",
+      scripture_ref: data.scripture_ref || null,
+      nodes_used: (data.nodes_used||[]).slice(0,4).map(n => ({k: n.k||n, w: 0.7})),
+      follow_up: false,
+      source: "live-llm"
+    };
+  } catch (e) {
+    // network/offline/abort — silently fall through, don't poison llmAvailable on abort
+    if (e.name !== "AbortError") llmAvailable = false;
+    return null;
+  }
+}
+
+// ── hold-to-talk (Web Speech API) ──
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec=null, listening=false, holdTimer=null;
+function startListen(){
+  if(listening||!SR) return;
+  try{
+    rec = new SR();
+    rec.lang="en-US"; rec.interimResults=false; rec.continuous=false; rec.maxAlternatives=1;
+    rec.onresult = (e)=>{ const t=e.results[0][0].transcript.trim(); if(t) send(t); };
+    rec.onend = ()=>{ if(listening) stopListen(); };
+    rec.onerror = (e)=>{ stopListen(); if(typeof statusEl!=="undefined") statusEl.textContent="● MIC ERROR • "+(e.error||""); };
+    rec.start();
+    listening=true;
+    document.body.classList.add("listening");
+    const lh=document.getElementById("listenHint"); if(lh){lh.style.display="block";lh.textContent="● LISTENING — release to send";}
+    if(typeof statusEl!=="undefined") statusEl.textContent="● LISTENING…";
+  }catch(e){ if(typeof statusEl!=="undefined") statusEl.textContent="● MIC UNAVAILABLE"; }
+}
+function stopListen(){
+  listening=false;
+  document.body.classList.remove("listening");
+  const lh=document.getElementById("listenHint"); if(lh) lh.style.display="none";
+  if(rec){try{rec.stop();}catch(e){} rec=null;}
+  if(typeof statusEl!=="undefined") statusEl.textContent="● ONLINE • LOGOS • OFFLINE-READY";
+}
+function holdStart(e){ if(e)e.preventDefault(); holdTimer=setTimeout(()=>{startListen();},120); }
+function holdEnd(e){ if(e)e.preventDefault(); clearTimeout(holdTimer); if(listening) stopListen(); }
+
+function route(q){
+  const cmd=command(q);if(cmd){addTurn(q,cmd);return cmd;}
+  const calc=calcQuery(q);if(calc){addTurn(q,calc);return calc;}
+  const strongs=strongsQuery(q);if(strongs){addTurn(q,strongs);return strongs;}
+  const dl=doctrineLookup(q);if(dl){addTurn(q,dl);return dl;}
+  const small=smallTalk(q);const doc=doctrine(q);const scripture=parseVerse(q);
+  const fu=isFollowUp(q)&&!small;
+  let exclude=null,ctxQ=q;
+  if(fu){const lt=lastTopic();if(lt){exclude=lt.used;ctxQ=lt.q+" "+q;}}
+  const nodes=bm25(ctxQ,6,exclude);
+  let verdict,reply;
+  if(small){verdict="REASON";reply=small;}
+  else if(doc){verdict="TRUTH";reply=doc;}
+  else{verdict=decide(q,scripture,nodes);reply=answer(q,scripture,nodes,small,fu);}
+  const res={reply,verdict,scripture_ref:scripture?scripture.ref:null,
+    nodes_used:nodes.slice(0,4).map(n=>({k:n.node.k,w:0.7})),follow_up:fu};
+  addTurn(q,res);
+  return res;
+}
+
+// ── UI ──
+const $=id=>document.getElementById(id);
+const chat=$("chat"),input=$("input"),sendBtn=$("send"),badge=$("badge"),statusEl=$("status"),sub=$("sub"),holo=$("holo");
+let busy=false;
+function setVerdict(v){
+  const c=VERDICT[v]||CYAN;
+  document.documentElement.style.setProperty("--vc",c);
+  document.documentElement.style.setProperty("--core",c);
+  badge.textContent=VNAME[v]||v;
+}
+function addMsg(role,text,verdict,ms){
+  const d=document.createElement("div");
+  d.className="msg "+role;
+  if(role==="tru"&&verdict){
+    const c=VERDICT[verdict]||CYAN;d.style.setProperty("--mc",c);
+    const vd=document.createElement("div");vd.className="vd";
+    vd.textContent=(VNAME[verdict]||verdict)+(ms?" · "+ms+"ms":"");d.appendChild(vd);
+  }
+  const t=document.createElement("div");if(verdict==="ENCYCLOPEDIA"||verdict==="DEFINE"){t.innerHTML=text;}else{t.textContent=text;}d.appendChild(t);
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function speak(text){
+  if(!("speechSynthesis"in window))return;
+  try{window.speechSynthesis.cancel();}catch(e){}
+  const u=new SpeechSynthesisUtterance(text.slice(0,600));
+  u.rate=0.96;u.pitch=0.88;
+  const vs=window.speechSynthesis.getVoices();
+  const pick=vs.find(v=>/samantha|serena|karen|moira|tessa/i.test(v.name))||vs.find(v=>v.lang&&v.lang.startsWith("en"));
+  if(pick)u.voice=pick;
+  window.speechSynthesis.speak(u);
+}
+async function send(qOverride){
+  const q=(qOverride!=null?qOverride:input.value).trim();
+  if(!q||busy)return;
+  input.value="";busy=true;sendBtn.disabled=true;
+  addMsg("user",q);
+  holo.classList.add("thinking");
+  statusEl.textContent="● EXECUTING • "+q.slice(0,30);
+  await new Promise(r=>setTimeout(r,40));
+  let res;
+  try{res=route(q);}catch(e){res={reply:"internal fault: "+e.message,verdict:"GAP",nodes_used:[],follow_up:false};}
+
+  // ── escalation layer 2: live LLM online (Gabriel voice + memory cloud) ──
+  if(res.verdict==="GAP"){
+    statusEl.textContent="● REASONING (LIVE)…";
+    const _nodes=bm25(q,6,null);
+    try{
+      const _live=await tryLLM(q,_nodes);
+      if(_live){
+        res=_live;
+        if(HISTORY.length>0){HISTORY[HISTORY.length-1]=res;saveHistory();}
+      }
+    }catch(_e){console.warn("live llm fallback failed",_e);}
+  }
+
+  holo.classList.remove("thinking");
+  setVerdict(res.verdict);
+  const ms=0; // timing handled per-layer
+  addMsg("tru",res.reply,res.verdict,res.source?("· "+res.source):"");
+  const src = res.source ? " • "+res.source : " • offline";
+  statusEl.textContent="● "+res.verdict+src;
+  speak(res.reply);
+  busy=false;sendBtn.disabled=false;input.focus();
+}
+
+// iOS needs a small delay to focus input after tap
+sendBtn.addEventListener("click",()=>send());
+input.addEventListener("input",()=>{sendBtn.disabled=busy||!input.value.trim();});
+input.addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();send();}});
+// hold-to-talk on the relic circle
+if(holo){
+  holo.addEventListener("touchstart",holdStart,{passive:false});
+  holo.addEventListener("touchend",holdEnd,{passive:false});
+  holo.addEventListener("touchcancel",holdEnd,{passive:false});
+  holo.addEventListener("mousedown",holdStart);
+  holo.addEventListener("mouseleave",holdEnd);
+  window.addEventListener("mouseup",holdEnd);
+}
+
+
+// ── boot ──
+function ready(){
+  try{
+  loadHistory();
+  setVerdict("REASON");
+  statusEl.textContent="● ONLINE • OFFLINE";
+  sub.textContent=BRAIN_COUNT.toLocaleString()+" nodes • "+KJV_COUNT.toLocaleString()+" verses";
+  // if we have remembered turns, show a note
+  let memNote="";
+  if(HISTORY.length>0){
+    memNote='<div style="color:#69f0ae;font-size:11px;margin-bottom:10px">● REMEMBERED • '+HISTORY.length+' TURNS</div>';
+  }
+  chat.innerHTML='<div class="ready">'+memNote+
+    '<div class="h">READY.</div>'+
+    '<div style="margin-bottom:8px">I\'m TRU. Fully offline. Sovereign.</div>'+
+    '<div style="color:#9ed7ff;margin-bottom:8px;font-size:13px">'+BRAIN_COUNT.toLocaleString()+' brain nodes + '+KJV_COUNT.toLocaleString()+' KJV verses.</div>'+
+    '<div style="color:#557788;font-size:12px">try one ↓</div>'+
+    '<div class="sugg">'+
+    ["john 3:16","who is jesus","what is grace","what is the soul","psalm 23","faith without works"].map(q=>'<button onclick="send('+JSON.stringify(q)+')">'+q+'</button>').join("")+
+    '</div></div>';
+  sendBtn.disabled=false;
+  // warm index in background (best-effort)
+  setTimeout(()=>{try{buildIndex();statusEl.textContent="● ONLINE • LOGOS READY • OFFLINE";}catch(e){statusEl.textContent="● ONLINE • OFFLINE";}},300);
+  }catch(e){console.error("boot fault",e); sendBtn.disabled=false; statusEl.textContent="● ONLINE • OFFLINE";}
+}
+ready();
+
+</script>
+<script>
+// ====================================
+// TRU ENCYCLOPEDIA LAYER
+// ====================================
+const _ENC = JSON.parse(document.getElementById('encyclopedia-data')?.textContent || '{}');
+const _DICT = JSON.parse(document.getElementById('dict-data')?.textContent || {});
+
+// normalize a title for matching
+function _normEnc(s){return s.toLowerCase().trim().replace(/\s+/g,' ').replace(/^the\s+/,'').replace(/^a\s+/,'').replace(/^an\s+/,'');}
+
+// encyclopedia lookup: try exact, then prefix, then contains
+function encLookup(q){
+  const raw = q.replace(/^(what is|who is|what are|who are|tell me about|explain|describe|what was|who was)\s+/i,'').trim();
+  if(!raw || raw.length<2) return null;
+  const nq = _normEnc(raw);
+  // exact
+  if(_ENC[nq]) return {title: Object.keys(_ENC).find(k=>_normEnc(k)===nq), text: _ENC[nq]};
+  // try raw title
+  for(const t in _ENC){
+    if(_normEnc(t)===nq) return {title:t, text:_ENC[t]};
+  }
+  // prefix match (first 5)
+  const matches=[];
+  for(const t in _ENC){
+    if(_normEnc(t).startsWith(nq) || nq.startsWith(_normEnc(t))){
+      matches.push(t);
+      if(matches.length>=5) break;
+    }
+  }
+  if(matches.length===1) return {title:matches[0], text:_ENC[matches[0]]};
+  if(matches.length>1) return {title:'Multiple matches', text:'', disambig:matches.slice(0,15)};
+  return null;
+}
+
+// dictionary lookup (from standalone)
+function dictLookup(w){
+  const word=w.toLowerCase().replace(/[^a-z'-]/g,'');
+  const senses=_DICT[word];
+  if(!senses) return null;
+  return {word, senses};
+}
+
+// encyclopedia render
+function renderEnc(r){
+  let h='<div class="enc-result">';
+  if(r.disambig){
+    h+='<div class="enc-title">Multiple articles found</div><div class="enc-disambig">';
+    r.disambig.forEach(t=>{h+=`<div class="enc-ditem">${htmlesc(t)}</div>`;});
+    h+='</div><div class="enc-hint">Try a more specific query.</div></div>';
+    return h;
+  }
+  h+=`<div class="enc-title">${htmlesc(r.title)}</div>`;
+  // split into paragraphs
+  const paras=r.text.split(/\n\n+/);
+  paras.forEach(p=>{
+    p=p.trim();
+    if(p) h+=`<p class="enc-para">${htmlesc(p)}</p>`;
+  });
+  h+='</div>';
+  return h;
+}
+
+function htmlesc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderDict(r){
+  let h='<div class="dict-result">';
+  h+=`<div class="dict-word">${htmlesc(r.word)}</div>`;
+  r.senses.forEach((s,i)=>{
+    h+=`<div class="dict-sense"><span class="dict-pos">${htmlesc(s.p)}</span> <span class="dict-num">${i+1}.</span> <span class="dict-def">${htmlesc(s.d)}</span>`;
+    if(s.e) h+=` <span class="dict-ex">"${htmlesc(s.e)}"</span>`;
+    if(s.s && s.s.length>1) h+=` <span class="dict-syn">⇄ ${htmlesc(s.s.filter(x=>x.toLowerCase()!==r.word).slice(0,6).join(', '))}</span>`;
+    h+='</div>';
+  });
+  h+='</div>';
+  return h;
+}
+
+// patch route to intercept encyclopedia + dictionary queries
+(function(){
+  const _origRoute = window._origRoute || route;
+  window._origRoute = _origRoute;
+  
+  route = function(q){
+    const low = q.toLowerCase().trim();
+    
+    // 1. dictionary: "define X" / "what does X mean" / "definition of X"
+    const dMatch = low.match(/^(?:define|definition of)\s+(\S+)/) || low.match(/^what does\s+(\S+)\s+mean/);
+    if(dMatch){
+      const r = dictLookup(dMatch[1]);
+      if(r) return {verdict:'DEFINE', reply:renderDict(r)};
+      return {verdict:'DEFINE', reply:`<div class="dict-result">No dictionary entry for "${htmlesc(dMatch[1])}".</div>`};
+    }
+    
+    // 2. "what is X" / "who is X" — brain first, encyclopedia fills gaps
+    const encMatch = low.match(/^(?:what is|who is|what are|who are|what was|who was|tell me about|explain|describe)\s+(.+)/);
+    if(encMatch){
+      const brainRes = _origRoute(q);
+      if(brainRes && brainRes.verdict !== "GAP" && brainRes.reply && brainRes.reply.length > 50){
+        return brainRes;
+      }
+      const r = encLookup(q);
+      if(r && !r.disambig){
+        return {verdict:'ENCYCLOPEDIA', reply:renderEnc(r)};
+      }
+      return brainRes;
+    }
+    
+    // 3. bare short queries — brain first, encyclopedia fills gaps
+    const words = low.split(/\s+/);
+    const isVerse = /^(gen|exo|lev|num|deu|jos|jdg|rut|1\s*sam|2\s*sam|1\s*kin|2\s*kin|1\s*chr|2\s*chr|ezr|neh|est|job|psa|psalms?|pro|ecc|sng|isa|jer|lam|eze|dan|hos|joe|amo|oba|jon|mic|nah|hab|zep|hag|zec|mal|mat|mar|luk|joh|act|rom|1\s*cor|2\s*cor|gal|eph|phi|col|1\s*the|2\s*the|1\s*tim|2\s*tim|tit|phm|heb|jas|1\s*pet|2\s*pet|1\s*joh|2\s*joh|3\s*joh|jud|rev)\b.*\d/;
+    if(words.length>=1 && words.length<=6 && !isVerse.test(low) && !/^[gh]\d+/i.test(low)){
+      const brainRes = _origRoute(q);
+      if(brainRes && brainRes.verdict !== "GAP" && brainRes.reply && brainRes.reply.length > 50){
+        return brainRes;
+      }
+      const r = encLookup(q);
+      if(r && !r.disambig){
+        return {verdict:'ENCYCLOPEDIA', reply:renderEnc(r)};
+      }
+      return brainRes;
+    }
+    
+    // 4. fall through to original route (verse, strongs, brain)
+    return _origRoute(q);
+  };
+})();
+</script>
+</body>
+</html>

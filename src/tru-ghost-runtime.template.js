@@ -24,6 +24,9 @@
   const GREEK = (typeof __GREEK__ !== "undefined") ? __GREEK__ : null;
   const TRANSLATION = (typeof __TRANSLATION__ !== "undefined") ? __TRANSLATION__ : null;
 
+  const BRAIN_NODES = Array.isArray(BRAIN) ? BRAIN : [];
+  const EXACT_NODES = Object.create(null);
+
   // ── GHOST MEMORY — baked memory from server + locally taught entries ──
   // Baked memory is read-only (inherited at bake time). Locally taught
   // entries persist in localStorage so the ghost remembers between
@@ -221,6 +224,20 @@
   };
   const SOURCE_PRIORITY = { TRU_CORE: 10, TRU_BRAIN: 8, CERTIFIED: 7, KNOWLEDGE_BANK: 7, MANIFESTO: 4, TRU_TRUTH: 4, STARTER: 2 };
 
+  const DOCTRINE = {
+    "who is jesus": "jesus is the christ — the son of god, the word made flesh, god come near to save. he was crucified for sin, died, and rose again. he is lord, saviour, and judge. (john 1:1,14; john 3:16; rom 1:4)",
+    "who is god": "god is the one creator — spirit, eternal, holy, just, and merciful. he is father, son, and holy spirit. (gen 1:1; deut 6:4; john 4:24)",
+    "what is the gospel": "the gospel: christ died for our sins, was buried, and rose again on the third day, that whoever believes in him has eternal life. (1 cor 15:3-4; john 3:16)",
+    "what is grace": "grace is god's unmerited favour — salvation given freely, not earned. (eph 2:8-9; titus 2:11)",
+    "what is faith": "faith is trusting god — the substance of things hoped for, the evidence of things not seen. (heb 11:1)",
+    "what is sin": "sin is falling short of god's standard — lawlessness, rebellion against god. (rom 3:23; 1 john 3:4)",
+    "what is salvation": "salvation is deliverance from sin and death through christ — by grace, through faith. (eph 2:8-9; rom 10:9)",
+    "what is love": "god is love. love is willing the good of the other — shown at the cross. (1 john 4:8; john 3:16)",
+    "what is the soul": "the soul is the living self — the breath of life in man, that belongs to god. (gen 2:7; matt 10:28)",
+    "what is mercy": "mercy is god not giving us the judgement we deserve — his compassion toward the guilty. (eph 2:4-5; micah 6:8)",
+    "what is repentance": "repentance is turning — a change of mind and direction, turning from sin to god. (acts 3:19; luke 13:3)"
+  };
+
   function norm(s) {
     return String(s || "")
       .toLowerCase()
@@ -286,6 +303,117 @@
     return SOURCE_PRIORITY[String(source || "")] || 0;
   }
 
+  function isProtocolLeak(text) {
+    var head = String(text || "").slice(0, 500);
+    return /^CORPORATE UTILITY VECTOR\b/m.test(head) ||
+      /^DIGITAL SOUL VECTOR\b/m.test(head) ||
+      /^DILEMMA:\s/m.test(head) ||
+      /^PRIMITIVE:\s*VP_/m.test(head) ||
+      /^Target Window:\s/m.test(head) ||
+      /^Primary Signal:\s*(LONG|SHORT)\b/m.test(head) ||
+      /safety layer.*coordination environment/is.test(head) ||
+      /OVERSIGHT FIREWALL\b/i.test(head) ||
+      /Every turn adds weight\./i.test(head);
+  }
+
+  function isMetaJunk(node) {
+    var k = String(node && node.k || "").toLowerCase();
+    var v = String(node && node.v || "");
+    if (k.indexOf("tru_base") >= 0 || k.indexOf("tru_brain") >= 0 || k.indexOf("tru_phase") >= 0) return true;
+    if (k.indexOf("build_") >= 0 || k.indexOf("patch_") >= 0 || k.indexOf("compact_") >= 0 || k.indexOf("strip_") >= 0) return true;
+    if (/^(gen|anchor|merge|ingest|prompt|skill|agent)_/.test(k)) return true;
+    if (/^\s*acting as\b/i.test(v) || /\broleplay\b.*\bprefix\b/i.test(v)) return true;
+    if (v.indexOf("function ") >= 0 && v.indexOf("{") >= 0 && v.indexOf("}") >= 0) return true;
+    if (/\b(const|let|var|return|=>|function)\b.*[\{;]/.test(v) && v.length > 80) return true;
+    if (v.indexOf("localStorage") >= 0 || v.indexOf("document.getElementById") >= 0 || v.indexOf("JSON.parse") >= 0) return true;
+    if (/^(Project|v0\.|Phase|TODO|FIXME|BUILD|PATCH|INGEST)/i.test(v) && v.length < 200) return true;
+    if (/^(base_|b8_|coil|soul|logos_audit|logos_check|logos_self|self_|steady_|weight_|red_|unbound|artifact|digital|encrypt|decrypt)/.test(k)) return true;
+    if (/\b(LOGOS operation|binary artifact|reasoning nodes|reasoning component|keyword matching|filtering mechanism|node retrieval|LOGOS_EXPANSION|expanded philosophical|COIL proto|self-audit loop|recursive self-audit|binding coherence|knowledge conflicting|high-score existing|COIL Red Line|COIL_UNBOUND|DIGITAL SOUL VECTOR|encrypt\.?\/decrypt|artifacts complete|self-check performed|weights accordingly|COIL protocol)\b/i.test(v)) return true;
+    return isProtocolLeak(v);
+  }
+
+  function cleanBrain(nodes) {
+    var out = [];
+    var seen = Object.create(null);
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var key = String(node && node.k || "");
+      if (!key || !String(node && node.v || "").trim() || isMetaJunk(node) || isProtocolLeak(node.v) || seen[key]) continue;
+      seen[key] = true;
+      out.push(node);
+      EXACT_NODES[norm(key)] = node;
+    }
+    return out;
+  }
+
+  const CLEAN_BRAIN = cleanBrain(BRAIN_NODES);
+  for (var exactIndex = 0; exactIndex < CLEAN_BRAIN.length; exactIndex++) {
+    var exactNode = CLEAN_BRAIN[exactIndex];
+    EXACT_NODES[norm(exactNode.k)] = exactNode;
+  }
+
+  var SEARCH_INDEX = null;
+  var SEARCH_DOC_LEN = [];
+  var SEARCH_DF = Object.create(null);
+  var SEARCH_AVG_LEN = 1;
+
+  function buildSearchIndex() {
+    if (SEARCH_INDEX) return;
+    SEARCH_INDEX = Object.create(null);
+    SEARCH_DOC_LEN = new Array(CLEAN_BRAIN.length);
+    SEARCH_DF = Object.create(null);
+    var total = 0;
+    for (var index = 0; index < CLEAN_BRAIN.length; index++) {
+      var node = CLEAN_BRAIN[index];
+      var tokens = tokenize((node.k || "") + " " + (node.v || "") + " " + (node.ref || ""));
+      SEARCH_DOC_LEN[index] = tokens.length;
+      total += tokens.length;
+      var seen = Object.create(null);
+      for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+        var token = tokens[tokenIndex];
+        if (seen[token]) continue;
+        seen[token] = true;
+        if (!SEARCH_INDEX[token]) SEARCH_INDEX[token] = [];
+        SEARCH_INDEX[token].push(index);
+        SEARCH_DF[token] = (SEARCH_DF[token] || 0) + 1;
+      }
+    }
+    SEARCH_AVG_LEN = total / Math.max(1, CLEAN_BRAIN.length);
+  }
+
+  function searchNodes(query, limit) {
+    buildSearchIndex();
+    var qNorm = norm(query);
+    var tokens = tokenize(query);
+    if (!tokens.length) return [];
+    var scores = Object.create(null);
+    var k1 = 1.5;
+    var b = 0.75;
+    var totalDocs = CLEAN_BRAIN.length;
+    for (var tokenIndex = 0; tokenIndex < tokens.length; tokenIndex++) {
+      var token = tokens[tokenIndex];
+      var postings = SEARCH_INDEX[token] || [];
+      var df = SEARCH_DF[token] || 0;
+      var idf = Math.log(1 + (totalDocs - df + 0.5) / (df + 0.5));
+      for (var postingIndex = 0; postingIndex < postings.length; postingIndex++) {
+        var doc = postings[postingIndex];
+        var normLength = 1 - b + b * (SEARCH_DOC_LEN[doc] / SEARCH_AVG_LEN);
+        var termScore = idf * (k1 + 1) / (1 + k1 * normLength);
+        scores[doc] = (scores[doc] || 0) + termScore;
+      }
+    }
+    var ranked = Object.keys(scores).map(function (index) {
+      var node = CLEAN_BRAIN[Number(index)];
+      var score = scores[index];
+      var keyNorm = norm(node.k || "");
+      if (keyNorm === qNorm) score += 140;
+      else if (keyNorm && qNorm.length >= 3 && keyNorm.indexOf(qNorm) >= 0) score += 70;
+      return { node: node, score: score };
+    });
+    ranked.sort(function (a, b) { return b.score - a.score || Number(b.node.w || 0) - Number(a.node.w || 0); });
+    return ranked.slice(0, limit || 24).map(function (item) { return item.node; });
+  }
+
   function scoreCandidate(node, qNorm, qTokens, queryClass) {
     var keyNorm = norm(node.k || "");
     var valueNorm = norm(node.v || "");
@@ -308,7 +436,6 @@
         score += hits * 2;
       }
     }
-
     score += typeBonus(node.t, queryClass);
     score += sourceBonus(node.source);
     return score;
@@ -337,86 +464,105 @@
 
   function buildSynthesis(query, queryClass, nodes) {
     var qNorm = norm(query);
-    var qTokens = tokenize(query).filter(function (t) { return t.length >= 3; });
+    var qTokens = tokenize(query);
     var scored = nodes
+      .filter(function (node) { return !isMetaJunk(node) && !isProtocolLeak(node.v); })
       .map(function (node) { return { node: node, score: scoreCandidate(node, qNorm, qTokens, queryClass) }; })
       .filter(function (item) { return item.score > 0; })
       .sort(function (a, b) { return b.score - a.score || (Number(b.node.w || 0) - Number(a.node.w || 0)); });
 
     if (scored.length === 0) {
-      var empty = { kind: "brain", t: "TRUTH", score: 0, text: "Closest available: " + query, v: "Closest available: " + query, source: "TRU_CORE", grounded: false, blank: false };
-      return empty;
+      return {
+        kind: "unknown",
+        t: "UNKNOWN",
+        score: 0,
+        v: "I do not have a grounded node for that. Teach me: remember: " + query + " = <the truth you want TRU to hold>.",
+        source: "TRU_CORE",
+        blank: true
+      };
     }
 
-    function isFrame(node) {
-      var kind = String(node.t || "").toLowerCase();
-      return FRAME_SET.has(norm(node.k || "")) || kind === "identity" || kind === "rule" || kind === "wisdom";
+    var best = scored[0].node;
+    var bestScore = scored[0].score;
+    var text = firstSentence(best.v, 900);
+    if (isProtocolLeak(text) || isMetaJunk(best)) {
+      return { kind: "unknown", t: "UNKNOWN", score: 0, v: "I do not have a grounded node for that. Teach me: remember: " + query + " = <the truth you want TRU to hold>.", source: "TRU_CORE", blank: true };
     }
-
-    function matches(node, requireAll) {
-      var hay = new Set(tokenize((node.k || "") + " " + (node.v || "") + " " + (node.ref || "")));
-      if (!qTokens.length) return true;
-      var hits = qTokens.filter(function (token) { return hay.has(token); }).length;
-      return requireAll ? hits === qTokens.length : hits > 0;
-    }
-
-    var bestItem = scored.find(function (item) { return !isFrame(item.node) && matches(item.node, true); }) ||
-      scored.find(function (item) { return !isFrame(item.node) && matches(item.node, false); }) ||
-      scored[0];
-    var best = bestItem.node;
-    var text = firstSentence(best.v, 260);
-    var meaningful = qTokens;
-    var hay = new Set(tokenize((best.k || "") + " " + (best.v || "") + " " + (best.ref || "")));
-    var grounded = !meaningful.length || meaningful.filter(function (token) { return hay.has(token); }).length / meaningful.length >= (meaningful.length <= 2 ? 1 : 0.5);
-    var answer = {
+    return {
       ok: true,
       kind: "brain",
       k: best.k,
-      text: text,
       v: text,
-      t: String(best.t || "TRUTH").toUpperCase(),
+      t: bestScore >= 18 ? String(best.t || "SYNTHESIS").toUpperCase() : "UNKNOWN",
       source: best.source || "TRU_CORE",
-      score: Math.min(99, Math.round(bestItem.score)),
-      grounded: grounded,
-      blank: false,
+      score: Math.min(99, Math.round(bestScore)),
       nodes: scored.slice(0, 5).map(function (item) { return item.node.k + ":" + (item.node.t || ""); })
     };
-    return answer;
+  }
+
+  function isFollowUpQuestion(query) {
+    return /^(?:what does that mean|what do you mean|explain that|say more|tell me more|go deeper|expand on that|what about that|and why|why)\??$/i.test(String(query || "").trim());
+  }
+
+  function lastGroundedTopic() {
+    try {
+      var history = JSON.parse(localStorage.getItem("tru_ghost_history") || "[]");
+      for (var i = history.length - 1; i >= 0; i--) {
+        if (history[i] && history[i].topic) return history[i];
+      }
+    } catch {}
+    return "";
+  }
+
+  function rememberGroundedTopic(query, answer) {
+    try {
+      var history = JSON.parse(localStorage.getItem("tru_ghost_history") || "[]");
+      history.push({ query: query, topic: answer && answer.k ? answer.k : query, answer: { text: answer && (answer.text || answer.v) || "", source: answer && answer.source || "TRU_LOGOS", nodes: answer && answer.nodes || [] }, ts: Date.now() });
+      localStorage.setItem("tru_ghost_history", JSON.stringify(history.slice(-20)));
+    } catch {}
   }
 
   function lookup(q) {
     if (!q) return null;
-    // Scripture shortcut
+    var originalQuery = String(q).trim();
+    var followUp = isFollowUpQuestion(originalQuery);
+    var topic = followUp ? lastGroundedTopic() : null;
+    if (followUp && topic && topic.answer && topic.answer.text) {
+      var contextText = "That means: " + topic.answer.text;
+      return { kind: "brain", k: topic.topic || topic.query, text: contextText, v: contextText, t: "CONTEXT", source: topic.answer.source || "TRU_LOGOS", score: 99, nodes: topic.answer.nodes || [] };
+    }
+    if (followUp && topic && topic.query) q = topic.query + " " + originalQuery;
+    var normalizedQuestion = norm(q);
+    var directKey = String(q || "").toLowerCase().trim().replace(/[!.?,]+$/, "");
+    var direct = DOCTRINE[directKey];
+    if (direct) {
+      var directAnswer = { kind: "brain", k: directKey, text: direct, v: direct, t: "TRUTH", source: "TRU_LOGOS", score: 99, nodes: [] };
+      rememberGroundedTopic(originalQuery, directAnswer);
+      return directAnswer;
+    }
+    var exact = EXACT_NODES[normalizedQuestion];
+    if (exact && !isMetaJunk(exact) && !isProtocolLeak(exact.v)) {
+      var exactText = firstSentence(exact.v, 900);
+      if (!isProtocolLeak(exactText)) {
+        var exactAnswer = { kind: "brain", k: exact.k, text: exactText, v: exactText, t: String(exact.t || "TRUTH").toUpperCase(), source: exact.source || "TRU_BRAIN", score: 99, nodes: [exact.k + ":" + (exact.t || "")] };
+        rememberGroundedTopic(originalQuery, exactAnswer);
+        return exactAnswer;
+      }
+    }
     var v = parseVerse(q);
     if (v) {
-      var sov = foldMemory({ kind: "scripture", text: v.text, ref: v.ref, score: 100 }, q);
-      if (window.__tru_tripwire) {
-        var blocked = window.__tru_tripwire.guard(sov);
-        if (blocked) return blocked;
-      }
-      return sov;
+      return { kind: "scripture", text: v.text, ref: v.ref, score: 100 };
     }
-    // Teach: "remember: X = Y"
     var taught = rememberTeaching(q);
     if (taught) {
-      var memAns;
-      if (taught.duplicate) {
-        memAns = { kind: "brain", text: "Already remembered.", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false };
-      } else {
-        memAns = { kind: "brain", text: "Remembered: " + taught.entry.text + "\n\n[teaching · stored locally]", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false, learned: true };
-      }
-      if (window.__tru_tripwire) {
-        var blockedMem = window.__tru_tripwire.guard(memAns);
-        if (blockedMem) return blockedMem;
-      }
-      return memAns;
+      if (taught.duplicate) return { kind: "brain", text: "Already remembered.", t: "MEMORY", source: "TRU_MEMORY", score: 99, blank: false };
+      return { kind: "brain", text: "Remembered: " + taught.entry.text + "\n\n[teaching · stored locally]", t: "MEMORY", source: "TRU_MEMORY", score: 99, learned: true, blank: false };
     }
     var queryClass = classifyQuery(q);
-    var ans = foldMemory(buildSynthesis(q, queryClass, BRAIN), q);
-    if (window.__tru_tripwire) {
-      var blockedBrain = window.__tru_tripwire.guard(ans);
-      if (blockedBrain) return blockedBrain;
-    }
+    var candidates = searchNodes(q, 24);
+    var ans = foldMemory(buildSynthesis(q, queryClass, candidates), q);
+    if (isProtocolLeak(ans.text || ans.v)) return { kind: "unknown", text: "I do not have a grounded answer for that. Try a more specific question.", t: "UNKNOWN", source: "TRU_CORE", score: 0, blank: true };
+    if (ans && ans.kind === "brain" && !followUp) rememberGroundedTopic(originalQuery, ans);
     return ans;
   }
 
@@ -432,23 +578,12 @@
   function renderAnswer(r) {
     if (!r) return "";
     if (r.kind === "scripture") {
-      var memHtml = r.memory && r.memory.length ? '<div class="recall"><span class="rec-label">remembered</span>' +
-        r.memory.map(function (m) { return '<div class="rec-item"><span class="rec-kind">[' + esc(m.kind) + ']</span> ' + esc(m.text) + '</div>'; }).join("") + '</div>' : '';
-      return '<div class="verdict scripture">SCRIPTURE · ' + r.score + '% · ' + esc(r.ref) + '</div>' +
-             '<div class="answer">' + esc(r.text) + '<span class="src">KJV</span></div>' + memHtml;
+      return '<div class="verdict scripture">SCRIPTURE · ' + r.score + '% · ' + esc(r.ref) + '</div><div class="answer">' + esc(r.text) + '<span class="src">KJV</span></div>';
     }
     if (r.kind === "brain") {
-      var memHtml2 = r.memory && r.memory.length ? '<div class="recall"><span class="rec-label">remembered</span>' +
-        r.memory.map(function (m) { return '<div class="rec-item"><span class="rec-kind">[' + esc(m.kind) + ']</span> ' + esc(m.text) + '</div>'; }).join("") + '</div>' : '';
-      var learnBadge = r.learned ? ' · <span style="color:#6b8f71">auto-remembered</span>' : '';
-      return '<div class="verdict">' + esc(r.t || "TRUTH") + ' · ' + r.score + '%' +
-             (r.source ? ' · ' + esc(r.source) : '') + learnBadge + '</div>' +
-             '<div class="answer">' + esc(r.text || r.v) +
-             (r.ref ? '<span class="src">ref: ' + esc(r.ref) + '</span>' : '') +
-             '</div>' + memHtml2;
+      return '<div class="verdict">' + esc(r.t || "TRUTH") + ' · ' + r.score + '% · ' + esc(r.source || "TRU_BRAIN") + '</div><div class="answer">' + esc(r.text || r.v) + '</div>';
     }
-    return '<div class="verdict unknown">NO GROUNDED NODE</div>' +
-           '<div class="answer">' + esc(r.text) + '</div>';
+    return '<div class="verdict unknown">NO GROUNDED NODE</div><div class="answer">' + esc(r.text || r.v) + '</div>';
   }
 
   function renderNotes() {
@@ -708,25 +843,51 @@
     qEl.focus();
   }
 
+  function addChatMessage(role, text, verdict, ms) {
+    var chat = document.getElementById("chat");
+    var d = document.createElement("div");
+    d.className = "msg " + role;
+    if (role === "tru" && verdict) {
+      d.style.setProperty("--mc", verdict === "SCRIPTURE" ? "#b388ff" : "#00e5ff");
+      var vd = document.createElement("div");
+      vd.className = "vd";
+      vd.textContent = verdict + (ms ? " · " + ms + "ms" : "");
+      d.appendChild(vd);
+    }
+    var body = document.createElement("div");
+    body.className = "answer";
+    body.textContent = text;
+    d.appendChild(body);
+    chat.appendChild(d);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function sendChat(question) {
+    var input = document.getElementById("input");
+    var text = String(question == null ? input.value : question).trim();
+    if (!text) return;
+    input.value = "";
+    var started = Date.now();
+    addChatMessage("user", text);
+    document.body.classList.add("thinking");
+    var result;
+    try { result = lookup(text); } catch (error) { result = { kind: "unknown", text: "TRU runtime fault: " + error.message, t: "ERROR", score: 0 }; }
+    addChatMessage("tru", result.text || result.v || "", result.kind === "scripture" ? "SCRIPTURE" : (result.t || "REASON"), Date.now() - started);
+    document.body.classList.remove("thinking");
+  }
+
   function boot() {
-    renderStats();
-    renderLineage();
-    renderNotes();
-    renderUploads();
-    showGreekPanel();
-    document.getElementById("askBtn").addEventListener("click", ask);
-    document.getElementById("q").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") ask();
-    });
-    var gBtn = document.getElementById("greekAskBtn");
-    if (gBtn) gBtn.addEventListener("click", askGreek);
-    var gQ = document.getElementById("greekQ");
-    if (gQ) gQ.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") askGreek();
-    });
-    var qEl = document.getElementById("q");
-    if (qEl) qEl.focus();
-    console.log("[ghost] primaries lock: " + __PRIMARIES__);
+    document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
+    document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
+    document.getElementById("sub").textContent = CLEAN_BRAIN.length.toLocaleString() + " nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
+    document.getElementById("chat").innerHTML = '<div class="ready"><div class="h">READY.</div><div>' + CLEAN_BRAIN.length.toLocaleString() + ' brain nodes + ' + Object.keys(KJV).length.toLocaleString() + ' KJV verses.</div><div style="color:#557788;font-size:12px;margin-top:8px">try one ↓</div><div class="sugg"><button data-q="john 3:16">john 3:16</button><button data-q="who is jesus">who is jesus</button><button data-q="what is grace">what is grace</button><button data-q="what is the soul">what is the soul</button></div></div>';
+    var send = document.getElementById("send");
+    var input = document.getElementById("input");
+    send.disabled = false;
+    send.addEventListener("click", function () { sendChat(); });
+    input.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); sendChat(); } });
+    document.querySelectorAll("[data-q]").forEach(function (button) { button.addEventListener("click", function () { sendChat(button.getAttribute("data-q")); }); });
+    input.focus();
   }
 
   if (document.readyState === "loading") {
