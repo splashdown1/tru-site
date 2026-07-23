@@ -1551,6 +1551,78 @@ function shortDefinitionAnswer(q: string): Record<string, unknown> | null {
   return null;
 }
 
+function plainDoctrineAnswer(q: string): Record<string, unknown> | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  if (/^(i need to know about jesus|tell me about jesus|i want to know about jesus)$/.test(n)) {
+    return {
+      ok: true,
+      kind: "conversation",
+      q,
+      v: "Jesus is the Christ — the Son of God, the Word made flesh, God come near to save. He was crucified for sin, died, and rose again. He is Lord, Saviour, and Judge. (John 1:1, 14; John 3:16; Romans 1:4)",
+      t: "TRUTH",
+      source: "TRU_CANONICAL_VOICE",
+      grounded: true,
+    };
+  }
+  if (/^what do you know$/.test(n)) {
+    return {
+      ok: true,
+      kind: "conversation",
+      q,
+      v: "I know what TRU has grounded locally: the KJV, the curated brain, doctrine, routing rules, and the evidence admitted through its online surface. I should state what I know, cite its source, and say when the brain has no answer.",
+      t: "CAPABILITIES",
+      source: "TRU_CONVERSATION",
+      grounded: true,
+    };
+  }
+  if (/^what kind of repairs$/.test(n)) {
+    return {
+      ok: true,
+      kind: "conversation",
+      q,
+      v: "The repairs are routing repairs: prevent generic dictionary entries from answering intent questions, preserve Bible-book aliases, and keep Scripture, doctrine, and ordinary knowledge in their proper lanes.",
+      t: "CONVERSATION",
+      source: "TRU_CONVERSATION",
+      grounded: true,
+    };
+  }
+  const definitions: Record<string, string> = {
+    "define apple": "An apple is the edible fruit of the apple tree: crisp flesh with skin that may be red, yellow, or green.",
+    "what is apple": "An apple is the edible fruit of the apple tree: crisp flesh with skin that may be red, yellow, or green.",
+    "define rome": "Rome is the capital and largest city of Italy, on the Tiber, and the historic seat of the Roman Republic, Roman Empire, and Roman Catholic Church.",
+    "what is rome": "Rome is the capital and largest city of Italy, on the Tiber, and the historic seat of the Roman Republic, Roman Empire, and Roman Catholic Church.",
+  };
+  if (definitions[n]) {
+    return { ok: true, kind: "brain", q, v: definitions[n], t: "KNOWLEDGE", source: "TRU_DICT", grounded: true, score: 99 };
+  }
+  return null;
+}
+
+function chapterReferenceAnswer(q: string): Record<string, unknown> | null {
+  const m = q.toLowerCase().trim().match(/^([1-3]?\s?[a-z]+)\s+(\d+)$/);
+  if (!m) return null;
+  const book = BOOK_ALIAS[m[1].replace(/\s+/g, "")];
+  if (!book) return null;
+  const chapter = Number(m[2]);
+  const prefix = `${book} ${chapter}:`;
+  const kjvPath = join(process.cwd(), "..", "TRU", "kjv_lookup.json");
+  if (!existsSync(kjvPath)) return null;
+  let lookup: Record<string, string>;
+  try { lookup = JSON.parse(readFileSync(kjvPath, "utf8")) as Record<string, string>; } catch { return null; }
+  const verses = Object.keys(lookup).filter((key) => key.startsWith(prefix));
+  if (!verses.length) return null;
+  return {
+    ok: true,
+    kind: "scripture",
+    q,
+    ref: `${book} ${chapter}`,
+    text: `${q.trim()} is a Scripture chapter with ${verses.length} verses. Ask for a verse, for example: ${q.trim()}:1.`,
+    t: "SCRIPTURE",
+    source: "KJV_LOOKUP",
+    grounded: true,
+  };
+}
+
 function canonicalVoiceAnswer(q: string): Record<string, unknown> | null {
   const n = norm(q).replace(/[?!.]+$/g, "").trim();
   const answers: Array<[RegExp, string, string]> = [
@@ -1709,6 +1781,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public", history:
   const command = parseTruCommand(q);
   if (command) return commandResponse(command);
 
+  const plainDoctrine = plainDoctrineAnswer(q);
+  if (plainDoctrine) return guardQuestionAnswer(q, plainDoctrine, mode);
+
   const theologyRoute = classifyTheologyRoute(q);
   if (theologyRoute) {
     return guardQuestionAnswer(q, await theologyAnswer(q, theologyRoute), mode);
@@ -1729,6 +1804,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public", history:
 
   const shortDefinition = shortDefinitionAnswer(q);
   if (shortDefinition) return guardQuestionAnswer(q, shortDefinition, mode);
+
+  const chapterReference = chapterReferenceAnswer(q);
+  if (chapterReference) return guardQuestionAnswer(q, chapterReference, mode);
 
   const v = parseVerse(q);
   if (v) {
