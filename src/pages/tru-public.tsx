@@ -89,6 +89,12 @@ function commandReply(command: string, stats: TruStats | null): { text: string; 
       meta: "COMMAND",
     };
   }
+  if (command === "EXPORT") {
+    return {
+      text: "The offline Ghost export is available from the TRU surface. Use GHOST or /onboard to inspect the offline route, or download the Ghost from the export control.",
+      meta: "COMMAND",
+    };
+  }
   if (command === "A1") {
     return {
       text: [
