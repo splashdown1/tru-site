@@ -933,6 +933,9 @@
       "  KJV:       " + (Object.keys(KJV).length || 0).toLocaleString() + " verses (King James Bible)",
       "  Memory:    " + memCount + " remembered entries (local, mutable)",
       "  Primaries: " + lock,
+      "  Local state: " + ((window.__TRU_LOCAL_RECEIPTS__ && window.__TRU_LOCAL_RECEIPTS__.stateReset) ? "RESET / REPAIRED" : "VERIFIED / READY"),
+      "  Memory receipt: " + ((window.__TRU_LOCAL_RECEIPTS__ && window.__TRU_LOCAL_RECEIPTS__.memory && window.__TRU_LOCAL_RECEIPTS__.memory.verified) ? "verified" : "not verified"),
+      "  History receipt: " + ((window.__TRU_LOCAL_RECEIPTS__ && window.__TRU_LOCAL_RECEIPTS__.history && window.__TRU_LOCAL_RECEIPTS__.history.verified) ? "verified" : "not verified"),
       "  Baked:     " + (META.baked || "unknown"),
       "",
       "HOW TO RE-BAKE THIS GHOST",
@@ -1027,6 +1030,7 @@
       stateReset = true;
     }
     window.__TRU_LOCAL_RECEIPTS__ = { memory: memoryReceipt, history: historyReceipt, stateReset: stateReset };
+    renderLineage();
     document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
     document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
     document.getElementById("sub").textContent = META.brain.toLocaleString() + " source nodes · " + CLEAN_BRAIN.length.toLocaleString() + " clean nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
