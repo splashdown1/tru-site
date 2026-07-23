@@ -923,7 +923,7 @@
     document.querySelectorAll("[data-q]").forEach(function (button) { button.addEventListener("click", function () { sendChat(button.getAttribute("data-q")); }); });
     input.focus();
     var status = document.getElementById("status");
-    if (status) status.textContent = "● ONLINE • OFFLINE-READY";
+    if (status) status.textContent = "● OFFLINE • GHOST READY";
   }
 
   if (document.readyState === "loading") {
