@@ -1013,7 +1013,20 @@
     await hydrateLocalState();
     var memoryReceipt = await verifyLocalState("memory");
     var historyReceipt = await verifyLocalState("history");
-    window.__TRU_LOCAL_RECEIPTS__ = { memory: memoryReceipt, history: historyReceipt };
+    var stateReset = false;
+    if (memoryReceipt.present && !memoryReceipt.verified) {
+      localMemoryCache = legacyState(MEM_KEY);
+      await idbWrite("memory", localMemoryCache);
+      memoryReceipt = await verifyLocalState("memory");
+      stateReset = true;
+    }
+    if (historyReceipt.present && !historyReceipt.verified) {
+      localHistoryCache = legacyState(HISTORY_KEY);
+      await idbWrite("history", localHistoryCache);
+      historyReceipt = await verifyLocalState("history");
+      stateReset = true;
+    }
+    window.__TRU_LOCAL_RECEIPTS__ = { memory: memoryReceipt, history: historyReceipt, stateReset: stateReset };
     document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
     document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
     document.getElementById("sub").textContent = META.brain.toLocaleString() + " source nodes · " + CLEAN_BRAIN.length.toLocaleString() + " clean nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
@@ -1025,7 +1038,7 @@
     input.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); sendChat(); } });
     document.querySelectorAll("[data-q]").forEach(function (button) { button.addEventListener("click", function () { sendChat(button.getAttribute("data-q")); }); });
     input.focus();
-    if (status) status.textContent = "● OFFLINE • GHOST READY";
+    if (status) status.textContent = stateReset ? "● OFFLINE • GHOST READY • STATE RESET" : "● OFFLINE • GHOST READY";
   }
 
   if (document.readyState === "loading") {

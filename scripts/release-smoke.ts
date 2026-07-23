@@ -92,6 +92,8 @@ if (existsSync(ghostPath)) {
   check((html.match(/<script/gi) || []).length === 2, "Ghost script boundary count is not 2");
   check(!/<script[^>]+src=/i.test(html), "Ghost contains an external script tag");
   check(!/\bfetch\s*\(/.test(runtimeTemplate), "Ghost runtime template contains a network fetch call");
+  check(runtimeTemplate.includes("crypto.subtle.digest"), "Ghost lacks Web Crypto state verification");
+  check(runtimeTemplate.includes("__TRU_LOCAL_RECEIPTS__"), "Ghost lacks local state receipt reporting");
   check(html.includes("OFFLINE • GHOST READY"), "Ghost ready status is missing");
   check(html.includes("TRU_QUANTUM_RESEARCH"), "Ghost lacks the pinned quantum research source");
 }
