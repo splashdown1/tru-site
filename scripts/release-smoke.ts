@@ -62,6 +62,8 @@ const cases: Array<[string, (body: any) => boolean, string]> = [
   ["define ti", (body) => body.kind === "unknown" && body.blank === true && /more complete term/i.test(String(body.v)), "short definition gap"],
   ["define", (body) => body.kind === "unknown" && body.blank === true, "bare definition gap"],
   ["what is", (body) => body.kind === "unknown" && body.blank === true, "bare question gap"],
+  ["help", (body) => body.kind === "command" && /EXPORT/i.test(String(body.text)), "help command"],
+  ["export", (body) => body.kind === "command" && /offline Ghost export/i.test(String(body.text)), "export command"],
   ["what is grace?", (body) => /unmerited favour/i.test(String(body.v)) && body.grounded === true, "grace"],
   ["jn 3:16", (body) => body.kind === "scripture" && body.ref === "jn 3:16" && /everlasting life/i.test(String(body.text)), "scripture"],
   ["quantum chemistry", (body) => body.source === "TRU_QUANTUM_RESEARCH" && /quantum chemistry/i.test(String(body.v)), "quantum pack"],
