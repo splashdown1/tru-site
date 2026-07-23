@@ -269,7 +269,7 @@ export default function TruPublic() {
       <div className="tru-input-area">
         <div className="tru-status">{status}</div>
         <div className="tru-command-strip">
-          {COMMANDS.slice(0, 4).map((command) => (
+          {COMMANDS.map((command) => (
             <button key={command} type="button" onClick={() => send(command)} disabled={busy}>{command}</button>
           ))}
           <button type="button" className="tru-clear-button" onClick={clearChat} disabled={busy}>CLEAR</button>
