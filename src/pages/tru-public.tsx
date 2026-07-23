@@ -186,7 +186,10 @@ export default function TruPublic() {
       const response = await fetch(apiUrl("/api/tru/ask"), {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ q: query }),
+        body: JSON.stringify({
+          q: query,
+          history: messages.slice(-8).map(({ role, text }) => ({ role, text })),
+        }),
       });
       const answer = (await response.json()) as TruAnswer;
       const verdict = verdictFor(answer);

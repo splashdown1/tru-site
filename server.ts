@@ -1675,6 +1675,7 @@ async function onlineTruAnswer(q: string, local: Record<string, unknown> | null,
 type QuestionMode = "public" | "sovereign";
 
 type QuestionAnswer = Record<string, unknown>;
+type ConversationTurn = { role?: string; text?: string };
 
 function isUnresolvedAnswer(answer: QuestionAnswer): boolean {
   return answer.blank === true || answer.t === "UNKNOWN" || answer.grounded === false ||
@@ -1695,7 +1696,16 @@ function guardQuestionAnswer(q: string, raw: QuestionAnswer, mode: QuestionMode)
   return tripwireGuard(answer) || answer;
 }
 
-async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise<QuestionAnswer> {
+function followUpContextAnswer(q: string, history: ConversationTurn[]): QuestionAnswer | null {
+  const n = norm(q).replace(/[?!.]+$/g, "").trim();
+  if (!/^(what does that mean|what do you mean|explain that|say more|tell me more|go deeper|expand on that|what about that|and why|why)$/.test(n)) return null;
+  const previous = [...history].reverse().find((turn) => turn?.role === "tru" && typeof turn.text === "string" && turn.text.trim());
+  if (!previous?.text) return null;
+  const text = `That means: ${previous.text.trim().slice(0, 2400)}`;
+  return { ok: true, kind: "conversation", q, v: text, t: "CONTEXT", source: "TRU_CONVERSATION", grounded: true, score: 99 };
+}
+
+async function answerQuestion(q: string, mode: QuestionMode = "public", history: ConversationTurn[] = []): Promise<QuestionAnswer> {
   const command = parseTruCommand(q);
   if (command) return commandResponse(command);
 
@@ -1710,6 +1720,9 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 
   const parity = conversationalParityAnswer(q);
   if (parity) return guardQuestionAnswer(q, parity, mode);
+
+  const followUp = followUpContextAnswer(q, history);
+  if (followUp) return guardQuestionAnswer(q, followUp, mode);
 
   const incompleteDefinition = incompleteDefinitionAnswer(q);
   if (incompleteDefinition) return guardQuestionAnswer(q, incompleteDefinition, mode);
@@ -1778,11 +1791,12 @@ async function answerQuestion(q: string, mode: QuestionMode = "public"): Promise
 }
 
 app.post("/api/tru/ask", async (c) => {
-  let body: { q?: string } = {};
-  try { body = (await c.req.json()) as { q?: string }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
+  let body: { q?: string; history?: ConversationTurn[] } = {};
+  try { body = (await c.req.json()) as { q?: string; history?: ConversationTurn[] }; } catch { return c.json({ ok: false, error: "invalid json" }, 400); }
   const q = (body.q || "").trim();
   if (!q) return c.json({ ok: false, error: "empty query" }, 400);
-  return c.json(await answerQuestion(q, "public"));
+  const history = Array.isArray(body.history) ? body.history.slice(-8) : [];
+  return c.json(await answerQuestion(q, "public", history));
 });
 
 app.post("/api/tru/ask/sovereign", async (c) => {

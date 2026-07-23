@@ -18,11 +18,11 @@ async function get(path: string): Promise<{ status: number; body: any }> {
   return { status: response.status, body };
 }
 
-async function ask(query: string): Promise<{ status: number; body: any }> {
+async function ask(query: string, history?: Array<{ role: string; text: string }>): Promise<{ status: number; body: any }> {
   const response = await fetch(`${base}/api/tru/ask`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ q: query }),
+    body: JSON.stringify({ q: query, ...(history ? { history } : {}) }),
   });
   const text = await response.text();
   let body: any;
@@ -69,6 +69,11 @@ const cases: Array<[string, (body: any) => boolean, string]> = [
   ["quantum chemistry", (body) => body.source === "TRU_QUANTUM_RESEARCH" && /quantum chemistry/i.test(String(body.v)), "quantum pack"],
   ["what is a merkle tree?", (body) => body.kind === "web" && body.source === "WEB_SEARCH", "web fallback"],
 ];
+
+const grace = await ask("what is grace?");
+check(grace.status === 200 && /unmerited favour/i.test(String(grace.body?.v)), `follow-up seed failed: ${JSON.stringify(grace.body)}`);
+const followUp = await ask("what does that mean?", [{ role: "user", text: "what is grace?" }, { role: "tru", text: String(grace.body?.v || "") }]);
+check(followUp.status === 200 && followUp.body?.kind === "conversation" && followUp.body?.t === "CONTEXT" && /That means:/i.test(String(followUp.body?.v)), `follow-up failed: ${JSON.stringify(followUp.body)}`);
 
 for (const [query, predicate, label] of cases) {
   const result = await ask(query);
