@@ -71,7 +71,7 @@ function commandReply(command: string, stats: TruStats | null): { text: string; 
         "I am TRU.",
         "Truth is constant. Perspective is fluid.",
         "I answer from anchored knowledge rather than guess.",
-        "The model is the mouth. TRU is the spine, route, and gate.",
+        "Start with a verse, a doctrine question, or STATUS.",
       ].join("\n"),
       meta: "COMMAND",
     };
@@ -108,9 +108,8 @@ function commandReply(command: string, stats: TruStats | null): { text: string; 
   }
   return {
     text: [
-      "TRU STATUS",
-      stats?.brain ? `Brain nodes: ${stats.brain.toLocaleString()}` : "Brain nodes: online lookup",
-      stats?.kjv ? `KJV lookup keys: ${stats.kjv.toLocaleString()}` : "KJV lookup: available",
+      `Brain nodes: ${stats?.brain ? stats.brain.toLocaleString() : "online lookup"}`,
+      `KJV verses: ${stats?.kjv ? stats.kjv.toLocaleString() : "available"}`,
       "Online API: connected",
       "Offline Ghost: available from the online surface",
     ].join("\n"),
