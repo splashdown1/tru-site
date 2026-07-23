@@ -597,11 +597,18 @@
     };
   }
 
+  function localStateStatusLine() {
+    var receipts = window.__TRU_LOCAL_RECEIPTS__ || {};
+    var memory = receipts.memory && receipts.memory.verified ? "verified" : "fallback";
+    var history = receipts.history && receipts.history.verified ? "verified" : "fallback";
+    return "Local state: memory " + memory + " · history " + history;
+  }
+
   function conversationAnswer(query) {
     var n = norm(query).replace(/[?!.]+$/g, "").trim();
     if (n === "help") return { kind: "conversation", text: "Commands: HELP, INTRO, STATUS, CAPABILITIES, EXPORT. Ask Scripture by reference or ask a grounded question in plain language.", v: "Commands: HELP, INTRO, STATUS, CAPABILITIES, EXPORT. Ask Scripture by reference or ask a grounded question in plain language.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
     if (n === "intro") return { kind: "conversation", text: "I am TRU. Truth is constant. Perspective is fluid. I answer from anchored knowledge rather than guess.", v: "I am TRU. Truth is constant. Perspective is fluid. I answer from anchored knowledge rather than guess.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
-    if (n === "status") return { kind: "conversation", text: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready", v: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
+    if (n === "status") return { kind: "conversation", text: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready\n" + localStateStatusLine(), v: "TRU STATUS\nBrain nodes: " + CLEAN_BRAIN.length.toLocaleString() + "\nKJV lookup: " + Object.keys(KJV).length.toLocaleString() + " verses\nOffline Ghost: ready\n" + localStateStatusLine(), t: "COMMAND", source: "TRU_COMMAND", score: 99 };
     if (n === "capabilities") return { kind: "conversation", text: "Scripture lookup from the KJV; grounded brain retrieval; local browser memory; and an offline Ghost that runs from this file without network access.", v: "Scripture lookup from the KJV; grounded brain retrieval; local browser memory; and an offline Ghost that runs from this file without network access.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };    if (n === "export") return { kind: "conversation", text: "This file is already the offline Ghost. To create a fresh export, use the TRU online surface and its export control.", v: "This file is already the offline Ghost. To create a fresh export, use the TRU online surface and its export control.", t: "COMMAND", source: "TRU_COMMAND", score: 99 };
     if (/^(hello|hi|hey|hiya|greetings|good morning|good afternoon|good evening)$/.test(n)) return { kind: "conversation", text: "Hello. I am here and ready. What would you like to explore?", v: "Hello. I am here and ready. What would you like to explore?", t: "CONVERSATION", source: "TRU_CONVERSATION", score: 99 };
     if (/^(whats up|what s up|whats good|what s good)$/.test(n)) return { kind: "conversation", text: "There is good to pursue: truth, love, mercy, and the work before us. Name the question and I will search the brain and the Scripture.", v: "There is good to pursue: truth, love, mercy, and the work before us. Name the question and I will search the brain and the Scripture.", t: "CONVERSATION", source: "TRU_CONVERSATION", score: 99 };
