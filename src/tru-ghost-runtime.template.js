@@ -78,6 +78,14 @@
     return Array.from(new Uint8Array(buffer)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
   }
 
+  async function verifyLocalState(key) {
+    var value = await idbRead("state", key);
+    var receipt = await idbRead("receipts", key);
+    if (value == null || !receipt || !receipt.sha256) return { key: key, present: false, verified: false };
+    var checksum = await stateChecksum(value);
+    return { key: key, present: true, verified: checksum === receipt.sha256, sha256: checksum };
+  }
+
   async function idbWrite(key, value) {
     var db = await openLocalDb();
     if (!db) return;
@@ -1003,6 +1011,9 @@
     var status = document.getElementById("status");
     if (status) status.textContent = "● OFFLINE • LOADING LOCAL STATE";
     await hydrateLocalState();
+    var memoryReceipt = await verifyLocalState("memory");
+    var historyReceipt = await verifyLocalState("history");
+    window.__TRU_LOCAL_RECEIPTS__ = { memory: memoryReceipt, history: historyReceipt };
     document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
     document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
     document.getElementById("sub").textContent = META.brain.toLocaleString() + " source nodes · " + CLEAN_BRAIN.length.toLocaleString() + " clean nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
