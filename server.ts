@@ -289,7 +289,7 @@ const BOOK_ALIAS: Record<string, string> = {
   "1jn": "1jn", "1john": "1jn", "1jhn": "1jn",
   "2jn": "2jn", "2john": "2jn", "2jhn": "2jn",
   "3jn": "3jn", "3john": "3jn", "3jhn": "3jn",
-  jud: "jud", jude: "jud",
+  jud: "jd", jude: "jd",
   rev: "rev", revelation: "rev", ap: "rev",
 };
 
