@@ -32,11 +32,100 @@
   // entries persist in localStorage so the ghost remembers between
   // sessions on the same machine. Both layers are searched on every ask.
   const MEM_KEY = "tru_ghost_memory";
+  const HISTORY_KEY = "tru_ghost_history";
+  const IDB_NAME = "tru_ghost_state_v1";
+  const IDB_VERSION = 1;
+  var localMemoryCache = null;
+  var localHistoryCache = null;
+  var localDbPromise = null;
+
+  function openLocalDb() {
+    if (localDbPromise) return localDbPromise;
+    if (!window.indexedDB) return Promise.resolve(null);
+    localDbPromise = new Promise(function (resolve) {
+      var request;
+      try { request = window.indexedDB.open(IDB_NAME, IDB_VERSION); } catch { resolve(null); return; }
+      request.onupgradeneeded = function () {
+        var db = request.result;
+        if (!db.objectStoreNames.contains("state")) db.createObjectStore("state");
+        if (!db.objectStoreNames.contains("receipts")) db.createObjectStore("receipts");
+      };
+      request.onsuccess = function () { resolve(request.result); };
+      request.onerror = function () { resolve(null); };
+      request.onblocked = function () { resolve(null); };
+    });
+    return localDbPromise;
+  }
+
+  function idbRead(storeName, key) {
+    return openLocalDb().then(function (db) {
+      if (!db) return null;
+      return new Promise(function (resolve) {
+        try {
+          var tx = db.transaction(storeName, "readonly");
+          var request = tx.objectStore(storeName).get(key);
+          request.onsuccess = function () { resolve(request.result == null ? null : request.result); };
+          request.onerror = function () { resolve(null); };
+        } catch { resolve(null); }
+      });
+    });
+  }
+
+  async function stateChecksum(value) {
+    var encoded = new TextEncoder().encode(JSON.stringify(value));
+    if (!window.crypto || !window.crypto.subtle) return "";
+    var buffer = await window.crypto.subtle.digest("SHA-256", encoded);
+    return Array.from(new Uint8Array(buffer)).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
+  }
+
+  async function idbWrite(key, value) {
+    var db = await openLocalDb();
+    if (!db) return;
+    try {
+      var checksum = await stateChecksum(value);
+      await new Promise(function (resolve) {
+        var tx = db.transaction(["state", "receipts"], "readwrite");
+        tx.objectStore("state").put(value, key);
+        tx.objectStore("receipts").put({ key: key, sha256: checksum, updatedAt: new Date().toISOString() }, key);
+        tx.oncomplete = resolve;
+        tx.onerror = resolve;
+        tx.onabort = resolve;
+      });
+    } catch {}
+  }
+
+  function legacyState(key) {
+    try { return JSON.parse(localStorage.getItem(key) || "[]"); } catch { return []; }
+  }
+
+  async function hydrateLocalState() {
+    var memory = await idbRead("state", "memory");
+    var history = await idbRead("state", "history");
+    localMemoryCache = Array.isArray(memory) ? memory : legacyState(MEM_KEY);
+    localHistoryCache = Array.isArray(history) ? history : legacyState(HISTORY_KEY);
+    if (!Array.isArray(memory) && localMemoryCache.length) await idbWrite("memory", localMemoryCache);
+    if (!Array.isArray(history) && localHistoryCache.length) await idbWrite("history", localHistoryCache);
+  }
+
   function loadLocalMemory() {
-    try { return JSON.parse(localStorage.getItem(MEM_KEY) || "[]"); } catch { return []; }
+    if (Array.isArray(localMemoryCache)) return localMemoryCache;
+    localMemoryCache = legacyState(MEM_KEY);
+    return localMemoryCache;
   }
   function saveLocalMemory(entries) {
+    localMemoryCache = entries;
     try { localStorage.setItem(MEM_KEY, JSON.stringify(entries)); } catch {}
+    idbWrite("memory", entries);
+  }
+  function loadLocalHistory() {
+    if (Array.isArray(localHistoryCache)) return localHistoryCache;
+    localHistoryCache = legacyState(HISTORY_KEY);
+    return localHistoryCache;
+  }
+  function saveLocalHistory(entries) {
+    localHistoryCache = entries;
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(entries)); } catch {}
+    idbWrite("history", entries);
   }
   function allMemory() {
     return (BAKED_MEMORY.entries || []).concat(loadLocalMemory());
@@ -526,7 +615,7 @@
 
   function lastGroundedTopic() {
     try {
-      var history = JSON.parse(localStorage.getItem("tru_ghost_history") || "[]");
+      var history = loadLocalHistory();
       for (var i = history.length - 1; i >= 0; i--) {
         if (history[i] && history[i].topic) return history[i];
       }
@@ -536,9 +625,9 @@
 
   function rememberGroundedTopic(query, answer) {
     try {
-      var history = JSON.parse(localStorage.getItem("tru_ghost_history") || "[]");
+      var history = loadLocalHistory();
       history.push({ query: query, topic: answer && answer.k ? answer.k : query, answer: { text: answer && (answer.text || answer.v) || "", source: answer && answer.source || "TRU_LOGOS", nodes: answer && answer.nodes || [] }, ts: Date.now() });
-      localStorage.setItem("tru_ghost_history", JSON.stringify(history.slice(-20)));
+      saveLocalHistory(history.slice(-20));
     } catch {}
   }
 
@@ -910,7 +999,10 @@
     if (status) status.textContent = "● " + verdict + " • OFFLINE";
   }
 
-  function boot() {
+  async function boot() {
+    var status = document.getElementById("status");
+    if (status) status.textContent = "● OFFLINE • LOADING LOCAL STATE";
+    await hydrateLocalState();
     document.getElementById("statBrain").textContent = CLEAN_BRAIN.length.toLocaleString();
     document.getElementById("statKjv").textContent = Object.keys(KJV).length.toLocaleString();
     document.getElementById("sub").textContent = META.brain.toLocaleString() + " source nodes · " + CLEAN_BRAIN.length.toLocaleString() + " clean nodes · " + Object.keys(KJV).length.toLocaleString() + " verses";
@@ -922,13 +1014,12 @@
     input.addEventListener("keydown", function (event) { if (event.key === "Enter") { event.preventDefault(); sendChat(); } });
     document.querySelectorAll("[data-q]").forEach(function (button) { button.addEventListener("click", function () { sendChat(button.getAttribute("data-q")); }); });
     input.focus();
-    var status = document.getElementById("status");
     if (status) status.textContent = "● OFFLINE • GHOST READY";
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
+    document.addEventListener("DOMContentLoaded", function () { boot().catch(function () { var status = document.getElementById("status"); if (status) status.textContent = "● OFFLINE • GHOST READY"; }); });
   } else {
-    boot();
+    boot().catch(function () { var status = document.getElementById("status"); if (status) status.textContent = "● OFFLINE • GHOST READY"; });
   }
 })();
