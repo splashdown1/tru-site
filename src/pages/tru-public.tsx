@@ -38,7 +38,7 @@ const SUGGESTIONS = [
   "Psalm 23",
   "Faith without works",
 ];
-const COMMANDS = ["HELP", "INTRO", "STATUS", "CAPABILITIES"];
+const COMMANDS = ["HELP", "INTRO", "STATUS", "CAPABILITIES", "EXPORT"];
 
 function verdictFor(answer: TruAnswer): Verdict {
   if (answer.kind === "location") return "LOCATION";
@@ -57,7 +57,7 @@ function commandReply(command: string, stats: TruStats | null): { text: string; 
   if (command === "HELP") {
     return {
       text: [
-        "Commands: HELP, INTRO, STATUS, CAPABILITIES.",
+        "Commands: HELP, INTRO, STATUS, CAPABILITIES, EXPORT.",
         "Ask scripture by reference, for example John 3:16.",
         "Ask doctrine or truth questions in plain language.",
         "The core is offline-capable; the online surface adds web fallback.",
